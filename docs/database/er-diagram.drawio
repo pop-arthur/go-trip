@@ -1,0 +1,264 @@
+<mxfile host="app.diagrams.net" agent="ChatGPT">
+  <diagram id="goTripERD" name="goTrip ERD">
+    <mxGraphModel dx="1764" dy="1084" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1450" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="USERS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;USERS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;email : VARCHAR UNIQUE&lt;br/&gt;password_hash : VARCHAR&lt;br/&gt;full_name : VARCHAR&lt;br/&gt;created_at : TIMESTAMP&lt;br/&gt;updated_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="166.5" width="209" x="1031" y="950" as="geometry" />
+        </mxCell>
+        <mxCell id="TRIPS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;TRIPS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK user_id → USERS.id&lt;br/&gt;title : VARCHAR&lt;br/&gt;start_date : DATE&lt;br/&gt;end_date : DATE&lt;br/&gt;status : VARCHAR&lt;br/&gt;created_at : TIMESTAMP&lt;br/&gt;updated_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="205.75" x="1034.25" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="LOCATIONS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;LOCATIONS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;name : VARCHAR&lt;br/&gt;type : VARCHAR&lt;br/&gt;country : VARCHAR&lt;br/&gt;city : VARCHAR&lt;br/&gt;address : TEXT&lt;br/&gt;latitude : DECIMAL&lt;br/&gt;longitude : DECIMAL&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="160" x="1300" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="TRIP_LOCATIONS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;TRIP_LOCATIONS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK trip_id → TRIPS.id&lt;br/&gt;FK location_id → LOCATIONS.id&lt;br/&gt;visit_order : INT&lt;br/&gt;arrival_date : TIMESTAMP&lt;br/&gt;departure_date : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="160" width="219" x="970" y="135" as="geometry" />
+        </mxCell>
+        <mxCell id="PROVIDERS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;PROVIDERS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;name : VARCHAR&lt;br/&gt;type : VARCHAR&lt;br/&gt;website : VARCHAR&lt;br/&gt;support_contact : VARCHAR&lt;/div&gt;" vertex="1">
+          <mxGeometry height="146.5" width="199" x="1598.25" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="ORDERS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;ORDERS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK user_id → USERS.id&lt;br/&gt;FK trip_id → TRIPS.id&lt;br/&gt;FK provider_id → PROVIDERS.id&lt;br/&gt;service_type : VARCHAR&lt;br/&gt;external_order_id : VARCHAR&lt;br/&gt;title : VARCHAR&lt;br/&gt;status : VARCHAR&lt;br/&gt;price_amount : DECIMAL&lt;br/&gt;price_currency : VARCHAR&lt;br/&gt;start_datetime : TIMESTAMP&lt;br/&gt;end_datetime : TIMESTAMP&lt;br/&gt;FK departure_location_id → LOCATIONS.id&lt;br/&gt;FK arrival_location_id → LOCATIONS.id&lt;br/&gt;created_at : TIMESTAMP&lt;br/&gt;updated_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="420" width="284.5" x="1555.5" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="ORDER_FILES" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;ORDER_FILES&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK order_id → ORDERS.id&lt;br/&gt;file_url : VARCHAR&lt;br/&gt;file_type : VARCHAR&lt;br/&gt;parsed_data : JSONB&lt;br/&gt;uploaded_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="160" width="170" x="1960" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="ORDER_STATUS_EVENTS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;ORDER_STATUS_EVENTS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK order_id → ORDERS.id&lt;br/&gt;old_status : VARCHAR&lt;br/&gt;new_status : VARCHAR&lt;br/&gt;event_type : VARCHAR&lt;br/&gt;description : TEXT&lt;br/&gt;payload : JSONB&lt;br/&gt;source : VARCHAR&lt;br/&gt;created_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="205" width="220" x="1960" y="930" as="geometry" />
+        </mxCell>
+        <mxCell id="NOTIFICATION_PREFERENCES" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f5f5f5;strokeColor=#666666;align=center;verticalAlign=top;spacing=10;shadow=1;fontColor=#333333;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;NOTIFICATION_PREFERENCES&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK user_id → USERS.id&lt;br/&gt;channel : VARCHAR&lt;br/&gt;event_type : VARCHAR&lt;br/&gt;is_enabled : BOOLEAN&lt;/div&gt;" vertex="1">
+          <mxGeometry height="140" width="230" x="1230" y="1290" as="geometry" />
+        </mxCell>
+        <mxCell id="ADDITIONAL_SERVICES" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;ADDITIONAL_SERVICES&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;title : VARCHAR&lt;br/&gt;description : TEXT&lt;br/&gt;service_type : VARCHAR&lt;br/&gt;FK provider_id → PROVIDERS.id&lt;br/&gt;FK location_id → LOCATIONS.id&lt;br/&gt;price_amount : DECIMAL&lt;br/&gt;price_currency : VARCHAR&lt;br/&gt;is_active : BOOLEAN&lt;/div&gt;" vertex="1">
+          <mxGeometry height="210" width="240" x="1590" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="CROSS_SELL_RULES" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;CROSS_SELL_RULES&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;trigger_service_type : VARCHAR&lt;br/&gt;recommended_service_type : VARCHAR&lt;br/&gt;FK recommended_service_id → ADDITIONAL_SERVICES.id&lt;br/&gt;condition : JSONB&lt;br/&gt;priority : INT&lt;br/&gt;is_active : BOOLEAN&lt;/div&gt;" vertex="1">
+          <mxGeometry height="186.5" width="239" x="2080" y="111.75" as="geometry" />
+        </mxCell>
+        <mxCell id="REVIEWS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;REVIEWS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK user_id → USERS.id&lt;br/&gt;target_type : VARCHAR&lt;br/&gt;target_id : BIGINT&lt;br/&gt;rating : INT&lt;br/&gt;text : TEXT&lt;br/&gt;created_at : TIMESTAMP&lt;br/&gt;updated_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="200" x="680" y="1070" as="geometry" />
+        </mxCell>
+        <mxCell id="ACHIEVEMENTS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;ACHIEVEMENTS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;code : VARCHAR UNIQUE&lt;br/&gt;title : VARCHAR&lt;br/&gt;description : TEXT&lt;br/&gt;condition_type : VARCHAR&lt;br/&gt;condition_value : INT&lt;br/&gt;icon_url : VARCHAR&lt;/div&gt;" vertex="1">
+          <mxGeometry height="166.5" width="201" x="250" y="859.25" as="geometry" />
+        </mxCell>
+        <mxCell id="USER_ACHIEVEMENTS" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;USER_ACHIEVEMENTS&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK user_id → USERS.id&lt;br/&gt;FK achievement_id → ACHIEVEMENTS.id&lt;br/&gt;unlocked_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="131.75" width="280" x="540" y="876.63" as="geometry" />
+        </mxCell>
+        <mxCell id="USER_ROLES" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#1f1f1f;align=center;verticalAlign=top;spacing=10;shadow=1;" value="&lt;div style=&quot;font-size:14px&quot;&gt;&lt;b&gt;USER_ROLES&lt;/b&gt;&lt;/div&gt;&lt;hr size=&quot;1&quot;/&gt;&lt;div style=&quot;font-size:11px;line-height:1.45;text-align:left&quot;&gt;PK id : BIGINT&lt;br/&gt;FK user_id → USERS.id&lt;br/&gt;role : VARCHAR&lt;br/&gt;created_at : TIMESTAMP&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="190" x="980" y="1290" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="USERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="TRIPS" value="creates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1_src_card" parent="e1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e1_tgt_card" parent="e1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="TRIPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="ORDERS" value="contains">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3_src_card" parent="e3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3_tgt_card" parent="e3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="TRIPS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="TRIP_LOCATIONS" value="includes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4_src_card" parent="e4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4_tgt_card" parent="e4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="LOCATIONS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="TRIP_LOCATIONS" value="used in route">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5_src_card" parent="e5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5_tgt_card" parent="e5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="PROVIDERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="ORDERS" value="provides">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6_src_card" parent="e6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6_tgt_card" parent="e6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="ORDERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="ORDER_FILES" value="has files">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1960" y="720" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7_src_card" parent="e7" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7_tgt_card" parent="e7" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="ORDERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="ORDER_STATUS_EVENTS" value="has changes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8_src_card" parent="e8" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e8_tgt_card" parent="e8" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="USERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="NOTIFICATION_PREFERENCES" value="configures">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9_src_card" parent="e9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9_tgt_card" parent="e9" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="PROVIDERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="ADDITIONAL_SERVICES" value="offers">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10_src_card" parent="e10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10_tgt_card" parent="e10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="LOCATIONS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="ADDITIONAL_SERVICES" value="available at">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11_src_card" parent="e11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e11_tgt_card" parent="e11" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="ADDITIONAL_SERVICES" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="CROSS_SELL_RULES" value="recommended by">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12_src_card" parent="e12" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e12_tgt_card" parent="e12" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="USERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="REVIEWS" value="writes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13_src_card" parent="e13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e13_tgt_card" parent="e13" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="USERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="USER_ACHIEVEMENTS" value="unlocks">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14_src_card" parent="e14" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e14_tgt_card" parent="e14" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="ACHIEVEMENTS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="USER_ACHIEVEMENTS" value="awarded as">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15_src_card" parent="e15" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e15_tgt_card" parent="e15" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="USERS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#4d4d4d;strokeWidth=2;endArrow=none;startArrow=none;noEdgeStyle=1;orthogonal=1;" target="USER_ROLES" value="has role">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16_src_card" parent="e16" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.86" y="-0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e16_tgt_card" parent="e16" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;labelBackgroundColor=#ffffff;strokeColor=none;fillColor=#ffffff;" value="0..*" vertex="1">
+          <mxGeometry relative="1" x="0.86" y="0.18" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
