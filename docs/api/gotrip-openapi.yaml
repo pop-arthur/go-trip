@@ -1,0 +1,1471 @@
+openapi: 3.0.3
+info:
+  title: GoTrip REST API
+  version: 1.0.0
+  description: Swagger/OpenAPI documentation for the GoTrip Travel Assistant MVP. The API covers user registration/login, trips, locations, orders, uploaded files, push notification preferences, statistics, recommendations, reviews, achievements, and admin actions.
+servers:
+- url: http://localhost:8080/api/v1
+  description: Local development server
+security:
+- bearerAuth: []
+tags:
+- name: Auth
+  description: Registration, login and session management.
+- name: Users
+  description: Current user profile.
+- name: Trips
+  description: User trips.
+- name: Locations
+  description: Global and user-created locations.
+- name: Trip Locations
+  description: Route locations inside a trip.
+- name: Orders
+  description: Travel orders, bookings and current order status.
+- name: Order Files
+  description: Uploaded booking files, PDFs and screenshots.
+- name: Notifications
+  description: Push notification preferences.
+- name: Statistics
+  description: Post-trip analytics and upcoming trips.
+- name: Providers
+  description: Travel service providers.
+- name: Additional Services
+  description: Catalog of extra travel services.
+- name: Recommendations
+  description: Dynamic recommendations without stored stored recommendation rules.
+- name: Reviews
+  description: Reviews for providers, locations, orders and additional services.
+- name: Achievements
+  description: Gamification and unlocked achievements.
+- name: Admin
+  description: Administrative endpoints.
+paths:
+  "/auth/register":
+    "$ref": "./paths/auth.yaml#/paths/~1auth~1register"
+  "/auth/login":
+    "$ref": "./paths/auth.yaml#/paths/~1auth~1login"
+  "/auth/refresh":
+    "$ref": "./paths/auth.yaml#/paths/~1auth~1refresh"
+  "/auth/logout":
+    "$ref": "./paths/auth.yaml#/paths/~1auth~1logout"
+  "/users/me":
+    "$ref": "./paths/users.yaml#/paths/~1users~1me"
+  "/trips":
+    "$ref": "./paths/trips.yaml#/paths/~1trips"
+  "/trips/{tripId}":
+    "$ref": "./paths/trips.yaml#/paths/~1trips~1{tripId}"
+  "/locations":
+    "$ref": "./paths/locations.yaml#/paths/~1locations"
+  "/locations/{locationId}":
+    "$ref": "./paths/locations.yaml#/paths/~1locations~1{locationId}"
+  "/trips/{tripId}/locations":
+    "$ref": "./paths/trip-locations.yaml#/paths/~1trips~1{tripId}~1locations"
+  "/trips/{tripId}/locations/{tripLocationId}":
+    "$ref": "./paths/trip-locations.yaml#/paths/~1trips~1{tripId}~1locations~1{tripLocationId}"
+  "/trips/{tripId}/orders":
+    "$ref": "./paths/orders.yaml#/paths/~1trips~1{tripId}~1orders"
+  "/orders/{orderId}":
+    "$ref": "./paths/orders.yaml#/paths/~1orders~1{orderId}"
+  "/orders/{orderId}/status":
+    "$ref": "./paths/orders.yaml#/paths/~1orders~1{orderId}~1status"
+  "/orders/{orderId}/files":
+    "$ref": "./paths/order-files.yaml#/paths/~1orders~1{orderId}~1files"
+  "/orders/{orderId}/files/{fileId}":
+    "$ref": "./paths/order-files.yaml#/paths/~1orders~1{orderId}~1files~1{fileId}"
+  "/notification-preferences":
+    "$ref": "./paths/notifications.yaml#/paths/~1notification-preferences"
+  "/notification-preferences/{preferenceId}":
+    "$ref": "./paths/notifications.yaml#/paths/~1notification-preferences~1{preferenceId}"
+  "/statistics/countries":
+    "$ref": "./paths/statistics.yaml#/paths/~1statistics~1countries"
+  "/statistics/spending":
+    "$ref": "./paths/statistics.yaml#/paths/~1statistics~1spending"
+  "/statistics/upcoming-trips":
+    "$ref": "./paths/statistics.yaml#/paths/~1statistics~1upcoming-trips"
+  "/statistics/trip-durations":
+    "$ref": "./paths/statistics.yaml#/paths/~1statistics~1trip-durations"
+  "/providers":
+    "$ref": "./paths/providers.yaml#/paths/~1providers"
+  "/providers/{providerId}":
+    "$ref": "./paths/providers.yaml#/paths/~1providers~1{providerId}"
+  "/additional-services":
+    "$ref": "./paths/additional-services.yaml#/paths/~1additional-services"
+  "/additional-services/{serviceId}":
+    "$ref": "./paths/additional-services.yaml#/paths/~1additional-services~1{serviceId}"
+  "/trips/{tripId}/recommendations":
+    "$ref": "./paths/recommendations.yaml#/paths/~1trips~1{tripId}~1recommendations"
+  "/orders/{orderId}/recommendations":
+    "$ref": "./paths/recommendations.yaml#/paths/~1orders~1{orderId}~1recommendations"
+  "/reviews":
+    "$ref": "./paths/reviews.yaml#/paths/~1reviews"
+  "/reviews/{reviewId}":
+    "$ref": "./paths/reviews.yaml#/paths/~1reviews~1{reviewId}"
+  "/achievements":
+    "$ref": "./paths/achievements.yaml#/paths/~1achievements"
+  "/users/me/achievements":
+    "$ref": "./paths/achievements.yaml#/paths/~1users~1me~1achievements"
+  "/admin/orders/{orderId}/simulate-status-change":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1orders~1{orderId}~1simulate-status-change"
+  "/admin/providers":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1providers"
+  "/admin/providers/{providerId}":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1providers~1{providerId}"
+  "/admin/additional-services":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1additional-services"
+  "/admin/additional-services/{serviceId}":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1additional-services~1{serviceId}"
+  "/admin/achievements":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1achievements"
+  "/admin/achievements/{achievementId}":
+    "$ref": "./paths/admin.yaml#/paths/~1admin~1achievements~1{achievementId}"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TripId:
+      name: tripId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    LocationId:
+      name: locationId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    TripLocationId:
+      name: tripLocationId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    FileId:
+      name: fileId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ProviderId:
+      name: providerId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ServiceId:
+      name: serviceId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    AchievementId:
+      name: achievementId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PreferenceId:
+      name: preferenceId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    FromDate:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    ToDate:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: BAD_REQUEST
+            message: Request is malformed or contains invalid parameters.
+            details: 
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: UNAUTHORIZED
+            message: Authentication is required.
+            details: 
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: FORBIDDEN
+            message: You do not have permission to access this resource.
+            details: 
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: RESOURCE_NOT_FOUND
+            message: Resource was not found.
+            details: 
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: CONFLICT
+            message: Request conflicts with the current resource state.
+            details: 
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            "$ref": "#/components/schemas/ErrorResponse"
+          example:
+            code: VALIDATION_ERROR
+            message: Request validation failed.
+            details:
+              field: must not be blank
+  schemas:
+    Role:
+      type: string
+      enum:
+      - USER
+      - ADMIN
+    TripStatus:
+      type: string
+      enum:
+      - PLANNED
+      - ACTIVE
+      - COMPLETED
+      - CANCELLED
+    LocationType:
+      type: string
+      enum:
+      - COUNTRY
+      - CITY
+      - AIRPORT
+      - TRAIN_STATION
+      - BUS_STATION
+      - PORT
+      - HOTEL
+      - MEETING_POINT
+      - ATTRACTION
+      - OTHER
+    ServiceType:
+      type: string
+      enum:
+      - FLIGHT
+      - TRAIN
+      - BUS
+      - HOTEL
+      - TOUR
+      - CAR_RENTAL
+      - INSURANCE
+      - TAXI
+      - ESIM
+      - LOUNGE
+      - EXTRA_BAGGAGE
+      - OTHER
+    OrderStatus:
+      type: string
+      enum:
+      - PENDING_VERIFICATION
+      - CONFIRMED
+      - DELAYED
+      - CANCELLED
+      - COMPLETED
+      - REFUND_PENDING
+      - REFUNDED
+    FileType:
+      type: string
+      enum:
+      - PDF
+      - IMAGE
+      - EMAIL
+      - JSON
+      - OTHER
+    NotificationChannel:
+      type: string
+      enum:
+      - PUSH
+    NotificationEventType:
+      type: string
+      enum:
+      - CANCELLATION
+      - DELAY
+      - GATE_CHANGE
+      - REFUND
+      - CHECKIN_REMINDER
+      - BAGGAGE_CLAIM
+      - TIME_CHANGE
+    ProviderType:
+      type: string
+      enum:
+      - AIRLINE
+      - HOTEL
+      - TOUR_COMPANY
+      - TRANSPORT_COMPANY
+      - BOOKING_PLATFORM
+      - INSURANCE_COMPANY
+      - OTHER
+    ReviewTargetType:
+      type: string
+      enum:
+      - PROVIDER
+      - LOCATION
+      - ORDER
+      - ADDITIONAL_SERVICE
+    AchievementConditionType:
+      type: string
+      enum:
+      - TRIPS_COUNT
+      - COUNTRIES_COUNT
+      - ORDERS_COUNT
+      - REVIEWS_COUNT
+      - SPENDING_AMOUNT
+    ErrorResponse:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: ERROR_CODE
+        message:
+          type: string
+          example: Human-readable error message.
+        details:
+          type: object
+          additionalProperties: true
+          nullable: true
+    User:
+      type: object
+      required:
+      - id
+      - email
+      - roles
+      - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+          example: traveler@example.com
+        full_name:
+          type: string
+          nullable: true
+          example: Arthur Popov
+        roles:
+          type: array
+          items:
+            "$ref": "#/components/schemas/Role"
+          example:
+          - USER
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+    UserUpdateRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: new-email@example.com
+        full_name:
+          type: string
+          example: Arthur Popov
+    RegisterRequest:
+      type: object
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: traveler@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: strongPassword123
+        full_name:
+          type: string
+          example: Arthur Popov
+    LoginRequest:
+      type: object
+      required:
+      - email
+      - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: traveler@example.com
+        password:
+          type: string
+          format: password
+          example: strongPassword123
+    RefreshRequest:
+      type: object
+      required:
+      - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+    AuthResponse:
+      type: object
+      required:
+      - access_token
+      - refresh_token
+      - token_type
+      - user
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        token_type:
+          type: string
+          example: Bearer
+        user:
+          "$ref": "#/components/schemas/User"
+    Trip:
+      type: object
+      required:
+      - id
+      - user_id
+      - title
+      - status
+      - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        title:
+          type: string
+          example: Vietnam 2026
+        start_date:
+          type: string
+          format: date
+          nullable: true
+          example: '2026-06-10'
+        end_date:
+          type: string
+          format: date
+          nullable: true
+          example: '2026-06-20'
+        status:
+          "$ref": "#/components/schemas/TripStatus"
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+    TripCreateRequest:
+      type: object
+      required:
+      - title
+      properties:
+        title:
+          type: string
+          example: Vietnam 2026
+        start_date:
+          type: string
+          format: date
+          example: '2026-06-10'
+        end_date:
+          type: string
+          format: date
+          example: '2026-06-20'
+        status:
+          "$ref": "#/components/schemas/TripStatus"
+    TripUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Vietnam 2026
+        start_date:
+          type: string
+          format: date
+          example: '2026-06-10'
+        end_date:
+          type: string
+          format: date
+          example: '2026-06-20'
+        status:
+          "$ref": "#/components/schemas/TripStatus"
+    Location:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Noi Bai International Airport
+        type:
+          "$ref": "#/components/schemas/LocationType"
+        country:
+          type: string
+          nullable: true
+          example: Vietnam
+        city:
+          type: string
+          nullable: true
+          example: Hanoi
+        address:
+          type: string
+          nullable: true
+          example: Phu Minh, Soc Son, Hanoi
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 21.2187
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 105.8042
+    LocationCreateRequest:
+      type: object
+      required:
+      - name
+      - type
+      properties:
+        name:
+          type: string
+          example: Noi Bai International Airport
+        type:
+          "$ref": "#/components/schemas/LocationType"
+        country:
+          type: string
+          example: Vietnam
+        city:
+          type: string
+          example: Hanoi
+        address:
+          type: string
+          example: Phu Minh, Soc Son, Hanoi
+        latitude:
+          type: number
+          format: double
+          example: 21.2187
+        longitude:
+          type: number
+          format: double
+          example: 105.8042
+    LocationUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Noi Bai International Airport
+        type:
+          "$ref": "#/components/schemas/LocationType"
+        country:
+          type: string
+          example: Vietnam
+        city:
+          type: string
+          example: Hanoi
+        address:
+          type: string
+          example: Phu Minh, Soc Son, Hanoi
+        latitude:
+          type: number
+          format: double
+          example: 21.2187
+        longitude:
+          type: number
+          format: double
+          example: 105.8042
+    TripLocation:
+      type: object
+      required:
+      - id
+      - trip_id
+      - location_id
+      - visit_order
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        trip_id:
+          type: integer
+          format: int64
+          example: 1
+        location_id:
+          type: integer
+          format: int64
+          example: 1
+        visit_order:
+          type: integer
+          example: 1
+        arrival_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-10T10:00:00Z'
+        departure_date:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-12T18:00:00Z'
+    TripLocationCreateRequest:
+      type: object
+      required:
+      - location_id
+      properties:
+        location_id:
+          type: integer
+          format: int64
+          example: 1
+        visit_order:
+          type: integer
+          example: 1
+        arrival_date:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        departure_date:
+          type: string
+          format: date-time
+          example: '2026-06-12T18:00:00Z'
+    TripLocationUpdateRequest:
+      type: object
+      properties:
+        visit_order:
+          type: integer
+          example: 2
+        arrival_date:
+          type: string
+          format: date-time
+          example: '2026-06-11T10:00:00Z'
+        departure_date:
+          type: string
+          format: date-time
+          example: '2026-06-13T18:00:00Z'
+    Provider:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: Vietnam Airlines
+        type:
+          "$ref": "#/components/schemas/ProviderType"
+        website:
+          type: string
+          format: uri
+          nullable: true
+          example: https://www.vietnamairlines.com
+        support_contact:
+          type: string
+          nullable: true
+          example: "+84 24 3832 0320"
+    ProviderCreateRequest:
+      type: object
+      required:
+      - name
+      - type
+      properties:
+        name:
+          type: string
+          example: Vietnam Airlines
+        type:
+          "$ref": "#/components/schemas/ProviderType"
+        website:
+          type: string
+          format: uri
+          example: https://www.vietnamairlines.com
+        support_contact:
+          type: string
+          example: "+84 24 3832 0320"
+    ProviderUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Vietnam Airlines
+        type:
+          "$ref": "#/components/schemas/ProviderType"
+        website:
+          type: string
+          format: uri
+          example: https://www.vietnamairlines.com
+        support_contact:
+          type: string
+          example: "+84 24 3832 0320"
+    Order:
+      type: object
+      required:
+      - id
+      - user_id
+      - trip_id
+      - service_type
+      - title
+      - status
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        trip_id:
+          type: integer
+          format: int64
+          example: 1
+        provider_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 3
+        service_type:
+          "$ref": "#/components/schemas/ServiceType"
+        external_order_id:
+          type: string
+          nullable: true
+          example: VN123456
+        title:
+          type: string
+          example: Flight Hanoi to Bangkok
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        price_amount:
+          type: number
+          format: double
+          nullable: true
+          example: 129.99
+        price_currency:
+          type: string
+          nullable: true
+          example: USD
+        start_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-10T12:00:00Z'
+        end_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-10T14:00:00Z'
+        departure_location_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 10
+        arrival_location_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 11
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+    OrderCreateRequest:
+      type: object
+      required:
+      - service_type
+      - title
+      properties:
+        provider_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 3
+        service_type:
+          "$ref": "#/components/schemas/ServiceType"
+        external_order_id:
+          type: string
+          example: VN123456
+        title:
+          type: string
+          example: Flight Hanoi to Bangkok
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        price_amount:
+          type: number
+          format: double
+          example: 129.99
+        price_currency:
+          type: string
+          example: USD
+        start_datetime:
+          type: string
+          format: date-time
+          example: '2026-06-10T12:00:00Z'
+        end_datetime:
+          type: string
+          format: date-time
+          example: '2026-06-10T14:00:00Z'
+        departure_location_id:
+          type: integer
+          format: int64
+          example: 10
+        arrival_location_id:
+          type: integer
+          format: int64
+          example: 11
+    OrderUpdateRequest:
+      type: object
+      properties:
+        provider_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 3
+        service_type:
+          "$ref": "#/components/schemas/ServiceType"
+        external_order_id:
+          type: string
+          example: VN123456
+        title:
+          type: string
+          example: Flight Hanoi to Bangkok
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        price_amount:
+          type: number
+          format: double
+          example: 129.99
+        price_currency:
+          type: string
+          example: USD
+        start_datetime:
+          type: string
+          format: date-time
+          example: '2026-06-10T12:00:00Z'
+        end_datetime:
+          type: string
+          format: date-time
+          example: '2026-06-10T14:00:00Z'
+        departure_location_id:
+          type: integer
+          format: int64
+          example: 10
+        arrival_location_id:
+          type: integer
+          format: int64
+          example: 11
+    OrderStatusUpdateRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        reason:
+          type: string
+          nullable: true
+          example: Flight delayed by 2 hours
+        new_start_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-10T14:00:00Z'
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+          example:
+            delay_minutes: 120
+    AdminSimulateStatusChangeRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          "$ref": "#/components/schemas/OrderStatus"
+        reason:
+          type: string
+          nullable: true
+          example: Flight delayed by 2 hours
+        new_start_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-06-10T14:00:00Z'
+        payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+          example:
+            delay_minutes: 120
+    OrderFile:
+      type: object
+      required:
+      - id
+      - order_id
+      - file_url
+      - file_type
+      - uploaded_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        order_id:
+          type: integer
+          format: int64
+          example: 1
+        file_url:
+          type: string
+          format: uri
+          example: https://cdn.gotrip.example.com/orders/1/ticket.pdf
+        file_type:
+          "$ref": "#/components/schemas/FileType"
+        parsed_data:
+          type: object
+          additionalProperties: true
+          nullable: true
+        uploaded_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+    OrderFileUploadResponse:
+      allOf:
+      - "$ref": "#/components/schemas/OrderFile"
+    NotificationPreference:
+      type: object
+      required:
+      - id
+      - user_id
+      - channel
+      - event_type
+      - is_enabled
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        channel:
+          "$ref": "#/components/schemas/NotificationChannel"
+        event_type:
+          "$ref": "#/components/schemas/NotificationEventType"
+        is_enabled:
+          type: boolean
+          example: true
+    NotificationPreferenceUpdateItem:
+      type: object
+      required:
+      - channel
+      - event_type
+      - is_enabled
+      properties:
+        channel:
+          "$ref": "#/components/schemas/NotificationChannel"
+        event_type:
+          "$ref": "#/components/schemas/NotificationEventType"
+        is_enabled:
+          type: boolean
+          example: true
+    NotificationPreferencesUpdateRequest:
+      type: object
+      required:
+      - preferences
+      properties:
+        preferences:
+          type: array
+          items:
+            "$ref": "#/components/schemas/NotificationPreferenceUpdateItem"
+    NotificationPreferencePatchRequest:
+      type: object
+      required:
+      - is_enabled
+      properties:
+        is_enabled:
+          type: boolean
+          example: false
+    AdditionalService:
+      type: object
+      required:
+      - id
+      - title
+      - service_type
+      - is_active
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        title:
+          type: string
+          example: Airport transfer
+        description:
+          type: string
+          nullable: true
+          example: Private taxi from airport to hotel.
+        service_type:
+          "$ref": "#/components/schemas/ServiceType"
+        provider_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 3
+        location_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 15
+        price_amount:
+          type: number
+          format: double
+          nullable: true
+          example: 25
+        price_currency:
+          type: string
+          nullable: true
+          example: USD
+        is_active:
+          type: boolean
+          example: true
+    AdditionalServiceCreateRequest:
+      type: object
+      required:
+      - title
+      - service_type
+      properties:
+        title:
+          type: string
+          example: Airport transfer
+        description:
+          type: string
+          example: Private taxi from airport to hotel.
+        service_type:
+          "$ref": "#/components/schemas/ServiceType"
+        provider_id:
+          type: integer
+          format: int64
+          example: 3
+        location_id:
+          type: integer
+          format: int64
+          example: 15
+        price_amount:
+          type: number
+          format: double
+          example: 25
+        price_currency:
+          type: string
+          example: USD
+        is_active:
+          type: boolean
+          example: true
+    AdditionalServiceUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Airport transfer
+        description:
+          type: string
+          example: Private taxi from airport to hotel.
+        service_type:
+          "$ref": "#/components/schemas/ServiceType"
+        provider_id:
+          type: integer
+          format: int64
+          example: 3
+        location_id:
+          type: integer
+          format: int64
+          example: 15
+        price_amount:
+          type: number
+          format: double
+          example: 25
+        price_currency:
+          type: string
+          example: USD
+        is_active:
+          type: boolean
+          example: true
+    Recommendation:
+      type: object
+      required:
+      - service
+      - reason
+      properties:
+        service:
+          "$ref": "#/components/schemas/AdditionalService"
+        reason:
+          type: string
+          example: Recommended because your trip arrives at an airport.
+        score:
+          type: number
+          format: double
+          example: 0.87
+    Review:
+      type: object
+      required:
+      - id
+      - user_id
+      - target_type
+      - target_id
+      - rating
+      - created_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        target_type:
+          "$ref": "#/components/schemas/ReviewTargetType"
+        target_id:
+          type: integer
+          format: int64
+          example: 1
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        text:
+          type: string
+          nullable: true
+          example: Great service and clear instructions.
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+    ReviewCreateRequest:
+      type: object
+      required:
+      - target_type
+      - target_id
+      - rating
+      properties:
+        target_type:
+          "$ref": "#/components/schemas/ReviewTargetType"
+        target_id:
+          type: integer
+          format: int64
+          example: 1
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        text:
+          type: string
+          example: Great service and clear instructions.
+    ReviewUpdateRequest:
+      type: object
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 4
+        text:
+          type: string
+          example: Updated review text.
+    Achievement:
+      type: object
+      required:
+      - id
+      - code
+      - title
+      - condition_type
+      - condition_value
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        code:
+          type: string
+          example: FIRST_TRIP
+        title:
+          type: string
+          example: First Trip
+        description:
+          type: string
+          nullable: true
+          example: Complete your first trip.
+        condition_type:
+          "$ref": "#/components/schemas/AchievementConditionType"
+        condition_value:
+          type: integer
+          example: 1
+        icon_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://cdn.gotrip.example.com/icons/first-trip.svg
+    AchievementCreateRequest:
+      type: object
+      required:
+      - code
+      - title
+      - condition_type
+      - condition_value
+      properties:
+        code:
+          type: string
+          example: FIRST_TRIP
+        title:
+          type: string
+          example: First Trip
+        description:
+          type: string
+          example: Complete your first trip.
+        condition_type:
+          "$ref": "#/components/schemas/AchievementConditionType"
+        condition_value:
+          type: integer
+          example: 1
+        icon_url:
+          type: string
+          format: uri
+          example: https://cdn.gotrip.example.com/icons/first-trip.svg
+    AchievementUpdateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          example: FIRST_TRIP
+        title:
+          type: string
+          example: First Trip
+        description:
+          type: string
+          example: Complete your first trip.
+        condition_type:
+          "$ref": "#/components/schemas/AchievementConditionType"
+        condition_value:
+          type: integer
+          example: 1
+        icon_url:
+          type: string
+          format: uri
+          example: https://cdn.gotrip.example.com/icons/first-trip.svg
+    UserAchievement:
+      type: object
+      required:
+      - id
+      - user_id
+      - achievement_id
+      - unlocked_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        achievement_id:
+          type: integer
+          format: int64
+          example: 1
+        unlocked_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+    CountriesStatisticsResponse:
+      type: object
+      required:
+      - period
+      - countries_count
+      - countries
+      properties:
+        period:
+          type: string
+          example: YEAR
+        countries_count:
+          type: integer
+          example: 4
+        countries:
+          type: array
+          items:
+            type: string
+          example:
+          - Vietnam
+          - Thailand
+          - Japan
+          - China
+    SpendingStatisticsResponse:
+      type: object
+      required:
+      - total_amount
+      - currency
+      - items
+      properties:
+        total_amount:
+          type: number
+          format: double
+          example: 820.5
+        currency:
+          type: string
+          example: USD
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - trip_id
+            - trip_title
+            - amount
+            properties:
+              trip_id:
+                type: integer
+                format: int64
+                example: 1
+              trip_title:
+                type: string
+                example: Vietnam 2026
+              amount:
+                type: number
+                format: double
+                example: 420.5
+    UpcomingTripsResponse:
+      type: object
+      required:
+      - trips
+      properties:
+        trips:
+          type: array
+          items:
+            type: object
+            required:
+            - trip
+            - duration_days
+            properties:
+              trip:
+                "$ref": "#/components/schemas/Trip"
+              duration_days:
+                type: integer
+                example: 10
+    TripDurationsResponse:
+      type: object
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - trip_id
+            - trip_title
+            - duration_days
+            - duration_hours
+            properties:
+              trip_id:
+                type: integer
+                format: int64
+                example: 1
+              trip_title:
+                type: string
+                example: Vietnam 2026
+              duration_days:
+                type: integer
+                example: 10
+              duration_hours:
+                type: integer
+                example: 240

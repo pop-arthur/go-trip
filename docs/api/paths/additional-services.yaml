@@ -1,0 +1,52 @@
+paths:
+  "/additional-services":
+    get:
+      tags:
+      - Additional Services
+      summary: List additional services
+      operationId: listAdditionalServices
+      parameters:
+      - name: serviceType
+        in: query
+        schema:
+          "$ref": "../gotrip-openapi.yaml#/components/schemas/ServiceType"
+      - name: locationId
+        in: query
+        schema:
+          type: integer
+          format: int64
+      - name: providerId
+        in: query
+        schema:
+          type: integer
+          format: int64
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "../gotrip-openapi.yaml#/components/schemas/AdditionalService"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+  "/additional-services/{serviceId}":
+    get:
+      tags:
+      - Additional Services
+      summary: Get additional service by ID
+      operationId: getAdditionalService
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/ServiceId"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/AdditionalService"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"

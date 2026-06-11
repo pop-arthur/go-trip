@@ -1,0 +1,267 @@
+paths:
+  "/admin/orders/{orderId}/simulate-status-change":
+    post:
+      tags:
+      - Admin
+      summary: Simulate order status change
+      operationId: simulateOrderStatusChange
+      description: Admin-only endpoint for testing status changes and notification flow. It updates the current order status.
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/AdminSimulateStatusChangeRequest"
+      responses:
+        '200':
+          description: Order status simulated
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Order"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/admin/providers":
+    post:
+      tags:
+      - Admin
+      summary: Create provider
+      operationId: adminCreateProvider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/ProviderCreateRequest"
+      responses:
+        '201':
+          description: Provider created
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Provider"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/admin/providers/{providerId}":
+    patch:
+      tags:
+      - Admin
+      summary: Update provider
+      operationId: adminUpdateProvider
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/ProviderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/ProviderUpdateRequest"
+      responses:
+        '200':
+          description: Provider updated
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Provider"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+    delete:
+      tags:
+      - Admin
+      summary: Delete provider
+      operationId: adminDeleteProvider
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/ProviderId"
+      responses:
+        '204':
+          description: Provider deleted
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+  "/admin/additional-services":
+    post:
+      tags:
+      - Admin
+      summary: Create additional service
+      operationId: adminCreateAdditionalService
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/AdditionalServiceCreateRequest"
+      responses:
+        '201':
+          description: Additional service created
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/AdditionalService"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/admin/additional-services/{serviceId}":
+    patch:
+      tags:
+      - Admin
+      summary: Update additional service
+      operationId: adminUpdateAdditionalService
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/ServiceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/AdditionalServiceUpdateRequest"
+      responses:
+        '200':
+          description: Additional service updated
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/AdditionalService"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+    delete:
+      tags:
+      - Admin
+      summary: Delete additional service
+      operationId: adminDeleteAdditionalService
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/ServiceId"
+      responses:
+        '204':
+          description: Additional service deleted
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+  "/admin/achievements":
+    post:
+      tags:
+      - Admin
+      summary: Create achievement
+      operationId: adminCreateAchievement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/AchievementCreateRequest"
+      responses:
+        '201':
+          description: Achievement created
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Achievement"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/admin/achievements/{achievementId}":
+    patch:
+      tags:
+      - Admin
+      summary: Update achievement
+      operationId: adminUpdateAchievement
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/AchievementId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/AchievementUpdateRequest"
+      responses:
+        '200':
+          description: Achievement updated
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Achievement"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+    delete:
+      tags:
+      - Admin
+      summary: Delete achievement
+      operationId: adminDeleteAchievement
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/AchievementId"
+      responses:
+        '204':
+          description: Achievement deleted
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"

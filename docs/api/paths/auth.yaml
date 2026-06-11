@@ -1,0 +1,87 @@
+paths:
+  "/auth/register":
+    post:
+      tags:
+      - Auth
+      summary: Register a new user
+      operationId: registerUser
+      description: Creates a regular user account. Admin accounts are not created through public registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/RegisterRequest"
+      responses:
+        '201':
+          description: User registered
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/AuthResponse"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+      security: []
+  "/auth/login":
+    post:
+      tags:
+      - Auth
+      summary: Login user or admin
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/LoginRequest"
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/AuthResponse"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+      security: []
+  "/auth/refresh":
+    post:
+      tags:
+      - Auth
+      summary: Refresh access token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/RefreshRequest"
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/AuthResponse"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+      security: []
+  "/auth/logout":
+    post:
+      tags:
+      - Auth
+      summary: Logout current user
+      operationId: logout
+      responses:
+        '204':
+          description: Logged out
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"

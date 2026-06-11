@@ -1,0 +1,170 @@
+paths:
+  "/trips/{tripId}/orders":
+    get:
+      tags:
+      - Orders
+      summary: List orders in trip
+      operationId: listTripOrders
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/TripId"
+      - name: serviceType
+        in: query
+        schema:
+          "$ref": "../gotrip-openapi.yaml#/components/schemas/ServiceType"
+        required: false
+      - name: status
+        in: query
+        schema:
+          "$ref": "../gotrip-openapi.yaml#/components/schemas/OrderStatus"
+        required: false
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/FromDate"
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/ToDate"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "../gotrip-openapi.yaml#/components/schemas/Order"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+    post:
+      tags:
+      - Orders
+      summary: Create order manually
+      operationId: createOrder
+      description: Creates an order manually and links it to an existing trip.
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/TripId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/OrderCreateRequest"
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Order"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/orders/{orderId}":
+    get:
+      tags:
+      - Orders
+      summary: Get order by ID
+      operationId: getOrder
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/OrderId"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Order"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+    patch:
+      tags:
+      - Orders
+      summary: Update order
+      operationId: updateOrder
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/OrderUpdateRequest"
+      responses:
+        '200':
+          description: Order updated
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Order"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '409':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+    delete:
+      tags:
+      - Orders
+      summary: Delete order
+      operationId: deleteOrder
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/OrderId"
+      responses:
+        '204':
+          description: Order deleted
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+  "/orders/{orderId}/status":
+    patch:
+      tags:
+      - Orders
+      summary: Update order status
+      operationId: updateOrderStatus
+      description: Updates current orders.status and triggers push notification flow if user preferences allow it.
+      parameters:
+      - "$ref": "../gotrip-openapi.yaml#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/OrderStatusUpdateRequest"
+      responses:
+        '200':
+          description: Order status updated
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/Order"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
+        '403':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
+        '404':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
+        '422':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
