@@ -4,3 +4,4 @@
 /project/target/
 /target/
 /target/scala-3.3.7/classes/
+.DS_Store
