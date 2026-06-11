@@ -40,14 +40,12 @@ Main fields:
 
 Stores per-user notification settings.
 
-Each row represents whether a user wants to receive a specific event type through a specific channel. For the current API, the supported channel is `PUSH`.
+Each row represents whether a user wants to receive the notification. For the current API, the supported channel is `PUSH`.
 
 Main fields:
 
 - `id` - primary key.
 - `user_id` - references `USERS.id`.
-- `channel` - notification channel, for example `PUSH`.
-- `event_type` - notification event, such as `DELAY`, `CANCELLATION`, `GATE_CHANGE`, `REFUND`, `CHECKIN_REMINDER`, `BAGGAGE_CLAIM`, or `TIME_CHANGE`.
 - `is_enabled` - whether this preference is active.
 
 ### `TRIPS`
