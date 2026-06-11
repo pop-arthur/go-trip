@@ -3,59 +3,28 @@ paths:
     get:
       tags:
       - Notifications
-      summary: Get notification preferences
-      operationId: getNotificationPreferences
+      summary: Get notification preference
+      operationId: getNotificationPreference
       responses:
         '200':
           description: Successful response
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  "$ref": "../gotrip-openapi.yaml#/components/schemas/NotificationPreference"
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/NotificationPreference"
         '401':
           "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
     put:
       tags:
       - Notifications
-      summary: Replace notification preferences
-      operationId: replaceNotificationPreferences
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "../gotrip-openapi.yaml#/components/schemas/NotificationPreferencesUpdateRequest"
-      responses:
-        '200':
-          description: Preferences updated
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  "$ref": "../gotrip-openapi.yaml#/components/schemas/NotificationPreference"
-        '400':
-          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
-        '401':
-          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
-        '422':
-          "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
-  "/notification-preferences/{preferenceId}":
-    patch:
-      tags:
-      - Notifications
-      summary: Update one notification preference
+      summary: Update notification preference
       operationId: updateNotificationPreference
-      parameters:
-      - "$ref": "../gotrip-openapi.yaml#/components/parameters/PreferenceId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "../gotrip-openapi.yaml#/components/schemas/NotificationPreferencePatchRequest"
+              "$ref": "../gotrip-openapi.yaml#/components/schemas/NotificationPreferenceUpdateRequest"
       responses:
         '200':
           description: Preference updated
@@ -67,9 +36,5 @@ paths:
           "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
         '401':
           "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
-        '403':
-          "$ref": "../gotrip-openapi.yaml#/components/responses/Forbidden"
-        '404':
-          "$ref": "../gotrip-openapi.yaml#/components/responses/NotFound"
         '422':
           "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
