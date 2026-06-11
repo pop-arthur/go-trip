@@ -74,8 +74,6 @@ paths:
     "$ref": "./paths/order-files.yaml#/paths/~1orders~1{orderId}~1files~1{fileId}"
   "/notification-preferences":
     "$ref": "./paths/notifications.yaml#/paths/~1notification-preferences"
-  "/notification-preferences/{preferenceId}":
-    "$ref": "./paths/notifications.yaml#/paths/~1notification-preferences~1{preferenceId}"
   "/statistics/countries":
     "$ref": "./paths/statistics.yaml#/paths/~1statistics~1countries"
   "/statistics/spending":
@@ -183,13 +181,6 @@ components:
         format: int64
     AchievementId:
       name: achievementId
-      in: path
-      required: true
-      schema:
-        type: integer
-        format: int64
-    PreferenceId:
-      name: preferenceId
       in: path
       required: true
       schema:
@@ -330,20 +321,6 @@ components:
       - EMAIL
       - JSON
       - OTHER
-    NotificationChannel:
-      type: string
-      enum:
-      - PUSH
-    NotificationEventType:
-      type: string
-      enum:
-      - CANCELLATION
-      - DELAY
-      - GATE_CHANGE
-      - REFUND
-      - CHECKIN_REMINDER
-      - BAGGAGE_CLAIM
-      - TIME_CHANGE
     ProviderType:
       type: string
       enum:
@@ -1021,8 +998,6 @@ components:
       required:
       - id
       - user_id
-      - channel
-      - event_type
       - is_enabled
       properties:
         id:
@@ -1033,44 +1008,9 @@ components:
           type: integer
           format: int64
           example: 1
-        channel:
-          "$ref": "#/components/schemas/NotificationChannel"
-        event_type:
-          "$ref": "#/components/schemas/NotificationEventType"
         is_enabled:
           type: boolean
           example: true
-    NotificationPreferenceUpdateItem:
-      type: object
-      required:
-      - channel
-      - event_type
-      - is_enabled
-      properties:
-        channel:
-          "$ref": "#/components/schemas/NotificationChannel"
-        event_type:
-          "$ref": "#/components/schemas/NotificationEventType"
-        is_enabled:
-          type: boolean
-          example: true
-    NotificationPreferencesUpdateRequest:
-      type: object
-      required:
-      - preferences
-      properties:
-        preferences:
-          type: array
-          items:
-            "$ref": "#/components/schemas/NotificationPreferenceUpdateItem"
-    NotificationPreferencePatchRequest:
-      type: object
-      required:
-      - is_enabled
-      properties:
-        is_enabled:
-          type: boolean
-          example: false
     AdditionalService:
       type: object
       required:
@@ -1469,3 +1409,11 @@ components:
               duration_hours:
                 type: integer
                 example: 240
+    NotificationPreferenceUpdateRequest:
+      type: object
+      required:
+      - is_enabled
+      properties:
+        is_enabled:
+          type: boolean
+          example: false
