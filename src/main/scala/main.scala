@@ -1,11 +1,16 @@
-object TripConfig {
-  val appName: String = "Go Trip"
-
-  def welcomeMessage(): String =
-    s"Welcome to $appName!"
-}
+import domain.location.*
+import repository.location.InMemoryLocationRepository
+import service.location.LocationService
 
 @main
 def main(): Unit = {
-  println(TripConfig.welcomeMessage())
+  val locationService = LocationService(InMemoryLocationRepository)
+
+  val result = locationService.search(
+    LocationSearchParams(
+      country = Some("vietnam"),
+    )
+  )
+
+  result.foreach(println)
 }
