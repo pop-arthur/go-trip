@@ -9,3 +9,4 @@
 /project/project
 .metals
 .vscode
+pgdata/
