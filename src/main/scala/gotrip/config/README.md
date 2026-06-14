@@ -1,15 +1,34 @@
 # Configuration
 
-Загрузка конфигурации из `application.conf` с помощью PureConfig.
+Загрузка параметров подключения к базе данных из `application.conf` с помощью PureConfig.
 
-## Файлы
+## Файл
 
-- `DatabaseConfig.scala` — case class, описывающий параметры подключения к БД (url, user, password, driver, connectionPool).
+- `DatabaseConfig.scala` – case class, десериализующий секцию `gotrip.database` конфига.
 
-## Пример использования
+## Пример `application.conf`
 
-```scala
-val config = ConfigSource.default.at("gotrip.database").load[DatabaseConfig]
+```hocon
+gotrip {
+  database {
+    url = "jdbc:postgresql://localhost:5432/gotrip"
+    user = "gotrip_user"
+    password = "secret"
+    driver = "org.postgresql.Driver"
+    connectionPool {
+      maxSize = 10
+      minimumIdle = 2
+    }
+  }
+}
 ```
 
-Файл конфигурации должен быть в `src/main/resources/application.conf` в формате HOCON.
+## Загрузка в коде
+
+```scala
+import pureconfig.ConfigSource
+import pureconfig.error.ConfigReaderException
+
+val config = ConfigSource.default.at("gotrip.database").load[DatabaseConfig]
+  .leftMap(e => ConfigReaderException[DatabaseConfig](e))
+```

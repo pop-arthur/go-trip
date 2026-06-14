@@ -1,11 +1,11 @@
-# Database Module
+# Database module
 
-Модуль отвечает за создание пула соединений с PostgreSQL и запуск миграций Flyway.
+Модуль обеспечивает безопасное подключение к PostgreSQL и запуск миграций Flyway.
 
-## Файлы
+## Содержание
 
-- `DbTransactor.scala` — создание `Resource[F, HikariTransactor[F]]` с настройками пула (HikariCP).
-- `Migration.scala` — запуск миграций Flyway при старте приложения.
+- `DbTransactor.scala` – создание `Resource[F, HikariTransactor[F]]` (пул соединений HikariCP).
+- `Migration.scala` – применение миграций Flyway при старте приложения.
 
 ## Использование
 
@@ -13,18 +13,14 @@
 
 ```scala
 for {
-  config <- loadConfig
+  config <- loadDatabaseConfig
   _ <- DbTransactor[IO](config).use { xa =>
-    for {
-      _ <- Migration.migrate[IO](config)
-      // создание репозиториев с xa
-    } yield ()
+    Migration.migrate[IO](config) >>
+    // здесь будет бизнес-логика, использующая xa
   }
 } yield ()
 ```
 
 ## Миграции
 
-SQL-скрипты лежат в `src/main/resources/db/migration/` и именуются по шаблону `V{version}__description.sql`.  
-Первая миграция — `V1__init.sql`, создаёт все таблицы (см. схему в `gotrip-openapi.yaml` и ER-диаграмму).
-
+Файлы миграций находятся в `resources/db/migration/`.
