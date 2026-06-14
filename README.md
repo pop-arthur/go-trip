@@ -1,6 +1,10 @@
 # GoTrip Backend
 
-Сервис для управления поездками и заказами. Реализован на Scala 3 с использованием функционального стека: Cats Effect, Doobie, Flyway, PostgreSQL.
+Сервис для управления поездками и заказами.
+
+## Документация
+- [UserStories](https://docs.google.com/document/d/12_VgpVLQ9lQUd1dlmlBCyuZuOkQP9pXCvZ2K7SpG6-w/edit?tab=t.0)
+- [Specification](https://docs.google.com/document/d/1Q58Y4Cjxm6CMPYLfaArhQhrOVFkvLBKbki20aSrJ63M/edit?tab=t.0#heading=h.6tsam0yuh976)
 
 ## Стек технологий
 
