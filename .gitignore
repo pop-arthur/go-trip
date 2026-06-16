@@ -5,8 +5,3 @@
 /target/
 /target/scala-3.3.7/classes/
 .DS_Store
-.vscode/
-.metals/
-.bloop/
-/project/metals.sbt
-/project/project/
