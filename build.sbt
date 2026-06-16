@@ -9,12 +9,15 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-effect" % "3.7.0",
       
-      "org.tpolecat" %% "doobie-core"     % "1.0.0-RC12",
-      "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC12",
-      "org.tpolecat" %% "doobie-hikari"   % "1.0.0-RC12",
+      // "org.tpolecat" %% "doobie-core"     % "1.0.0-RC12",
+      // "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC12",
+      // "org.tpolecat" %% "doobie-hikari"   % "1.0.0-RC12",
+
+      "org.tpolecat" %% "skunk-core" % "1.0.0",
       
       "org.flywaydb" % "flyway-core"                % "12.8.1",
       "org.flywaydb" % "flyway-database-postgresql" % "12.8.1",
+      "org.postgresql" % "postgresql"               % "42.7.8",
       
       "com.github.pureconfig" %% "pureconfig-core"           % "0.17.10",
       "com.github.pureconfig" %% "pureconfig-generic-scala3" % "0.17.10",

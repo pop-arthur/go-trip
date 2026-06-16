@@ -4,6 +4,9 @@ import pureconfig.ConfigReader
 
 case class DatabaseConfig(
     url: String,
+    host: String,
+    port: Int,
+    database: String,
     user: String,
     password: String,
     driver: String,
