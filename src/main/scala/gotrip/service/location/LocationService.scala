@@ -1,7 +1,7 @@
-package service.location
+package gotrip.service.location
 
-import domain.location.*
-import repository.location.LocationRepository
+import gotrip.domain.location.*
+import gotrip.repository.location.LocationRepository
 
 final class LocationService[F[_]](repository: LocationRepository[F]):
 

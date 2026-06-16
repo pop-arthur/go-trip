@@ -1,6 +1,6 @@
-package repository.location
+package gotrip.repository.location
 
-import domain.location.*
+import gotrip.domain.location.*
 
 type Id[A] = A
 
@@ -10,7 +10,7 @@ trait LocationRepository[F[_]]:
   def findById(id: LocationId): F[Option[Location]]
 
 object LocationRepository:
-  
+
   def makeInMemory: LocationRepository[Id] =
     new LocationRepository[Id]:
       private val locations: List[Location] = List(

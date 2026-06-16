@@ -1,7 +1,6 @@
 package gotrip.config
 
 import pureconfig.ConfigReader
-import pureconfig.generic.derivation.default.*
 
 case class DatabaseConfig(
     url: String,

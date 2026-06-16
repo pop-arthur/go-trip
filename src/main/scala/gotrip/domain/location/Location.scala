@@ -1,4 +1,4 @@
-package domain.location
+package gotrip.domain.location
 
 enum LocationType:
   case Country, City, Airport, TrainStation, BusStation, Port, Hotel, MeetingPoint, Attraction, Other

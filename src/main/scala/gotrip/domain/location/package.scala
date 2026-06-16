@@ -1,4 +1,4 @@
-package domain
+package gotrip.domain
 
 import scala.annotation.targetName
 

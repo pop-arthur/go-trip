@@ -1,7 +1,21 @@
-# Project exclude paths
-.bsp/
-.idea/
-/project/target/
-/target/
-/target/scala-3.3.7/classes/
+# macOS
 .DS_Store
+
+# IDEs and editors
+.idea/
+.vscode/
+.metals/
+
+# Build tools
+.bloop/
+.bsp/
+.scala-build/
+target/
+project/target/
+
+# Local services
+pgdata/
+
+# Metals generated sbt files
+project/metals.sbt
+project/project/
