@@ -2,11 +2,11 @@ package gotrip.repository.location
 
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import gotrip.domain.location.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
-
 
 final class PostgresLocationRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -33,9 +33,47 @@ final class PostgresLocationRepository[F[_]: Concurrent](
       }
     }
 
+  override def create(location: LocationCreate): F[Location] =
+    sessionPool.use { session =>
+      session.prepare(PostgresLocationRepository.createQuery).flatMap { query =>
+        query.unique(PostgresLocationRepository.toCreateInput(location))
+      }
+    }
+
+  override def update(id: LocationId, location: LocationUpdate): F[Option[Location]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresLocationRepository.updateQuery).flatMap { query =>
+        query.option(PostgresLocationRepository.toUpdateInput(id, location))
+      }
+    }
+
+  override def delete(id: LocationId): F[Boolean] =
+    sessionPool.use { session =>
+      session.prepare(PostgresLocationRepository.deleteQuery).flatMap { query =>
+        query.option(id.value).map(_.isDefined)
+      }
+    }
 
 object PostgresLocationRepository:
   private type SearchInput = (Option[String], Option[String], Option[String], Option[String])
+  private type CreateInput =
+    (String, String, Option[String], Option[String], Option[String], Option[Double], Option[Double])
+  private type UpdateInput =
+    (
+      Option[String],
+      Option[String],
+      Boolean,
+      Option[String],
+      Boolean,
+      Option[String],
+      Boolean,
+      Option[String],
+      Boolean,
+      Option[Double],
+      Boolean,
+      Option[Double],
+      Long
+    )
 
   def make[F[_]: Concurrent](
     sessionPool: Resource[F, Session[F]]
@@ -120,3 +158,59 @@ object PostgresLocationRepository:
       case "ATTRACTION"    => LocationType.Attraction
       case "OTHER"         => LocationType.Other
       case other           => throw new IllegalArgumentException(s"Unknown location type: $other")
+
+  val createQuery: Query[CreateInput, Location] =
+    sql"""
+      insert into locations (name, type, country, city, address, latitude, longitude)
+      values ($text, ${text}::location_type, ${text.opt}, ${text.opt}, ${text.opt}, ${float8.opt}, ${float8.opt})
+      returning id, name::text, type::text, country::text, city::text, address, latitude, longitude
+    """.query(locationDecoder)
+
+  val updateQuery: Query[UpdateInput, Location] =
+    sql"""
+      update locations
+      set name = coalesce(${text.opt}, name),
+          type = coalesce(${text.opt}::location_type, type),
+          country = case when $bool then ${text.opt} else country end,
+          city = case when $bool then ${text.opt} else city end,
+          address = case when $bool then ${text.opt} else address end,
+          latitude = case when $bool then ${float8.opt} else latitude end,
+          longitude = case when $bool then ${float8.opt} else longitude end
+      where id = $int8
+      returning id, name::text, type::text, country::text, city::text, address, latitude, longitude
+    """.query(locationDecoder)
+
+  val deleteQuery: Query[Long, Long] =
+    sql"""
+      delete from locations
+      where id = $int8
+      returning id
+    """.query(int8)
+
+  private def toCreateInput(location: LocationCreate): CreateInput =
+    (
+      location.name.value,
+      encodeLocationType(location.locationType),
+      location.country.value,
+      location.city.value,
+      location.address.value,
+      location.latitude.value,
+      location.longitude.value
+    )
+
+  private def toUpdateInput(id: LocationId, location: LocationUpdate): UpdateInput =
+    (
+      location.name.map(_.value),
+      location.locationType.map(encodeLocationType),
+      location.country.isDefined,
+      location.country.flatMap(_.value),
+      location.city.isDefined,
+      location.city.flatMap(_.value),
+      location.address.isDefined,
+      location.address.flatMap(_.value),
+      location.latitude.isDefined,
+      location.latitude.flatMap(_.value),
+      location.longitude.isDefined,
+      location.longitude.flatMap(_.value),
+      id.value
+    )
