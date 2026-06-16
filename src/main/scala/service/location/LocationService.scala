@@ -3,21 +3,10 @@ package service.location
 import domain.location.*
 import repository.location.LocationRepository
 
-final class LocationService(repository: LocationRepository):
+final class LocationService[F[_]](repository: LocationRepository[F]):
 
-  def search(params: LocationSearchParams): List[Location] =
-    val locations = repository.findAll()
+  def search(params: LocationSearchParams): F[List[Location]] =
+    repository.search(params)
 
-    locations.filter { location =>
-      params.locationType.forall(_ == location.locationType) &&
-      params.country.forall(c =>
-        location.country.value.exists(_.equalsIgnoreCase(c))
-      ) &&
-      params.city.forall(c =>
-        location.city.value.exists(_.equalsIgnoreCase(c))
-      ) &&
-      params.query.forall(q => location.name.value.toLowerCase.contains(q.toLowerCase))
-    }
-
-  def findById(id: LocationId): Option[Location] =
+  def findById(id: LocationId): F[Option[Location]] =
     repository.findById(id)

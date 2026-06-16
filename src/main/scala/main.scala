@@ -1,10 +1,10 @@
 import domain.location.*
-import repository.location.InMemoryLocationRepository
+import repository.location.LocationRepository
 import service.location.LocationService
 
 @main
 def main(): Unit = {
-  val locationService = LocationService(InMemoryLocationRepository)
+  val locationService = LocationService(LocationRepository.makeInMemory)
 
   val result = locationService.search(
     LocationSearchParams(
