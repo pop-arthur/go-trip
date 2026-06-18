@@ -87,7 +87,7 @@ object PostgresLocationRepository:
           Location(
             id = LocationId(id),
             name = LocationName(name),
-            locationType = decodeLocationType(locationType),
+            `type` = decodeLocationType(locationType),
             country = LocationCountry(country),
             city = LocationCity(city),
             address = LocationAddress(address),
@@ -123,7 +123,7 @@ object PostgresLocationRepository:
 
   private def toSearchInput(params: LocationSearchParams): SearchInput =
     (
-      encodeLocationType(params.locationType),
+      encodeLocationType(params.`type`),
       params.country,
       params.city,
       params.query.map(query => s"%${query.toLowerCase}%")
@@ -190,7 +190,7 @@ object PostgresLocationRepository:
   private def toCreateInput(location: LocationCreate): CreateInput =
     (
       location.name.value,
-      encodeLocationType(location.locationType),
+      encodeLocationType(location.`type`),
       location.country.value,
       location.city.value,
       location.address.value,
@@ -201,7 +201,7 @@ object PostgresLocationRepository:
   private def toUpdateInput(id: LocationId, location: LocationUpdate): UpdateInput =
     (
       location.name.map(_.value),
-      location.locationType.map(encodeLocationType),
+      location.`type`.map(encodeLocationType),
       location.country.isDefined,
       location.country.flatMap(_.value),
       location.city.isDefined,

@@ -6,7 +6,7 @@ enum LocationType:
 final case class Location(
   id: LocationId,
   name: LocationName,
-  locationType: LocationType,
+  `type`: LocationType,
   country: LocationCountry,
   city: LocationCity,
   address: LocationAddress,
@@ -15,7 +15,7 @@ final case class Location(
 )
 
 final case class LocationSearchParams(
-  locationType: Option[LocationType] = None,
+  `type`: Option[LocationType] = None,
   country: Option[String] = None,
   city: Option[String] = None,
   query: Option[String] = None
@@ -23,7 +23,7 @@ final case class LocationSearchParams(
 
 final case class LocationCreate(
   name: LocationName,
-  locationType: LocationType,
+  `type`: LocationType,
   country: LocationCountry,
   city: LocationCity,
   address: LocationAddress,
@@ -33,7 +33,7 @@ final case class LocationCreate(
 
 final case class LocationUpdate(
   name: Option[LocationName] = None,
-  locationType: Option[LocationType] = None,
+  `type`: Option[LocationType] = None,
   country: Option[LocationCountry] = None,
   city: Option[LocationCity] = None,
   address: Option[LocationAddress] = None,
