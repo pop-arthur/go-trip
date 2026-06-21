@@ -1,6 +1,7 @@
 package gotrip.http.location
 
 import gotrip.domain.location.*
+import gotrip.http.ApiError
 import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.json.circe.*

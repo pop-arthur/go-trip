@@ -2,6 +2,7 @@ package gotrip.http.location
 
 import cats.effect.IO
 import gotrip.domain.location.*
+import gotrip.http.{ApiError, ValidationError}
 import gotrip.service.location.LocationService
 import sttp.model.StatusCode
 import sttp.tapir.server.ServerEndpoint
@@ -42,9 +43,9 @@ final class LocationController(service: LocationService[IO]):
 
   val createLocation: ServerEndpoint[Any, IO] =
     LocationEndpoints.createLocation.serverLogic { location =>
-      LocationValidator.validate(location) match
-        case Left(error) =>
-          IO.pure(Left(validationError(error)))
+      LocationValidator.validate(location).toEither match
+        case Left(errors) =>
+          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
         case Right(validLocation) =>
           service.create(validLocation).attempt.map {
             case Right(created) =>
@@ -57,9 +58,9 @@ final class LocationController(service: LocationService[IO]):
 
   val updateLocation: ServerEndpoint[Any, IO] =
     LocationEndpoints.updateLocation.serverLogic { case (id, location) =>
-      LocationValidator.validate(location) match
-        case Left(error) =>
-          IO.pure(Left(validationError(error)))
+      LocationValidator.validate(location).toEither match
+        case Left(errors) =>
+          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
         case Right(validLocation) =>
           service.update(id, validLocation).attempt.map {
             case Right(Some(updated)) =>

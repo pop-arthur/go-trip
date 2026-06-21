@@ -1,4 +1,4 @@
-package gotrip.http.location
+package gotrip.http
 
 final case class ApiError(
   code: String,

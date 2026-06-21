@@ -6,9 +6,18 @@ import gotrip.config.{DatabaseConfig, ServerConfig}
 import pureconfig.ConfigSource
 import pureconfig.error.ConfigReaderException
 import gotrip.database.{Migration, SkunkSessionPool}
+import gotrip.http.additionalservice.AdditionalServiceController
 import gotrip.http.location.LocationController
+import gotrip.http.provider.ProviderController
+import gotrip.http.triplocation.TripLocationController
+import gotrip.repository.additionalservice.AdditionalServiceRepository
 import gotrip.repository.location.LocationRepository
+import gotrip.repository.provider.ProviderRepository
+import gotrip.repository.triplocation.TripLocationRepository
+import gotrip.service.additionalservice.AdditionalServiceService
 import gotrip.service.location.LocationService
+import gotrip.service.provider.ProviderService
+import gotrip.service.triplocation.TripLocationService
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import sttp.tapir.server.http4s.Http4sServerInterpreter
@@ -38,13 +47,32 @@ object Main extends IOApp.Simple {
       _ <- IO.println("Initializing Skunk session pool...")
       _ <- SkunkSessionPool[IO](databaseConfig).use { sessionPool =>
         // Layers
-        val repository = LocationRepository.makePostgres[IO](sessionPool)
-        val service = LocationService[IO](repository)
-        val controller = LocationController(service)
+        val locationRepository = LocationRepository.makePostgres[IO](sessionPool)
+        val locationService = LocationService[IO](locationRepository)
+        val locationController = LocationController(locationService)
+
+        val tripLocationRepository = TripLocationRepository.makePostgres[IO](sessionPool)
+        val tripLocationService = TripLocationService[IO](tripLocationRepository)
+        val tripLocationController = TripLocationController(tripLocationService)
+
+        val providerRepository = ProviderRepository.makePostgres[IO](sessionPool)
+        val providerService = ProviderService[IO](providerRepository)
+        val providerController = ProviderController(providerService)
+
+        val additionalServiceRepository = AdditionalServiceRepository.makePostgres[IO](sessionPool)
+        val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
+        val additionalServiceController = AdditionalServiceController(additionalServiceService)
+
+        val serverEndpoints =
+          locationController.all ++
+            tripLocationController.all ++
+            providerController.all ++
+            additionalServiceController.all
+
         // Routes
         val swaggerEndpoints = SwaggerInterpreter()
-          .fromServerEndpoints[IO](controller.all, "GoTrip API", "0.1.0")
-        val routes = Http4sServerInterpreter[IO]().toRoutes(controller.all ++ swaggerEndpoints)
+          .fromServerEndpoints[IO](serverEndpoints, "GoTrip API", "0.1.0")
+        val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
         val httpApp = Router("/" -> routes).orNotFound
 
         IO.println(s"Starting HTTP server on ${serverConfig.host}:${serverConfig.port}...") >>

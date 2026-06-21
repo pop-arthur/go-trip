@@ -1,6 +1,7 @@
 package gotrip.http.location
 
 import gotrip.domain.location.*
+import gotrip.http.ApiError
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.{Codec, CodecFormat, Schema}

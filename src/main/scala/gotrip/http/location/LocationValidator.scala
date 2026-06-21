@@ -1,47 +1,49 @@
 package gotrip.http.location
 
+import cats.data.ValidatedNel
+import cats.syntax.apply.*
+import cats.syntax.validated.*
 import gotrip.domain.location.*
+import gotrip.domain.validation.DomainValidation
+import gotrip.domain.validation.DomainValidation.*
 
 object LocationValidator:
 
-  def validate(location: LocationCreate): Either[ApiError, LocationCreate] =
-    for {
-      _ <- validateName(location.name)
-      _ <- validateLatitude(location.latitude)
-      _ <- validateLongitude(location.longitude)
-    } yield location
+  def validate(location: LocationCreate): ValidatedNel[DomainValidation, LocationCreate] =
+    (
+      validateName(location.name),
+      validateLatitude(location.latitude),
+      validateLongitude(location.longitude)
+    ).mapN((_, _, _) => location)
 
-  def validate(location: LocationUpdate): Either[ApiError, LocationUpdate] =
-    for {
-      _ <- location.name.fold[Either[ApiError, Unit]](Right(()))(validateName)
-      _ <- location.latitude.fold[Either[ApiError, Unit]](Right(()))(validateLatitude)
-      _ <- location.longitude.fold[Either[ApiError, Unit]](Right(()))(validateLongitude)
-    } yield location
+  def validate(location: LocationUpdate): ValidatedNel[DomainValidation, LocationUpdate] =
+    (
+      location.name.fold(validUnit)(validateName),
+      location.latitude.fold(validUnit)(validateLatitude),
+      location.longitude.fold(validUnit)(validateLongitude)
+    ).mapN((_, _, _) => location)
 
-  private def validateName(name: LocationName): Either[ApiError, Unit] =
-    Either.cond(
-      name.value.trim.nonEmpty,
-      (),
-      validationError("Location name must not be blank")
-    )
+  private def validateName(name: LocationName): ValidatedNel[DomainValidation, Unit] =
+    if name.value.trim.nonEmpty then validUnit
+    else LocationNameIsBlank.invalidNel
 
-  private def validateLatitude(latitude: LocationLatitude): Either[ApiError, Unit] =
-    validateOptionalNumber(latitude.value, -90.0, 90.0, "Latitude")
+  private def validateLatitude(latitude: LocationLatitude): ValidatedNel[DomainValidation, Unit] =
+    validateOptionalNumber(latitude.value, -90.0, 90.0, LatitudeOutOfRange)
 
-  private def validateLongitude(longitude: LocationLongitude): Either[ApiError, Unit] =
-    validateOptionalNumber(longitude.value, -180.0, 180.0, "Longitude")
+  private def validateLongitude(longitude: LocationLongitude): ValidatedNel[DomainValidation, Unit] =
+    validateOptionalNumber(longitude.value, -180.0, 180.0, LongitudeOutOfRange)
 
   private def validateOptionalNumber(
     value: Option[Double],
     min: Double,
     max: Double,
-    fieldName: String
-  ): Either[ApiError, Unit] =
+    error: DomainValidation
+  ): ValidatedNel[DomainValidation, Unit] =
     value match
       case Some(number) if number < min || number > max =>
-        Left(validationError(s"$fieldName must be between $min and $max"))
+        error.invalidNel
       case _ =>
-        Right(())
+        validUnit
 
-  private def validationError(message: String): ApiError =
-    ApiError("VALIDATION_ERROR", message)
+  private def validUnit: ValidatedNel[DomainValidation, Unit] =
+    ().validNel
