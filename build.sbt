@@ -3,15 +3,24 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.8.4"
 ThisBuild / organization := "com.gotrip"
 
+val tapirVersion = "1.13.21"
+val http4sVersion = "0.23.17"
+val circeVersion = "0.14.15"
+
 lazy val root = (project in file("."))
   .settings(
     name := "gotrip-backend",
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-effect" % "3.7.0",
       
-      // "org.tpolecat" %% "doobie-core"     % "1.0.0-RC12",
-      // "org.tpolecat" %% "doobie-postgres" % "1.0.0-RC12",
-      // "org.tpolecat" %% "doobie-hikari"   % "1.0.0-RC12",
+      "com.softwaremill.sttp.tapir" %% "tapir-core" % tapirVersion,
+      "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % tapirVersion,
+      "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % tapirVersion,
+      "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-bundle" % tapirVersion,
+      "org.http4s" %% "http4s-blaze-server" % http4sVersion,
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion,
 
       "org.tpolecat" %% "skunk-core" % "1.0.0",
       
