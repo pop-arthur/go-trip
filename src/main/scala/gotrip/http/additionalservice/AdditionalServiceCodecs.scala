@@ -7,7 +7,7 @@ import gotrip.http.ApiError
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema}
+import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 
 object AdditionalServiceCodecs:
   // API errors
@@ -28,10 +28,14 @@ object AdditionalServiceCodecs:
     Decoder.decodeLong.map(ServiceId.apply)
 
   given Schema[ServiceId] =
-    Schema.schemaForLong.map(value => Some(ServiceId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(ServiceId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[ServiceId](_.value))
 
   given Codec[String, ServiceId, CodecFormat.TextPlain] =
-    Codec.long.map(ServiceId.apply)(_.value)
+    Codec.long
+      .map(ServiceId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[ServiceId](_.value))
 
   // ServiceTitle
   given Encoder[ServiceTitle] =
@@ -51,10 +55,14 @@ object AdditionalServiceCodecs:
     Decoder.decodeLong.map(ProviderId.apply)
 
   given Schema[ProviderId] =
-    Schema.schemaForLong.map(value => Some(ProviderId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(ProviderId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
 
   given Codec[String, ProviderId, CodecFormat.TextPlain] =
-    Codec.long.map(ProviderId.apply)(_.value)
+    Codec.long
+      .map(ProviderId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
 
   // LocationId
   given Encoder[LocationId] =
@@ -64,10 +72,14 @@ object AdditionalServiceCodecs:
     Decoder.decodeLong.map(LocationId.apply)
 
   given Schema[LocationId] =
-    Schema.schemaForLong.map(value => Some(LocationId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(LocationId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[LocationId](_.value))
 
   given Codec[String, LocationId, CodecFormat.TextPlain] =
-    Codec.long.map(LocationId.apply)(_.value)
+    Codec.long
+      .map(LocationId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[LocationId](_.value))
 
   // ServiceType
   given Encoder[ServiceType] =
@@ -107,7 +119,10 @@ object AdditionalServiceCodecs:
     deriveDecoder
 
   given Schema[AdditionalServiceCreate] =
-    derived
+    derived[AdditionalServiceCreate]
+      .modifyUnsafe[Double]("price_amount", Schema.ModifyCollectionElements)(
+        _.validate(Validator.positiveOrZero[Double])
+      )
 
   given Encoder[AdditionalServiceUpdate] =
     deriveEncoder
@@ -116,7 +131,10 @@ object AdditionalServiceCodecs:
     deriveDecoder
 
   given Schema[AdditionalServiceUpdate] =
-    derived
+    derived[AdditionalServiceUpdate]
+      .modifyUnsafe[Double]("price_amount", Schema.ModifyCollectionElements)(
+        _.validate(Validator.positiveOrZero[Double])
+      )
 
   private def parseServiceType(value: String): Either[ApiError, ServiceType] =
     value.toUpperCase match

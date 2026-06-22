@@ -9,7 +9,7 @@ import skunk.Session
 trait AdditionalServiceRepository[F[_]]:
   def search(params: AdditionalServiceSearchParams): F[List[AdditionalService]]
   def findById(id: ServiceId): F[Option[AdditionalService]]
-  def create(service: AdditionalServiceCreate, isActive: Boolean): F[AdditionalService]
+  def create(service: AdditionalServiceCreate): F[AdditionalService]
   def update(id: ServiceId, service: AdditionalServiceUpdate): F[Option[AdditionalService]]
   def delete(id: ServiceId): F[Boolean]
   def providerExists(id: ProviderId): F[Boolean]

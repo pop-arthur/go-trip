@@ -22,7 +22,7 @@ final class AdditionalServiceService[F[_]: Monad](repository: AdditionalServiceR
     (for {
       _ <- ensureProviderExists(service.provider_id)
       _ <- ensureLocationExists(service.location_id)
-      created <- EitherT.liftF(repository.create(service, service.is_active.getOrElse(true)))
+      created <- EitherT.liftF(repository.create(service))
     } yield created).value
 
   def update(

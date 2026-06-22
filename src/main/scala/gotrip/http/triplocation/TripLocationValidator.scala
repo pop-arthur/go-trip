@@ -1,7 +1,6 @@
 package gotrip.http.triplocation
 
 import cats.data.ValidatedNel
-import cats.syntax.apply.*
 import cats.syntax.validated.*
 import gotrip.domain.trip.*
 import gotrip.domain.validation.DomainValidation
@@ -10,20 +9,10 @@ import gotrip.domain.validation.DomainValidation.*
 object TripLocationValidator:
 
   def validate(location: TripLocationCreate): ValidatedNel[DomainValidation, TripLocationCreate] =
-    (
-      location.visit_order.fold(validUnit)(validateVisitOrder),
-      validateDateRange(location.arrival_date, location.departure_date)
-    ).mapN((_, _) => location)
+    validateDateRange(location.arrival_date, location.departure_date).map(_ => location)
 
   def validate(location: TripLocationUpdate): ValidatedNel[DomainValidation, TripLocationUpdate] =
-    (
-      location.visit_order.fold(validUnit)(validateVisitOrder),
-      validateProvidedDateRange(location.arrival_date, location.departure_date)
-    ).mapN((_, _) => location)
-
-  private def validateVisitOrder(visitOrder: VisitOrder): ValidatedNel[DomainValidation, Unit] =
-    if visitOrder.value > 0 then validUnit
-    else VisitOrderIsNotPositive.invalidNel
+    validateProvidedDateRange(location.arrival_date, location.departure_date).map(_ => location)
 
   private def validateDateRange(
     arrivalDate: TripLocationArrivalDate,

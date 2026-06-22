@@ -5,7 +5,7 @@ import gotrip.http.ApiError
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema}
+import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 
 object ProviderCodecs:
   // API errors
@@ -26,10 +26,14 @@ object ProviderCodecs:
     Decoder.decodeLong.map(ProviderId.apply)
 
   given Schema[ProviderId] =
-    Schema.schemaForLong.map(value => Some(ProviderId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(ProviderId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
 
   given Codec[String, ProviderId, CodecFormat.TextPlain] =
-    Codec.long.map(ProviderId.apply)(_.value)
+    Codec.long
+      .map(ProviderId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
 
   // ProviderName
   given Encoder[ProviderName] =

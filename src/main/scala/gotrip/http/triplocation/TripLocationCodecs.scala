@@ -6,7 +6,7 @@ import gotrip.http.ApiError
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema}
+import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -45,7 +45,9 @@ object TripLocationCodecs:
     Decoder.decodeLong.map(LocationId.apply)
 
   given Schema[LocationId] =
-    Schema.schemaForLong.map(value => Some(LocationId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(LocationId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[LocationId](_.value))
 
   // TripId
   given Encoder[TripId] =
@@ -55,10 +57,14 @@ object TripLocationCodecs:
     Decoder.decodeLong.map(TripId.apply)
 
   given Schema[TripId] =
-    Schema.schemaForLong.map(value => Some(TripId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(TripId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[TripId](_.value))
 
   given Codec[String, TripId, CodecFormat.TextPlain] =
-    Codec.long.map(TripId.apply)(_.value)
+    Codec.long
+      .map(TripId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[TripId](_.value))
 
   // TripLocationId
   given Encoder[TripLocationId] =
@@ -68,10 +74,14 @@ object TripLocationCodecs:
     Decoder.decodeLong.map(TripLocationId.apply)
 
   given Schema[TripLocationId] =
-    Schema.schemaForLong.map(value => Some(TripLocationId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(TripLocationId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[TripLocationId](_.value))
 
   given Codec[String, TripLocationId, CodecFormat.TextPlain] =
-    Codec.long.map(TripLocationId.apply)(_.value)
+    Codec.long
+      .map(TripLocationId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[TripLocationId](_.value))
 
   // VisitOrder
   given Encoder[VisitOrder] =
@@ -81,7 +91,9 @@ object TripLocationCodecs:
     Decoder.decodeInt.map(VisitOrder.apply)
 
   given Schema[VisitOrder] =
-    Schema.schemaForInt.map(value => Some(VisitOrder(value)))(_.value)
+    Schema.schemaForInt
+      .map(value => Some(VisitOrder(value)))(_.value)
+      .validate(Validator.positive[Int].contramap[VisitOrder](_.value))
 
   // Optional date-time wrappers
   given Encoder[TripLocationArrivalDate] =

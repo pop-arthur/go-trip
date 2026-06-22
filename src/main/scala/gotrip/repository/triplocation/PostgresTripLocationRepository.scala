@@ -35,9 +35,10 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     visitOrder: VisitOrder
   ): F[TripLocation] =
     sessionPool.use { session =>
-      session.prepare(PostgresTripLocationRepository.createQuery).flatMap { query =>
-        query.unique(PostgresTripLocationRepository.toCreateInput(tripId, location, visitOrder))
-      }
+      PostgresTripLocationRepository.uniqueTripLocation(
+        session,
+        PostgresTripLocationRepository.createFragment(tripId, location, visitOrder)
+      )
     }
 
   override def update(
@@ -46,9 +47,13 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     location: TripLocationUpdate
   ): F[Option[TripLocation]] =
     sessionPool.use { session =>
-      session.prepare(PostgresTripLocationRepository.updateQuery).flatMap { query =>
-        query.option(PostgresTripLocationRepository.toUpdateInput(tripId, tripLocationId, location))
-      }
+      PostgresTripLocationRepository.updateFragment(tripId, tripLocationId, location) match
+        case Some(fragment) =>
+          PostgresTripLocationRepository.optionTripLocation(session, fragment)
+        case None =>
+          session.prepare(PostgresTripLocationRepository.findInTripQuery).flatMap { query =>
+            query.option((tripId.value, tripLocationId.value))
+          }
     }
 
   override def delete(tripId: TripId, tripLocationId: TripLocationId): F[Boolean] =
@@ -92,24 +97,28 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     }
 
 object PostgresTripLocationRepository:
-  private type CreateInput =
-    (Long, Long, Int, Option[OffsetDateTime], Option[OffsetDateTime])
-  private type UpdateInput =
-    (
-      Option[Int],
-      Boolean,
-      Option[OffsetDateTime],
-      Boolean,
-      Option[OffsetDateTime],
-      Long,
-      Long
-    )
   private type VisitOrderExistsInput = (Long, Int, Boolean, Long)
 
   def make[F[_]: Concurrent](
     sessionPool: Resource[F, Session[F]]
   ): TripLocationRepository[F] =
     new PostgresTripLocationRepository(sessionPool)
+
+  private def uniqueTripLocation[F[_]: Concurrent](
+    session: Session[F],
+    fragment: AppliedFragment
+  ): F[TripLocation] =
+    session.prepare(fragment.fragment.query(tripLocationDecoder)).flatMap { query =>
+      query.unique(fragment.argument)
+    }
+
+  private def optionTripLocation[F[_]: Concurrent](
+    session: Session[F],
+    fragment: AppliedFragment
+  ): F[Option[TripLocation]] =
+    session.prepare(fragment.fragment.query(tripLocationDecoder)).flatMap { query =>
+      query.option(fragment.argument)
+    }
 
   private val tripLocationDecoder: Decoder[TripLocation] =
     (int8 ~ int8 ~ int8 ~ int4 ~ timestamptz.opt ~ timestamptz.opt)
@@ -139,24 +148,6 @@ object PostgresTripLocationRepository:
       from trip_locations
       where trip_id = $int8
         and id = $int8
-    """.query(tripLocationDecoder)
-
-  val createQuery: Query[CreateInput, TripLocation] =
-    sql"""
-      insert into trip_locations (trip_id, location_id, visit_order, arrival_date, departure_date)
-      values ($int8, $int8, $int4, ${timestamptz.opt}, ${timestamptz.opt})
-      returning id, trip_id, location_id, visit_order, arrival_date, departure_date
-    """.query(tripLocationDecoder)
-
-  val updateQuery: Query[UpdateInput, TripLocation] =
-    sql"""
-      update trip_locations
-      set visit_order = coalesce(${int4.opt}, visit_order),
-          arrival_date = case when $bool then ${timestamptz.opt} else arrival_date end,
-          departure_date = case when $bool then ${timestamptz.opt} else departure_date end
-      where trip_id = $int8
-        and id = $int8
-      returning id, trip_id, location_id, visit_order, arrival_date, departure_date
     """.query(tripLocationDecoder)
 
   val deleteQuery: Query[(Long, Long), Long] =
@@ -198,33 +189,53 @@ object PostgresTripLocationRepository:
       where trip_id = $int8
     """.query(int4)
 
-  private def toCreateInput(
+  private def createFragment(
     tripId: TripId,
     location: TripLocationCreate,
     visitOrder: VisitOrder
-  ): CreateInput =
-    (
-      tripId.value,
-      location.location_id.value,
-      visitOrder.value,
-      location.arrival_date.value,
-      location.departure_date.value
+  ): AppliedFragment =
+    val fields =
+      List(
+        "trip_id" -> sql"$int8"(tripId.value),
+        "location_id" -> sql"$int8"(location.location_id.value),
+        "visit_order" -> sql"$int4"(visitOrder.value)
+      ) ++ List(
+        location.arrival_date.value.map(value => "arrival_date" -> sql"$timestamptz"(value)),
+        location.departure_date.value.map(value => "departure_date" -> sql"$timestamptz"(value))
+      ).flatten
+
+    val columns = fields.map(_._1).mkString(", ")
+    val values = combineApplied(fields.map(_._2))
+    AppliedFragment(
+      sql"""
+        insert into trip_locations (#$columns)
+        values (${values.fragment})
+        returning id, trip_id, location_id, visit_order, arrival_date, departure_date
+      """,
+      values.argument
     )
 
-  private def toUpdateInput(
+  private def updateFragment(
     tripId: TripId,
     tripLocationId: TripLocationId,
     location: TripLocationUpdate
-  ): UpdateInput =
-    (
-      location.visit_order.map(_.value),
-      location.arrival_date.isDefined,
-      location.arrival_date.flatMap(_.value),
-      location.departure_date.isDefined,
-      location.departure_date.flatMap(_.value),
-      tripId.value,
-      tripLocationId.value
-    )
+  ): Option[AppliedFragment] =
+    val fields =
+      List(
+        location.visit_order.map(value => sql"visit_order = $int4"(value.value)),
+        location.arrival_date.map(value => sql"arrival_date = ${timestamptz.opt}"(value.value)),
+        location.departure_date.map(value => sql"departure_date = ${timestamptz.opt}"(value.value))
+      ).flatten
+
+    fields.headOption.map { head =>
+      val sets = combineApplied(head :: fields.tail)
+      AppliedFragment(sql"update trip_locations set ${sets.fragment}", sets.argument) |+|
+        sql"""
+          where trip_id = $int8
+            and id = $int8
+          returning id, trip_id, location_id, visit_order, arrival_date, departure_date
+        """((tripId.value, tripLocationId.value))
+    }
 
   private def toVisitOrderExistsInput(
     tripId: TripId,
@@ -237,3 +248,8 @@ object PostgresTripLocationRepository:
       excludeTripLocationId.isEmpty,
       excludeTripLocationId.map(_.value).getOrElse(0L)
     )
+
+  private def combineApplied(fragments: List[AppliedFragment]): AppliedFragment =
+    fragments.reduceLeft { (left, right) =>
+      left |+| sql", "(Void) |+| right
+    }

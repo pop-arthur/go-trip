@@ -4,6 +4,7 @@ import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import gotrip.domain.provider.*
+import gotrip.repository.SkunkCodecs.providerType
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
@@ -28,16 +29,18 @@ final class PostgresProviderRepository[F[_]: Concurrent](
 
   override def create(provider: ProviderCreate): F[Provider] =
     sessionPool.use { session =>
-      session.prepare(PostgresProviderRepository.createQuery).flatMap { query =>
-        query.unique(PostgresProviderRepository.toCreateInput(provider))
-      }
+      PostgresProviderRepository.uniqueProvider(session, PostgresProviderRepository.createFragment(provider))
     }
 
   override def update(id: ProviderId, provider: ProviderUpdate): F[Option[Provider]] =
     sessionPool.use { session =>
-      session.prepare(PostgresProviderRepository.updateQuery).flatMap { query =>
-        query.option(PostgresProviderRepository.toUpdateInput(id, provider))
-      }
+      PostgresProviderRepository.updateFragment(id, provider) match
+        case Some(fragment) =>
+          PostgresProviderRepository.optionProvider(session, fragment)
+        case None =>
+          session.prepare(PostgresProviderRepository.findByIdQuery).flatMap { query =>
+            query.option(id.value)
+          }
     }
 
   override def delete(id: ProviderId): F[Boolean] =
@@ -62,10 +65,7 @@ final class PostgresProviderRepository[F[_]: Concurrent](
     }
 
 object PostgresProviderRepository:
-  private type SearchInput = (Option[String], Option[String])
-  private type CreateInput = (String, String, Option[String], Option[String])
-  private type UpdateInput =
-    (Option[String], Option[String], Boolean, Option[String], Boolean, Option[String], Long)
+  private type SearchInput = (Option[ProviderType], Option[String])
   private type NameExistsInput = (String, Boolean, Long)
 
   def make[F[_]: Concurrent](
@@ -73,14 +73,30 @@ object PostgresProviderRepository:
   ): ProviderRepository[F] =
     new PostgresProviderRepository(sessionPool)
 
+  private def uniqueProvider[F[_]: Concurrent](
+    session: Session[F],
+    fragment: AppliedFragment
+  ): F[Provider] =
+    session.prepare(fragment.fragment.query(providerDecoder)).flatMap { query =>
+      query.unique(fragment.argument)
+    }
+
+  private def optionProvider[F[_]: Concurrent](
+    session: Session[F],
+    fragment: AppliedFragment
+  ): F[Option[Provider]] =
+    session.prepare(fragment.fragment.query(providerDecoder)).flatMap { query =>
+      query.option(fragment.argument)
+    }
+
   private val providerDecoder: Decoder[Provider] =
-    (int8 ~ text ~ text ~ text.opt ~ text.opt)
+    (int8 ~ text ~ providerType ~ text.opt ~ text.opt)
       .map {
-        case id ~ name ~ providerType ~ website ~ supportContact =>
+        case id ~ name ~ decodedProviderType ~ website ~ supportContact =>
           Provider(
             id = ProviderId(id),
             name = ProviderName(name),
-            `type` = decodeProviderType(providerType),
+            `type` = decodedProviderType,
             website = website,
             support_contact = supportContact
           )
@@ -88,36 +104,18 @@ object PostgresProviderRepository:
 
   val searchQuery: Query[SearchInput, Provider] =
     sql"""
-      select id, name::text, type::text, website::text, support_contact::text
+      select id, name::text, type, website::text, support_contact::text
       from providers
-      where type::text = coalesce(${text.opt}, type::text)
+      where type = coalesce(${providerType.opt}, type)
         and lower(name) like coalesce(${text.opt}, lower(name))
       order by name
     """.query(providerDecoder)
 
   val findByIdQuery: Query[Long, Provider] =
     sql"""
-      select id, name::text, type::text, website::text, support_contact::text
+      select id, name::text, type, website::text, support_contact::text
       from providers
       where id = $int8
-    """.query(providerDecoder)
-
-  val createQuery: Query[CreateInput, Provider] =
-    sql"""
-      insert into providers (name, type, website, support_contact)
-      values ($text, ${text}::provider_type, ${text.opt}, ${text.opt})
-      returning id, name::text, type::text, website::text, support_contact::text
-    """.query(providerDecoder)
-
-  val updateQuery: Query[UpdateInput, Provider] =
-    sql"""
-      update providers
-      set name = coalesce(${text.opt}, name),
-          type = coalesce(${text.opt}::provider_type, type),
-          website = case when $bool then ${text.opt} else website end,
-          support_contact = case when $bool then ${text.opt} else support_contact end
-      where id = $int8
-      returning id, name::text, type::text, website::text, support_contact::text
     """.query(providerDecoder)
 
   val deleteQuery: Query[Long, Long] =
@@ -146,27 +144,8 @@ object PostgresProviderRepository:
 
   private def toSearchInput(params: ProviderSearchParams): SearchInput =
     (
-      params.`type`.map(encodeProviderType),
+      params.`type`,
       params.query.map(query => s"%${query.toLowerCase}%")
-    )
-
-  private def toCreateInput(provider: ProviderCreate): CreateInput =
-    (
-      provider.name.value,
-      encodeProviderType(provider.`type`),
-      provider.website,
-      provider.support_contact
-    )
-
-  private def toUpdateInput(id: ProviderId, provider: ProviderUpdate): UpdateInput =
-    (
-      provider.name.map(_.value),
-      provider.`type`.map(encodeProviderType),
-      provider.website.isDefined,
-      provider.website,
-      provider.support_contact.isDefined,
-      provider.support_contact,
-      id.value
     )
 
   private def toNameExistsInput(
@@ -179,23 +158,46 @@ object PostgresProviderRepository:
       excludeProviderId.map(_.value).getOrElse(0L)
     )
 
-  private def encodeProviderType(providerType: ProviderType): String =
-    providerType match
-      case ProviderType.Airline          => "AIRLINE"
-      case ProviderType.Hotel            => "HOTEL"
-      case ProviderType.TourCompany      => "TOUR_COMPANY"
-      case ProviderType.TransportCompany => "TRANSPORT_COMPANY"
-      case ProviderType.BookingPlatform  => "BOOKING_PLATFORM"
-      case ProviderType.InsuranceCompany => "INSURANCE_COMPANY"
-      case ProviderType.Other            => "OTHER"
+  private def createFragment(provider: ProviderCreate): AppliedFragment =
+    val fields =
+      List(
+        "name" -> sql"$text"(provider.name.value),
+        "type" -> sql"$providerType"(provider.`type`)
+      ) ++ List(
+        provider.website.map(value => "website" -> sql"$text"(value)),
+        provider.support_contact.map(value => "support_contact" -> sql"$text"(value))
+      ).flatten
 
-  private def decodeProviderType(value: String): ProviderType =
-    value match
-      case "AIRLINE"             => ProviderType.Airline
-      case "HOTEL"               => ProviderType.Hotel
-      case "TOUR_COMPANY"        => ProviderType.TourCompany
-      case "TRANSPORT_COMPANY"   => ProviderType.TransportCompany
-      case "BOOKING_PLATFORM"    => ProviderType.BookingPlatform
-      case "INSURANCE_COMPANY"   => ProviderType.InsuranceCompany
-      case "OTHER"               => ProviderType.Other
-      case other                 => throw new IllegalArgumentException(s"Unknown provider type: $other")
+    val columns = fields.map(_._1).mkString(", ")
+    val values = combineApplied(fields.map(_._2))
+    AppliedFragment(
+      sql"""
+        insert into providers (#$columns)
+        values (${values.fragment})
+        returning id, name::text, type, website::text, support_contact::text
+      """,
+      values.argument
+    )
+
+  private def updateFragment(id: ProviderId, provider: ProviderUpdate): Option[AppliedFragment] =
+    val fields =
+      List(
+        provider.name.map(value => sql"name = $text"(value.value)),
+        provider.`type`.map(value => sql"type = $providerType"(value)),
+        provider.website.map(value => sql"website = $text"(value)),
+        provider.support_contact.map(value => sql"support_contact = $text"(value))
+      ).flatten
+
+    fields.headOption.map { head =>
+      val sets = combineApplied(head :: fields.tail)
+      AppliedFragment(sql"update providers set ${sets.fragment}", sets.argument) |+|
+        sql"""
+          where id = $int8
+          returning id, name::text, type, website::text, support_contact::text
+        """(id.value)
+    }
+
+  private def combineApplied(fragments: List[AppliedFragment]): AppliedFragment =
+    fragments.reduceLeft { (left, right) =>
+      left |+| sql", "(Void) |+| right
+    }

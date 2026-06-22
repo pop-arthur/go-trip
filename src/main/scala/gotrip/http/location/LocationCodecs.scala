@@ -4,7 +4,7 @@ import gotrip.domain.location.*
 import gotrip.http.ApiError
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
-import sttp.tapir.{Codec, CodecFormat, Schema}
+import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 import sttp.tapir.Schema.derived
 
 object LocationCodecs:
@@ -54,10 +54,14 @@ object LocationCodecs:
     Decoder.decodeLong.map(LocationId.apply)
 
   given Schema[LocationId] =
-    Schema.schemaForLong.map(value => Some(LocationId(value)))(_.value)
+    Schema.schemaForLong
+      .map(value => Some(LocationId(value)))(_.value)
+      .validate(Validator.positive[Long].contramap[LocationId](_.value))
 
   given Codec[String, LocationId, CodecFormat.TextPlain] =
-    Codec.long.map(LocationId.apply)(_.value)
+    Codec.long
+      .map(LocationId.apply)(_.value)
+      .validate(Validator.positive[Long].contramap[LocationId](_.value))
 
   // LocationName
   given Encoder[LocationName] =
@@ -105,7 +109,9 @@ object LocationCodecs:
     Decoder.decodeOption[Double].map(LocationLatitude.apply)
 
   given Schema[LocationLatitude] =
-    Schema.schemaForOption[Double].map(value => Some(LocationLatitude(value)))(_.value)
+    Schema.schemaForOption[Double]
+      .map(value => Some(LocationLatitude(value)))(_.value)
+      .validate(optionalDoubleInRange[LocationLatitude](_.value, -90.0, 90.0))
 
   given Encoder[LocationLongitude] =
     Encoder.encodeOption[Double].contramap(_.value)
@@ -114,7 +120,9 @@ object LocationCodecs:
     Decoder.decodeOption[Double].map(LocationLongitude.apply)
 
   given Schema[LocationLongitude] =
-    Schema.schemaForOption[Double].map(value => Some(LocationLongitude(value)))(_.value)
+    Schema.schemaForOption[Double]
+      .map(value => Some(LocationLongitude(value)))(_.value)
+      .validate(optionalDoubleInRange[LocationLongitude](_.value, -180.0, 180.0))
 
   // LocationType
   given Encoder[LocationType] =
@@ -164,3 +172,6 @@ object LocationCodecs:
       case LocationType.MeetingPoint => "MEETING_POINT"
       case LocationType.Attraction   => "ATTRACTION"
       case LocationType.Other        => "OTHER"
+
+  private def optionalDoubleInRange[A](extract: A => Option[Double], min: Double, max: Double): Validator[A] =
+    Validator.inRange(min, max).contramap[A](value => extract(value).getOrElse(min))
