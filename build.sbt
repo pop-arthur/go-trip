@@ -8,8 +8,14 @@ val http4sVersion = "0.23.17"
 val circeVersion = "0.14.15"
 
 lazy val root = (project in file("."))
+  .enablePlugins(JavaAppPackaging, DockerPlugin)
   .settings(
     name := "gotrip-backend",
+    Compile / mainClass := Some("gotrip.Main"),
+    Docker / packageName := "gotrip-backend",
+    dockerBaseImage := "eclipse-temurin:21-jre",
+    Docker / daemonUser := "daemon",
+    dockerExposedPorts := Seq(8080),
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-effect" % "3.7.0",
       
@@ -36,3 +42,5 @@ lazy val root = (project in file("."))
       "org.typelevel" %% "log4cats-slf4j"  % "2.8.0"
     )
   )
+
+addCommandAlias("native", "Docker / publishLocal")

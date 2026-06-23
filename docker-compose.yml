@@ -1,4 +1,21 @@
 services:
+  app:
+    image: gotrip-backend:0.1.0-SNAPSHOT
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      GOTRIP_DB_URL: jdbc:postgresql://postgres:5432/gotrip
+      GOTRIP_DB_HOST: postgres
+      GOTRIP_DB_PORT: 5432
+      GOTRIP_DB_NAME: gotrip
+      GOTRIP_DB_USER: gotrip_user
+      GOTRIP_DB_PASSWORD: secret
+      GOTRIP_SERVER_HOST: 0.0.0.0
+      GOTRIP_SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+
   postgres:
     image: postgres:17
     environment:
@@ -8,4 +25,12 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gotrip_user -d gotrip"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
