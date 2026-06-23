@@ -4,7 +4,7 @@
 
 ## Содержание
 
-- `DbTransactor.scala` – создание `Resource[F, HikariTransactor[F]]` (пул соединений HikariCP).
+- `SkunkSessionPool.scala` – создание пула `Session[F]` для работы с PostgreSQL через Skunk.
 - `Migration.scala` – применение миграций Flyway при старте приложения.
 
 ## Использование
@@ -14,9 +14,9 @@
 ```scala
 for {
   config <- loadDatabaseConfig
-  _ <- DbTransactor[IO](config).use { xa =>
-    Migration.migrate[IO](config) >>
-    // здесь будет бизнес-логика, использующая xa
+  _ <- Migration.migrate[IO](config)
+  _ <- SkunkSessionPool[IO](config).use { sessionPool =>
+    // здесь будет бизнес-логика, использующая sessionPool
   }
 } yield ()
 ```

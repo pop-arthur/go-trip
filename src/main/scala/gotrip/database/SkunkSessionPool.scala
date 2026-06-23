@@ -6,7 +6,7 @@ import fs2.io.net.Network
 import gotrip.config.DatabaseConfig
 import org.typelevel.otel4s.metrics.Meter
 import org.typelevel.otel4s.trace.Tracer
-import skunk.Session
+import skunk.{Session, TypingStrategy}
 
 object SkunkSessionPool:
   def apply[F[_]: Async: Console: Network](
@@ -21,5 +21,6 @@ object SkunkSessionPool:
       user = config.user,
       database = config.database,
       password = Some(config.password),
-      max = config.connectionPool.maxSize
+      max = config.connectionPool.maxSize,
+      strategy = TypingStrategy.SearchPath
     )
