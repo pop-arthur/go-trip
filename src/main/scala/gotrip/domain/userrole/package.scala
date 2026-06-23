@@ -1,12 +1,14 @@
 package gotrip.domain
 
+import scala.annotation.targetName
+
 package object userrole {
   opaque type UserRoleId = Long
   object UserRoleId {
     def apply(value: Long): UserRoleId = value
   }
   extension (id: UserRoleId) {
-    def value: Long = id
+    @targetName("userRoleIdValue") def value: Long = id
   }
 
   sealed trait Role

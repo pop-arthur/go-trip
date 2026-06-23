@@ -7,7 +7,8 @@ import gotrip.domain.userrole.Role
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
-import java.time.Instant
+import skunk.data._
+import java.time.{OffsetDateTime, ZoneOffset}
 
 final class PostgresUserRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -16,8 +17,9 @@ final class PostgresUserRepository[F[_]: Concurrent](
   override def create(email: UserEmail, passwordHash: UserPasswordHash, fullName: UserFullName): F[User] =
     sessionPool.use { session =>
       session.prepare(PostgresUserRepository.insertQuery).flatMap { cmd =>
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
         cmd.unique(
-          (email.value, passwordHash.value, fullName.value, Instant.now(), Instant.now())
+          (email.value, passwordHash.value, fullName.value, now, now)
         )
       }
     }
@@ -38,31 +40,32 @@ final class PostgresUserRepository[F[_]: Concurrent](
 
   override def update(user: User): F[Int] =
     sessionPool.use { session =>
-      session.prepare(PostgresUserRepository.updateQuery).flatMap { cmd =>
+      session.prepare(PostgresUserRepository.updateCommand).flatMap { cmd =>
         cmd.execute(
           (user.email.value, user.passwordHash.value, user.fullName.value, user.id.value)
-        ).map(_.rows)
+        ).map(PostgresUserRepository.rowsAffected)
       }
     }
 
   override def delete(id: UserId): F[Int] =
     sessionPool.use { session =>
-      session.prepare(PostgresUserRepository.deleteQuery).flatMap { cmd =>
-        cmd.execute(id.value).map(_.rows)
+      session.prepare(PostgresUserRepository.deleteCommand).flatMap { cmd =>
+        cmd.execute(id.value).map(PostgresUserRepository.rowsAffected)
       }
     }
 
   override def addRole(userId: UserId, role: Role): F[Int] =
     sessionPool.use { session =>
-      session.prepare(PostgresUserRepository.addRoleQuery).flatMap { cmd =>
-        cmd.execute((userId.value, Role.toString(role), Instant.now(), Instant.now())).map(_.rows)
+      session.prepare(PostgresUserRepository.addRoleCommand).flatMap { cmd =>
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
+        cmd.execute((userId.value, Role.toString(role), now, now)).map(PostgresUserRepository.rowsAffected)
       }
     }
 
   override def removeRole(userId: UserId, role: Role): F[Int] =
     sessionPool.use { session =>
-      session.prepare(PostgresUserRepository.removeRoleQuery).flatMap { cmd =>
-        cmd.execute((userId.value, Role.toString(role))).map(_.rows)
+      session.prepare(PostgresUserRepository.removeRoleCommand).flatMap { cmd =>
+        cmd.execute((userId.value, Role.toString(role))).map(PostgresUserRepository.rowsAffected)
       }
     }
 
@@ -73,7 +76,14 @@ final class PostgresUserRepository[F[_]: Concurrent](
       }
     }
 
-object PostgresUserRepository:
+object PostgresUserRepository {
+
+  private def rowsAffected(c: Completion): Int = c match {
+    case Completion.Insert(count) => count
+    case Completion.Update(count) => count
+    case Completion.Delete(count) => count
+    case _                        => 0
+  }
 
   private val userDecoder: Decoder[User] =
     (int8 ~ text ~ text ~ text.opt ~ timestamptz ~ timestamptz).map {
@@ -83,17 +93,17 @@ object PostgresUserRepository:
           email = UserEmail(email),
           passwordHash = UserPasswordHash(hash),
           fullName = UserFullName(fullName),
-          createdAt = created,
-          updatedAt = updated
+          createdAt = created.toInstant,
+          updatedAt = updated.toInstant
         )
     }
 
-  val insertQuery: Command[(String, String, Option[String], Instant, Instant)] =
+  val insertQuery: Query[(String, String, Option[String], OffsetDateTime, OffsetDateTime), User] =
     sql"""
       INSERT INTO users (email, password_hash, full_name, created_at, updated_at)
       VALUES ($text, $text, ${text.opt}, $timestamptz, $timestamptz)
       RETURNING id, email, password_hash, full_name, created_at, updated_at
-    """.query(userDecoder).command
+    """.query(userDecoder)
 
   val findByEmailQuery: Query[String, User] =
     sql"""
@@ -107,23 +117,23 @@ object PostgresUserRepository:
       FROM users WHERE id = $int8
     """.query(userDecoder)
 
-  val updateQuery: Command[(String, String, Option[String], Long)] =
+  val updateCommand: Command[(String, String, Option[String], Long)] =
     sql"""
       UPDATE users
       SET email = $text, password_hash = $text, full_name = ${text.opt}, updated_at = NOW()
       WHERE id = $int8
     """.command
 
-  val deleteQuery: Command[Long] =
+  val deleteCommand: Command[Long] =
     sql"DELETE FROM users WHERE id = $int8".command
 
-  val addRoleQuery: Command[(Long, String, Instant, Instant)] =
+  val addRoleCommand: Command[(Long, String, OffsetDateTime, OffsetDateTime)] =
     sql"""
       INSERT INTO user_roles (user_id, role, created_at, updated_at)
       VALUES ($int8, $text, $timestamptz, $timestamptz)
     """.command
 
-  val removeRoleQuery: Command[(Long, String)] =
+  val removeRoleCommand: Command[(Long, String)] =
     sql"DELETE FROM user_roles WHERE user_id = $int8 AND role = $text".command
 
   val getRolesQuery: Query[Long, String] =
@@ -131,3 +141,4 @@ object PostgresUserRepository:
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): UserRepository[F] =
     new PostgresUserRepository(sessionPool)
+}

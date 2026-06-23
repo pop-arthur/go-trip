@@ -1,9 +1,10 @@
 package gotrip.repository.user
 
+import cats.Applicative
+import cats.effect.Concurrent
+import cats.effect.Resource
 import gotrip.domain.user.{User, UserEmail, UserId, UserPasswordHash, UserFullName}
 import gotrip.domain.userrole.Role
-import cats.effect.{Concurrent, Resource}
-import cats.Id
 import skunk.Session
 
 trait UserRepository[F[_]]:
@@ -12,7 +13,6 @@ trait UserRepository[F[_]]:
   def findById(id: UserId): F[Option[User]]
   def update(user: User): F[Int]
   def delete(id: UserId): F[Int]
-
   def addRole(userId: UserId, role: Role): F[Int]
   def removeRole(userId: UserId, role: Role): F[Int]
   def getRoles(userId: UserId): F[List[Role]]

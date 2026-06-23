@@ -1,7 +1,6 @@
 package gotrip.repository.user
 
-import cats.{Applicative, Id}
-import cats.data.State
+import cats.Applicative
 import cats.syntax.all._
 import gotrip.domain.user._
 import gotrip.domain.userrole.Role
@@ -18,7 +17,8 @@ object InMemoryUserRepository {
 
     new UserRepository[F] {
       override def create(email: UserEmail, passwordHash: UserPasswordHash, fullName: UserFullName): F[User] = {
-        val user = User(newId(), email, passwordHash, fullName, Instant.now(), Instant.now())
+        val now = Instant.now()
+        val user = User(newId(), email, passwordHash, fullName, now, now)
         state += (user.id -> user)
         roles += (user.id -> List(Role.USER))
         user.pure[F]
@@ -32,9 +32,9 @@ object InMemoryUserRepository {
 
       override def update(user: User): F[Int] = {
         state.get(user.id) match {
-          case Some(old) =>
+          case Some(_) =>
             val updated = user.copy(updatedAt = Instant.now())
-            state += (old.id -> updated)
+            state += (user.id -> updated)
             1.pure[F]
           case None => 0.pure[F]
         }
@@ -63,6 +63,6 @@ object InMemoryUserRepository {
 
       override def getRoles(userId: UserId): F[List[Role]] =
         roles.getOrElse(userId, List(Role.USER)).pure[F]
-    }
+    }.pure[F]
   }
 }

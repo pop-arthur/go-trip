@@ -1,12 +1,14 @@
 package gotrip.domain
 
+import scala.annotation.targetName
+
 package object user {
   opaque type UserId = Long
   object UserId {
     def apply(value: Long): UserId = value
   }
   extension (id: UserId) {
-    def value: Long = id
+    @targetName("userIdValue") def value: Long = id
   }
 
   opaque type UserEmail = String
@@ -14,7 +16,7 @@ package object user {
     def apply(value: String): UserEmail = value
   }
   extension (email: UserEmail) {
-    def value: String = email
+    @targetName("userEmailValue") def value: String = email
   }
 
   opaque type UserPasswordHash = String
@@ -22,7 +24,7 @@ package object user {
     def apply(value: String): UserPasswordHash = value
   }
   extension (hash: UserPasswordHash) {
-    def value: String = hash
+    @targetName("userPasswordHashValue") def value: String = hash
   }
 
   opaque type UserFullName = Option[String]
@@ -30,6 +32,6 @@ package object user {
     def apply(value: Option[String]): UserFullName = value
   }
   extension (name: UserFullName) {
-    def value: Option[String] = name
+    @targetName("userFullNameValue") def value: Option[String] = name
   }
 }
