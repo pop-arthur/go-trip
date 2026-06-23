@@ -98,23 +98,23 @@ object PostgresUserRepository {
         )
     }
 
-  val insertQuery: Query[(String, String, Option[String], OffsetDateTime, OffsetDateTime), User] =
-    sql"""
-      INSERT INTO users (email, password_hash, full_name, created_at, updated_at)
-      VALUES ($text, $text, ${text.opt}, $timestamptz, $timestamptz)
-      RETURNING id, email, password_hash, full_name, created_at, updated_at
-    """.query(userDecoder)
-
   val findByEmailQuery: Query[String, User] =
     sql"""
-      SELECT id, email, password_hash, full_name, created_at, updated_at
+      SELECT id, email::text, password_hash::text, full_name::text, created_at, updated_at
       FROM users WHERE email = $text
     """.query(userDecoder)
 
   val findByIdQuery: Query[Long, User] =
     sql"""
-      SELECT id, email, password_hash, full_name, created_at, updated_at
+      SELECT id, email::text, password_hash::text, full_name::text, created_at, updated_at
       FROM users WHERE id = $int8
+    """.query(userDecoder)
+
+  val insertQuery: Query[(String, String, Option[String], OffsetDateTime, OffsetDateTime), User] =
+    sql"""
+      INSERT INTO users (email, password_hash, full_name, created_at, updated_at)
+      VALUES ($text, $text, ${text.opt}, $timestamptz, $timestamptz)
+      RETURNING id, email::text, password_hash::text, full_name::text, created_at, updated_at
     """.query(userDecoder)
 
   val updateCommand: Command[(String, String, Option[String], Long)] =

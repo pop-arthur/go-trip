@@ -108,18 +108,18 @@ object PostgresReviewRepository {
     sql"""
       INSERT INTO reviews (user_id, target_type, target_id, rating, text, created_at, updated_at)
       VALUES ($int8, $text, $int8, $int4, ${text.opt}, $timestamptz, $timestamptz)
-      RETURNING id, user_id, target_type, target_id, rating, text, created_at, updated_at
+      RETURNING id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
     """.query(decoder)
 
   val selectById: Query[Long, Review] =
     sql"""
-      SELECT id, user_id, target_type, target_id, rating, text, created_at, updated_at
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
       FROM reviews WHERE id = $int8
     """.query(decoder)
 
   val selectByTarget: Query[(String, Long), Review] =
     sql"""
-      SELECT id, user_id, target_type, target_id, rating, text, created_at, updated_at
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
       FROM reviews
       WHERE target_type = $text AND target_id = $int8
       ORDER BY created_at DESC
@@ -127,7 +127,7 @@ object PostgresReviewRepository {
 
   val selectByUserId: Query[Long, Review] =
     sql"""
-      SELECT id, user_id, target_type, target_id, rating, text, created_at, updated_at
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
       FROM reviews WHERE user_id = $int8
       ORDER BY created_at DESC
     """.query(decoder)
@@ -151,4 +151,5 @@ object PostgresReviewRepository {
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): ReviewRepository[F] =
     new PostgresReviewRepository(sessionPool)
+
 }

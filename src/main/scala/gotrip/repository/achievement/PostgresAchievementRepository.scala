@@ -77,7 +77,7 @@ final class PostgresAchievementRepository[F[_]: Concurrent](
       }
     }
 
-object PostgresAchievementRepository {
+object PostgresAchievementRepository:
 
   private def rowsAffected(c: Completion): Int = c match {
     case Completion.Insert(count) => count
@@ -104,20 +104,20 @@ object PostgresAchievementRepository {
 
   val selectAll: Query[Void, Achievement] =
     sql"""
-      SELECT id, code, title, description, condition_type, condition_value, icon_url, created_at, updated_at
+      SELECT id, code::text, title::text, description::text, condition_type::text, condition_value, icon_url::text, created_at, updated_at
       FROM achievements
       ORDER BY id
     """.query(decoder)
 
   val selectById: Query[Long, Achievement] =
     sql"""
-      SELECT id, code, title, description, condition_type, condition_value, icon_url, created_at, updated_at
+      SELECT id, code::text, title::text, description::text, condition_type::text, condition_value, icon_url::text, created_at, updated_at
       FROM achievements WHERE id = $int8
     """.query(decoder)
 
   val selectByCode: Query[String, Achievement] =
     sql"""
-      SELECT id, code, title, description, condition_type, condition_value, icon_url, created_at, updated_at
+      SELECT id, code::text, title::text, description::text, condition_type::text, condition_value, icon_url::text, created_at, updated_at
       FROM achievements WHERE code = $text
     """.query(decoder)
 
@@ -125,7 +125,7 @@ object PostgresAchievementRepository {
     sql"""
       INSERT INTO achievements (code, title, description, condition_type, condition_value, icon_url, created_at, updated_at)
       VALUES ($text, $text, ${text.opt}, $text, $int4, ${text.opt}, $timestamptz, $timestamptz)
-      RETURNING id, code, title, description, condition_type, condition_value, icon_url, created_at, updated_at
+      RETURNING id, code::text, title::text, description::text, condition_type::text, condition_value, icon_url::text, created_at, updated_at
     """.query(decoder)
 
   val updateCommand: Command[(String, String, Option[String], String, Int, Option[String], Long)] =
@@ -141,4 +141,3 @@ object PostgresAchievementRepository {
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): AchievementRepository[F] =
     new PostgresAchievementRepository(sessionPool)
-}

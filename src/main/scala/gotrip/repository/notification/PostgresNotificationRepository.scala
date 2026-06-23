@@ -75,7 +75,7 @@ final class PostgresNotificationRepository[F[_]: Concurrent](
       }
     }
 
-object PostgresNotificationRepository {
+object PostgresNotificationRepository:
 
   private def rowsAffected(c: Completion): Int = c match {
     case Completion.Update(count) => count
@@ -104,18 +104,18 @@ object PostgresNotificationRepository {
     sql"""
       INSERT INTO user_notifications (user_id, order_id, type, title, body, is_read, sent_at, created_at, updated_at)
       VALUES ($int8, ${int8.opt}, $text, $text, $text, $bool, $timestamptz, $timestamptz, $timestamptz)
-      RETURNING id, user_id, order_id, type, title, body, is_read, sent_at, created_at, updated_at
+      RETURNING id, user_id, order_id, type::text, title::text, body::text, is_read, sent_at, created_at, updated_at
     """.query(decoder)
 
   val selectById: Query[Long, UserNotification] =
     sql"""
-      SELECT id, user_id, order_id, type, title, body, is_read, sent_at, created_at, updated_at
+      SELECT id, user_id, order_id, type::text, title::text, body::text, is_read, sent_at, created_at, updated_at
       FROM user_notifications WHERE id = $int8
     """.query(decoder)
 
   val selectByUserId: Query[(Long, Int, Int), UserNotification] =
     sql"""
-      SELECT id, user_id, order_id, type, title, body, is_read, sent_at, created_at, updated_at
+      SELECT id, user_id, order_id, type::text, title::text, body::text, is_read, sent_at, created_at, updated_at
       FROM user_notifications
       WHERE user_id = $int8
       ORDER BY sent_at DESC
@@ -144,4 +144,3 @@ object PostgresNotificationRepository {
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): NotificationRepository[F] =
     new PostgresNotificationRepository(sessionPool)
-}
