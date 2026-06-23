@@ -6,12 +6,16 @@ ThisBuild / organization := "com.gotrip"
 val tapirVersion = "1.13.21"
 val http4sVersion = "0.23.17"
 val circeVersion = "0.14.15"
+val scalaTestVersion = "3.2.20"
+val scalaMockVersion = "7.5.5"
 
 lazy val root = (project in file("."))
   .settings(
     name := "gotrip-backend",
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-effect" % "3.7.0",
+      "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
+      "org.scalamock" %% "scalamock" % scalaMockVersion % Test,
       
       "com.softwaremill.sttp.tapir" %% "tapir-core" % tapirVersion,
       "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % tapirVersion,
