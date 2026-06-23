@@ -4,9 +4,8 @@ import cats.effect.IO
 import gotrip.domain.additionalservice.*
 import gotrip.domain.location.*
 import gotrip.domain.provider.*
-import gotrip.http.{ApiError, ValidationError}
+import gotrip.http.{HttpError, ValidationError}
 import gotrip.service.additionalservice.{AdditionalServiceService, AdditionalServiceServiceError}
-import sttp.model.StatusCode
 import sttp.tapir.server.ServerEndpoint
 
 final class AdditionalServiceController(service: AdditionalServiceService[IO]):
@@ -46,7 +45,7 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
     AdditionalServiceEndpoints.adminCreateAdditionalService.serverLogic { additionalService =>
       AdditionalServiceValidator.validate(additionalService).toEither match
         case Left(errors) =>
-          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
+          IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validService) =>
           service.create(validService).attempt.map {
             case Right(Right(created)) =>
@@ -64,7 +63,7 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
     AdditionalServiceEndpoints.adminUpdateAdditionalService.serverLogic { case (id, additionalService) =>
       AdditionalServiceValidator.validate(additionalService).toEither match
         case Left(errors) =>
-          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
+          IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validService) =>
           service.update(id, validService).attempt.map {
             case Right(Right(updated)) =>
@@ -122,10 +121,7 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
     s"Location with id ${id.value} was not found"
 
   private def notFound(message: String): AdditionalServiceEndpoints.ErrorResponse =
-    StatusCode.NotFound -> ApiError("NOT_FOUND", message)
-
-  private def validationError(error: ApiError): AdditionalServiceEndpoints.ErrorResponse =
-    StatusCode.UnprocessableEntity -> error
+    HttpError.NotFound(message)
 
   private def internalError(error: Throwable): AdditionalServiceEndpoints.ErrorResponse =
-    StatusCode.InternalServerError -> ApiError("INTERNAL_ERROR", error.getMessage)
+    HttpError.Internal(error.getMessage)
