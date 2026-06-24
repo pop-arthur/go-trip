@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: GoTrip REST API
   version: 1.0.0
-  description: Swagger/OpenAPI documentation for the GoTrip Travel Assistant MVP. The API covers user registration/login, trips, locations, orders, uploaded files, push notification preferences, statistics, recommendations, reviews, achievements, and admin actions.
+  description: Swagger/OpenAPI documentation for the GoTrip Travel Assistant MVP. The API covers user registration/login, trips, locations, orders, uploaded files, notification preferences and history, statistics, recommendations, reviews, achievements, and admin actions.
 servers:
 - url: http://localhost:8080/api/v1
   description: Local development server
@@ -24,7 +24,7 @@ tags:
 - name: Order Files
   description: Uploaded booking files, PDFs and screenshots.
 - name: Notifications
-  description: Push notification preferences.
+  description: Push notification preferences and user notification history.
 - name: Statistics
   description: Post-trip analytics and upcoming trips.
 - name: Providers
@@ -74,6 +74,8 @@ paths:
     "$ref": "./paths/order-files.yaml#/paths/~1orders~1{orderId}~1files~1{fileId}"
   "/notification-preferences":
     "$ref": "./paths/notifications.yaml#/paths/~1notification-preferences"
+  "/notifications":
+    "$ref": "./paths/notifications.yaml#/paths/~1notifications"
   "/statistics/countries":
     "$ref": "./paths/statistics.yaml#/paths/~1statistics~1countries"
   "/statistics/spending":
@@ -330,6 +332,14 @@ components:
       - TRANSPORT_COMPANY
       - BOOKING_PLATFORM
       - INSURANCE_COMPANY
+      - OTHER
+    NotificationType:
+      type: string
+      enum:
+      - STATUS_CHANGE
+      - REMINDER
+      - GENERAL
+      - PROMO
       - OTHER
     ReviewTargetType:
       type: string
@@ -1011,6 +1021,55 @@ components:
         is_enabled:
           type: boolean
           example: true
+    UserNotification:
+      type: object
+      required:
+      - id
+      - user_id
+      - type
+      - title
+      - body
+      - is_read
+      - sent_at
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        user_id:
+          type: integer
+          format: int64
+          example: 1
+        order_id:
+          type: integer
+          format: int64
+          nullable: true
+          example: 42
+        type:
+          "$ref": "#/components/schemas/NotificationType"
+        title:
+          type: string
+          example: Flight status changed
+        body:
+          type: string
+          example: Your flight was delayed by 2 hours.
+        is_read:
+          type: boolean
+          example: false
+        sent_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-06-10T10:00:00Z'
     AdditionalService:
       type: object
       required:
