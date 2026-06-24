@@ -4,8 +4,9 @@ import cats.effect.{IO, IOApp}
 import cats.syntax.either.*
 import pureconfig.ConfigSource
 import pureconfig.error.ConfigReaderException
-import gotrip.config.{DatabaseConfig, ServerConfig}
+import gotrip.config.{AuthConfig, DatabaseConfig, ServerConfig}
 import gotrip.database.{Migration, SkunkSessionPool}
+import gotrip.http.auth.{AuthController, AuthSupport}
 import gotrip.http.additionalservice.AdditionalServiceController
 import gotrip.http.location.LocationController
 import gotrip.http.provider.ProviderController
@@ -27,7 +28,9 @@ import gotrip.repository.notificationpreference.NotificationPreferenceRepository
 import gotrip.repository.achievement.AchievementRepository
 import gotrip.repository.userachievement.UserAchievementRepository
 import gotrip.repository.review.ReviewRepository
+import gotrip.repository.auth.AuthSessionRepository
 
+import gotrip.service.auth.{AuthService, JwtService, PasswordHasher}
 import gotrip.service.additionalservice.AdditionalServiceService
 import gotrip.service.location.LocationService
 import gotrip.service.provider.ProviderService
@@ -58,6 +61,10 @@ object Main extends IOApp.Simple {
         ConfigSource.default.at("gotrip.server").load[ServerConfig]
           .leftMap(e => ConfigReaderException[ServerConfig](e))
       )
+      authConfig <- IO.fromEither(
+        ConfigSource.default.at("gotrip.auth").load[AuthConfig]
+          .leftMap(e => ConfigReaderException[AuthConfig](e))
+      )
 
       _ <- IO.println("Running Flyway migrations...")
       _ <- Migration.migrate[IO](databaseConfig)
@@ -75,8 +82,11 @@ object Main extends IOApp.Simple {
         val achievementRepository = AchievementRepository.makePostgres[IO](sessionPool)
         val userAchievementRepository = UserAchievementRepository.makePostgres[IO](sessionPool)
         val reviewRepository = ReviewRepository.makePostgres[IO](sessionPool)
+        val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
 
         // ---- Service Layer ----
+        val jwtService = new JwtService[IO](authConfig)
+        val passwordHasher = PasswordHasher.bcrypt[IO](authConfig.passwordCost)
         val locationService = LocationService[IO](locationRepository)
         val tripLocationService = TripLocationService[IO](tripLocationRepository)
         val providerService = ProviderService[IO](providerRepository)
@@ -87,22 +97,32 @@ object Main extends IOApp.Simple {
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
         val reviewService = new ReviewService[IO](reviewRepository)
+        val authService = new AuthService[IO](
+          userRepository,
+          authSessionRepository,
+          passwordHasher,
+          jwtService,
+          authConfig.refreshTokenTtl
+        )
 
         // ---- Controller Layer ----
-        val locationController = LocationController(locationService)
-        val tripLocationController = TripLocationController(tripLocationService)
-        val providerController = ProviderController(providerService)
-        val additionalServiceController = AdditionalServiceController(additionalServiceService)
-        val userController = new UserController(userService)
-        val notificationController = new NotificationController(notificationService)
-        val notifPrefController = new NotificationPreferenceController(notifPrefService)
-        val achievementController = new AchievementController(achievementService)
-        val adminAchievementController = new AdminAchievementController(achievementService)
-        val userAchievementController = new UserAchievementController(userAchievementService)
-        val reviewController = new ReviewController(reviewService)
+        val authSupport = new AuthSupport(jwtService)
+        val authController = new AuthController(authService, authSupport)
+        val locationController = new LocationController(locationService, authSupport)
+        val tripLocationController = new TripLocationController(tripLocationService, authSupport)
+        val providerController = new ProviderController(providerService, authSupport)
+        val additionalServiceController = new AdditionalServiceController(additionalServiceService, authSupport)
+        val userController = new UserController(userService, authSupport)
+        val notificationController = new NotificationController(notificationService, authSupport)
+        val notifPrefController = new NotificationPreferenceController(notifPrefService, authSupport)
+        val achievementController = new AchievementController(achievementService, authSupport)
+        val adminAchievementController = new AdminAchievementController(achievementService, authSupport)
+        val userAchievementController = new UserAchievementController(userAchievementService, authSupport)
+        val reviewController = new ReviewController(reviewService, authSupport)
 
         // ---- Сборка всех эндпоинтов ----
         val serverEndpoints =
+          authController.all ++
           locationController.all ++
           tripLocationController.all ++
           providerController.all ++

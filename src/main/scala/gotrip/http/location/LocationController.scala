@@ -3,13 +3,16 @@ package gotrip.http.location
 import cats.effect.IO
 import gotrip.domain.location.*
 import gotrip.http.{HttpError, ValidationError}
+import gotrip.http.auth.AuthSupport
 import gotrip.service.location.LocationService
 import sttp.tapir.server.ServerEndpoint
 
-final class LocationController(service: LocationService[IO]):
+final class LocationController(service: LocationService[IO], authSupport: AuthSupport):
 
   val listLocations: ServerEndpoint[Any, IO] =
-    LocationEndpoints.listLocations.serverLogic { case (locationType, country, city, query) =>
+    LocationEndpoints.listLocations
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (locationType, country, city, query) =>
       val params = LocationSearchParams(
         `type` = locationType,
         country = country,
@@ -24,10 +27,12 @@ final class LocationController(service: LocationService[IO]):
         case Left(error) =>
           Left(internalError(error))
       }
-    }
+    }}
 
   val getLocation: ServerEndpoint[Any, IO] =
-    LocationEndpoints.getLocation.serverLogic { id =>
+    LocationEndpoints.getLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       service.findById(id).attempt.map {
         case Right(Some(location)) =>
           Right(location)
@@ -41,7 +46,9 @@ final class LocationController(service: LocationService[IO]):
     }
 
   val createLocation: ServerEndpoint[Any, IO] =
-    LocationEndpoints.createLocation.serverLogic { location =>
+    LocationEndpoints.createLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => location =>
       LocationValidator.validate(location).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -56,7 +63,9 @@ final class LocationController(service: LocationService[IO]):
     }
 
   val updateLocation: ServerEndpoint[Any, IO] =
-    LocationEndpoints.updateLocation.serverLogic { case (id, location) =>
+    LocationEndpoints.updateLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (id, location) =>
       LocationValidator.validate(location).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -71,10 +80,12 @@ final class LocationController(service: LocationService[IO]):
             case Left(error) =>
               Left(internalError(error))
           }
-    }
+    }}
 
   val deleteLocation: ServerEndpoint[Any, IO] =
-    LocationEndpoints.deleteLocation.serverLogic { id =>
+    LocationEndpoints.deleteLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       service.delete(id).attempt.map {
         case Right(true) =>
           Right(())

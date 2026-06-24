@@ -2,6 +2,7 @@ package gotrip.http.location
 
 import gotrip.domain.location.*
 import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.json.circe.*
@@ -12,8 +13,9 @@ object LocationEndpoints:
   type ErrorResponse = HttpError
 
   val listLocations
-      : PublicEndpoint[(Option[LocationType], Option[String], Option[String], Option[String]), ErrorResponse, List[Location], Any] =
+      : Endpoint[String, (Option[LocationType], Option[String], Option[String], Option[String]), ErrorResponse, List[Location], Any] =
     endpoint.get
+      .securityIn(AuthEndpoints.bearer)
       .in("locations")
       .in(query[Option[LocationType]]("type"))
       .in(query[Option[String]]("country"))
@@ -22,29 +24,33 @@ object LocationEndpoints:
       .errorOut(EndpointErrors.internalOnly)
       .out(jsonBody[List[Location]])
 
-  val getLocation: PublicEndpoint[LocationId, ErrorResponse, Location, Any] =
+  val getLocation: Endpoint[String, LocationId, ErrorResponse, Location, Any] =
     endpoint.get
+      .securityIn(AuthEndpoints.bearer)
       .in("locations" / path[LocationId]("locationId"))
       .errorOut(EndpointErrors.notFound)
       .out(jsonBody[Location])
 
-  val createLocation: PublicEndpoint[LocationCreate, ErrorResponse, Location, Any] =
+  val createLocation: Endpoint[String, LocationCreate, ErrorResponse, Location, Any] =
     endpoint.post
+      .securityIn(AuthEndpoints.bearer)
       .in("locations")
       .in(jsonBody[LocationCreate])
       .errorOut(EndpointErrors.validation)
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[Location])
 
-  val updateLocation: PublicEndpoint[(LocationId, LocationUpdate), ErrorResponse, Location, Any] =
+  val updateLocation: Endpoint[String, (LocationId, LocationUpdate), ErrorResponse, Location, Any] =
     endpoint.patch
+      .securityIn(AuthEndpoints.bearer)
       .in("locations" / path[LocationId]("locationId"))
       .in(jsonBody[LocationUpdate])
       .errorOut(EndpointErrors.validationOrNotFound)
       .out(jsonBody[Location])
 
-  val deleteLocation: PublicEndpoint[LocationId, ErrorResponse, Unit, Any] =
+  val deleteLocation: Endpoint[String, LocationId, ErrorResponse, Unit, Any] =
     endpoint.delete
+      .securityIn(AuthEndpoints.bearer)
       .in("locations" / path[LocationId]("locationId"))
       .errorOut(EndpointErrors.notFound)
       .out(statusCode(StatusCode.NoContent))

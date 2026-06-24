@@ -4,14 +4,18 @@ import cats.effect.IO
 import gotrip.domain.additionalservice.*
 import gotrip.domain.location.*
 import gotrip.domain.provider.*
+import gotrip.domain.userrole.Role
 import gotrip.http.{HttpError, ValidationError}
+import gotrip.http.auth.AuthSupport
 import gotrip.service.additionalservice.{AdditionalServiceService, AdditionalServiceServiceError}
 import sttp.tapir.server.ServerEndpoint
 
-final class AdditionalServiceController(service: AdditionalServiceService[IO]):
+final class AdditionalServiceController(service: AdditionalServiceService[IO], authSupport: AuthSupport):
 
   val listAdditionalServices: ServerEndpoint[Any, IO] =
-    AdditionalServiceEndpoints.listAdditionalServices.serverLogic { case (serviceType, locationId, providerId) =>
+    AdditionalServiceEndpoints.listAdditionalServices
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (serviceType, locationId, providerId) =>
       val params = AdditionalServiceSearchParams(
         serviceType = serviceType,
         locationId = locationId,
@@ -25,10 +29,12 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
         case Left(error) =>
           Left(internalError(error))
       }
-    }
+    }}
 
   val getAdditionalService: ServerEndpoint[Any, IO] =
-    AdditionalServiceEndpoints.getAdditionalService.serverLogic { id =>
+    AdditionalServiceEndpoints.getAdditionalService
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       service.findById(id).attempt.map {
         case Right(Some(additionalService)) =>
           Right(additionalService)
@@ -42,7 +48,9 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
     }
 
   val adminCreateAdditionalService: ServerEndpoint[Any, IO] =
-    AdditionalServiceEndpoints.adminCreateAdditionalService.serverLogic { additionalService =>
+    AdditionalServiceEndpoints.adminCreateAdditionalService
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => additionalService =>
       AdditionalServiceValidator.validate(additionalService).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -60,7 +68,9 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
     }
 
   val adminUpdateAdditionalService: ServerEndpoint[Any, IO] =
-    AdditionalServiceEndpoints.adminUpdateAdditionalService.serverLogic { case (id, additionalService) =>
+    AdditionalServiceEndpoints.adminUpdateAdditionalService
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => { case (id, additionalService) =>
       AdditionalServiceValidator.validate(additionalService).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -75,10 +85,12 @@ final class AdditionalServiceController(service: AdditionalServiceService[IO]):
             case Left(error) =>
               Left(internalError(error))
           }
-    }
+    }}
 
   val adminDeleteAdditionalService: ServerEndpoint[Any, IO] =
-    AdditionalServiceEndpoints.adminDeleteAdditionalService.serverLogic { id =>
+    AdditionalServiceEndpoints.adminDeleteAdditionalService
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => id =>
       service.delete(id).attempt.map {
         case Right(Right(_)) =>
           Right(())

@@ -2,15 +2,19 @@ package gotrip.http.achievement
 
 import cats.effect.IO
 import gotrip.domain.achievement._
+import gotrip.domain.userrole.Role
 import gotrip.http.HttpError
+import gotrip.http.auth.AuthSupport
 import gotrip.service.achievement.AchievementService
 import sttp.tapir.server.ServerEndpoint
 import AchievementCodecs.{AchievementCreateRequest, AchievementUpdateRequest}
 
-final class AdminAchievementController(service: AchievementService[IO]):
+final class AdminAchievementController(service: AchievementService[IO], authSupport: AuthSupport):
 
   val adminCreate: ServerEndpoint[Any, IO] =
-    AdminAchievementEndpoints.adminCreateAchievement.serverLogic { request =>
+    AdminAchievementEndpoints.adminCreateAchievement
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => request =>
       val achievement = Achievement(
         id = AchievementId(0L),
         code = AchievementCode(request.code),
@@ -29,7 +33,9 @@ final class AdminAchievementController(service: AchievementService[IO]):
     }
 
   val adminUpdate: ServerEndpoint[Any, IO] =
-    AdminAchievementEndpoints.adminUpdateAchievement.serverLogic { case (id, update) =>
+    AdminAchievementEndpoints.adminUpdateAchievement
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => { case (id, update) =>
       service.findById(id).flatMap {
         case Some(existing) =>
           val updated = existing.copy(
@@ -50,10 +56,12 @@ final class AdminAchievementController(service: AchievementService[IO]):
         case None =>
           IO.pure(Left(HttpError.NotFound(s"Achievement ${id.value} not found")))
       }
-    }
+    }}
 
   val adminDelete: ServerEndpoint[Any, IO] =
-    AdminAchievementEndpoints.adminDeleteAchievement.serverLogic { id =>
+    AdminAchievementEndpoints.adminDeleteAchievement
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => id =>
       service.delete(id).attempt.map {
         case Right(n) if n == 1 => Right(())
         case Right(n) if n == 0 => Left(HttpError.NotFound(s"Achievement ${id.value} not found"))
