@@ -3,9 +3,8 @@ package gotrip.http.triplocation
 import cats.effect.IO
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
-import gotrip.http.{ApiError, ValidationError}
+import gotrip.http.{HttpError, ValidationError}
 import gotrip.service.triplocation.{TripLocationService, TripLocationServiceError}
-import sttp.model.StatusCode
 import sttp.tapir.server.ServerEndpoint
 
 final class TripLocationController(service: TripLocationService[IO]):
@@ -28,7 +27,7 @@ final class TripLocationController(service: TripLocationService[IO]):
     TripLocationEndpoints.addTripLocation.serverLogic { case (tripId, location) =>
       TripLocationValidator.validate(location).toEither match
         case Left(errors) =>
-          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
+          IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validLocation) =>
           service.create(tripId, validLocation).attempt.map {
             case Right(Right(created)) =>
@@ -46,7 +45,7 @@ final class TripLocationController(service: TripLocationService[IO]):
     TripLocationEndpoints.updateTripLocation.serverLogic { case (tripId, tripLocationId, location) =>
       TripLocationValidator.validate(location).toEither match
         case Left(errors) =>
-          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
+          IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validLocation) =>
           service.update(tripId, tripLocationId, validLocation).attempt.map {
             case Right(Right(updated)) =>
@@ -89,19 +88,16 @@ final class TripLocationController(service: TripLocationService[IO]):
         notFound(s"Trip location with id ${id.value} was not found")
 
       case TripLocationServiceError.DuplicateVisitOrder(visitOrder) =>
-        validationError(ApiError("VALIDATION_ERROR", s"Visit order ${visitOrder.value} is already used in this trip"))
+        HttpError.Validation(s"Visit order ${visitOrder.value} is already used in this trip")
 
       case TripLocationServiceError.InvalidDateRange =>
-        validationError(ApiError("VALIDATION_ERROR", "Arrival date must be before or equal to departure date"))
+        HttpError.Validation("Arrival date must be before or equal to departure date")
 
   private def locationNotFoundMessage(id: LocationId): String =
     s"Location with id ${id.value} was not found"
 
   private def notFound(message: String): TripLocationEndpoints.ErrorResponse =
-    StatusCode.NotFound -> ApiError("NOT_FOUND", message)
-
-  private def validationError(error: ApiError): TripLocationEndpoints.ErrorResponse =
-    StatusCode.UnprocessableEntity -> error
+    HttpError.NotFound(message)
 
   private def internalError(error: Throwable): TripLocationEndpoints.ErrorResponse =
-    StatusCode.InternalServerError -> ApiError("INTERNAL_ERROR", error.getMessage)
+    HttpError.Internal(error.getMessage)

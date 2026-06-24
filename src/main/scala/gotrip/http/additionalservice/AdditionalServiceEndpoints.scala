@@ -3,7 +3,7 @@ package gotrip.http.additionalservice
 import gotrip.domain.additionalservice.*
 import gotrip.domain.location.*
 import gotrip.domain.provider.*
-import gotrip.http.ApiError
+import gotrip.http.{EndpointErrors, HttpError}
 import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.json.circe.*
@@ -11,10 +11,7 @@ import sttp.tapir.json.circe.*
 object AdditionalServiceEndpoints:
   import AdditionalServiceCodecs.given
 
-  type ErrorResponse = (StatusCode, ApiError)
-
-  private val errorOut: EndpointOutput[ErrorResponse] =
-    statusCode.and(jsonBody[ApiError])
+  type ErrorResponse = HttpError
 
   val listAdditionalServices
       : PublicEndpoint[(Option[ServiceType], Option[LocationId], Option[ProviderId]), ErrorResponse, List[AdditionalService], Any] =
@@ -23,20 +20,20 @@ object AdditionalServiceEndpoints:
       .in(query[Option[ServiceType]]("serviceType"))
       .in(query[Option[LocationId]]("locationId"))
       .in(query[Option[ProviderId]]("providerId"))
-      .errorOut(errorOut)
+      .errorOut(EndpointErrors.internalOnly)
       .out(jsonBody[List[AdditionalService]])
 
   val getAdditionalService: PublicEndpoint[ServiceId, ErrorResponse, AdditionalService, Any] =
     endpoint.get
       .in("additional-services" / path[ServiceId]("serviceId"))
-      .errorOut(errorOut)
+      .errorOut(EndpointErrors.notFound)
       .out(jsonBody[AdditionalService])
 
   val adminCreateAdditionalService: PublicEndpoint[AdditionalServiceCreate, ErrorResponse, AdditionalService, Any] =
     endpoint.post
       .in("admin" / "additional-services")
       .in(jsonBody[AdditionalServiceCreate])
-      .errorOut(errorOut)
+      .errorOut(EndpointErrors.validationOrNotFound)
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[AdditionalService])
 
@@ -45,11 +42,11 @@ object AdditionalServiceEndpoints:
     endpoint.patch
       .in("admin" / "additional-services" / path[ServiceId]("serviceId"))
       .in(jsonBody[AdditionalServiceUpdate])
-      .errorOut(errorOut)
+      .errorOut(EndpointErrors.validationOrNotFound)
       .out(jsonBody[AdditionalService])
 
   val adminDeleteAdditionalService: PublicEndpoint[ServiceId, ErrorResponse, Unit, Any] =
     endpoint.delete
       .in("admin" / "additional-services" / path[ServiceId]("serviceId"))
-      .errorOut(errorOut)
+      .errorOut(EndpointErrors.notFound)
       .out(statusCode(StatusCode.NoContent))
