@@ -131,6 +131,7 @@ object PostgresUserRepository {
     sql"""
       INSERT INTO user_roles (user_id, role, created_at, updated_at)
       VALUES ($int8, $text, $timestamptz, $timestamptz)
+      ON CONFLICT (user_id, role) DO NOTHING
     """.command
 
   val removeRoleCommand: Command[(Long, String)] =
