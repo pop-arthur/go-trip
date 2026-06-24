@@ -11,6 +11,7 @@ import gotrip.http.location.LocationController
 import gotrip.http.provider.ProviderController
 import gotrip.http.triplocation.TripLocationController
 import gotrip.http.user.UserController
+import gotrip.http.notification.NotificationController
 import gotrip.http.notificationpreference.NotificationPreferenceController
 import gotrip.http.achievement.{AchievementController, AdminAchievementController}
 import gotrip.http.userachievement.UserAchievementController
@@ -21,6 +22,7 @@ import gotrip.repository.location.LocationRepository
 import gotrip.repository.provider.ProviderRepository
 import gotrip.repository.triplocation.TripLocationRepository
 import gotrip.repository.user.UserRepository
+import gotrip.repository.notification.NotificationRepository
 import gotrip.repository.notificationpreference.NotificationPreferenceRepository
 import gotrip.repository.achievement.AchievementRepository
 import gotrip.repository.userachievement.UserAchievementRepository
@@ -31,6 +33,7 @@ import gotrip.service.location.LocationService
 import gotrip.service.provider.ProviderService
 import gotrip.service.triplocation.TripLocationService
 import gotrip.service.user.UserService
+import gotrip.service.notification.NotificationService
 import gotrip.service.notificationpreference.NotificationPreferenceService
 import gotrip.service.achievement.AchievementService
 import gotrip.service.userachievement.UserAchievementService
@@ -67,6 +70,7 @@ object Main extends IOApp.Simple {
         val providerRepository = ProviderRepository.makePostgres[IO](sessionPool)
         val additionalServiceRepository = AdditionalServiceRepository.makePostgres[IO](sessionPool)
         val userRepository = UserRepository.makePostgres[IO](sessionPool)
+        val notificationRepository = NotificationRepository.makePostgres[IO](sessionPool)
         val notifPrefRepository = NotificationPreferenceRepository.makePostgres[IO](sessionPool)
         val achievementRepository = AchievementRepository.makePostgres[IO](sessionPool)
         val userAchievementRepository = UserAchievementRepository.makePostgres[IO](sessionPool)
@@ -78,6 +82,7 @@ object Main extends IOApp.Simple {
         val providerService = ProviderService[IO](providerRepository)
         val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
         val userService = new UserService[IO](userRepository)
+        val notificationService = new NotificationService[IO](notificationRepository)
         val notifPrefService = new NotificationPreferenceService[IO](notifPrefRepository)
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
@@ -89,6 +94,7 @@ object Main extends IOApp.Simple {
         val providerController = ProviderController(providerService)
         val additionalServiceController = AdditionalServiceController(additionalServiceService)
         val userController = new UserController(userService)
+        val notificationController = new NotificationController(notificationService)
         val notifPrefController = new NotificationPreferenceController(notifPrefService)
         val achievementController = new AchievementController(achievementService)
         val adminAchievementController = new AdminAchievementController(achievementService)
@@ -102,6 +108,7 @@ object Main extends IOApp.Simple {
           providerController.all ++
           additionalServiceController.all ++
           userController.all ++
+          notificationController.all ++
           notifPrefController.all ++
           achievementController.all ++
           adminAchievementController.all ++

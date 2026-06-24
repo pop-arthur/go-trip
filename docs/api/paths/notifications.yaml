@@ -38,3 +38,20 @@ paths:
           "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
         '422':
           "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/notifications":
+    get:
+      tags:
+      - Notifications
+      summary: List current user notifications
+      operationId: listCurrentUserNotifications
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  "$ref": "../gotrip-openapi.yaml#/components/schemas/UserNotification"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
