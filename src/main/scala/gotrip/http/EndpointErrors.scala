@@ -7,6 +7,18 @@ import sttp.tapir.json.circe.*
 object EndpointErrors:
   import HttpError.given
 
+  private val unauthorizedVariant =
+    oneOfVariant(
+      statusCode(StatusCode.Unauthorized)
+        .and(jsonBody[HttpError.Unauthorized].description("Authentication required"))
+    )
+
+  private val forbiddenVariant =
+    oneOfVariant(
+      statusCode(StatusCode.Forbidden)
+        .and(jsonBody[HttpError.Forbidden].description("Permission denied"))
+    )
+
   private val validationVariant =
     oneOfVariant(
       statusCode(StatusCode.UnprocessableEntity)
@@ -33,23 +45,31 @@ object EndpointErrors:
 
   val internalOnly =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       internalVariant
     )
 
   val notFound =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       notFoundVariant,
       internalVariant
     )
 
   val validation =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       validationVariant,
       internalVariant
     )
 
   val validationOrNotFound =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       validationVariant,
       notFoundVariant,
       internalVariant
@@ -57,6 +77,8 @@ object EndpointErrors:
 
   val notFoundOrConflict =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       notFoundVariant,
       conflictVariant,
       internalVariant
@@ -64,6 +86,8 @@ object EndpointErrors:
 
   val validationOrConflict =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       validationVariant,
       conflictVariant,
       internalVariant
@@ -71,6 +95,8 @@ object EndpointErrors:
 
   val validationOrNotFoundOrConflict =
     oneOf[HttpError](
+      unauthorizedVariant,
+      forbiddenVariant,
       validationVariant,
       notFoundVariant,
       conflictVariant,
