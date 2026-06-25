@@ -44,6 +44,7 @@ import gotrip.service.review.ReviewService
 
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
+import org.http4s.server.middleware.CORS
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 
@@ -141,11 +142,16 @@ object Main extends IOApp.Simple {
         val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
         val httpApp = Router("/" -> routes).orNotFound
 
+        // ---- CORS middleware (разрешить все источники для разработки) ----
+        val corsApp = CORS.policy
+          .withAllowOriginAll
+          .apply(httpApp)
+
         IO.println(s"Starting HTTP server on ${serverConfig.host}:${serverConfig.port}...") >>
           BlazeServerBuilder[IO]
             .withExecutionContext(ExecutionContext.global)
             .bindHttp(serverConfig.port, serverConfig.host)
-            .withHttpApp(httpApp)
+            .withHttpApp(corsApp)
             .resource
             .use(_ => IO.never)
       }
