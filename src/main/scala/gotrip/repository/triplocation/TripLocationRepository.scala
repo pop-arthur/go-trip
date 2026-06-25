@@ -3,6 +3,7 @@ package gotrip.repository.triplocation
 import cats.effect.{Concurrent, Resource}
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
+import gotrip.domain.user.UserId
 import skunk.Session
 
 trait TripLocationRepository[F[_]]:
@@ -12,6 +13,7 @@ trait TripLocationRepository[F[_]]:
   def update(tripId: TripId, tripLocationId: TripLocationId, location: TripLocationUpdate): F[Option[TripLocation]]
   def delete(tripId: TripId, tripLocationId: TripLocationId): F[Boolean]
   def tripExists(tripId: TripId): F[Boolean]
+  def tripExistsForUser(userId: UserId, tripId: TripId): F[Boolean]
   def locationExists(locationId: LocationId): F[Boolean]
   def visitOrderExists(
     tripId: TripId,
