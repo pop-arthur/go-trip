@@ -21,7 +21,7 @@ Backend-сервис GoTrip для управления поездками, ло
 ```text
 go-trip/
 ├── build.sbt
-├── docker-compose.yml
+├── docker-compose.yml               # PostgreSQL + приложение
 ├── docs/
 │   ├── api/                         # OpenAPI-спецификация
 │   ├── database/                    # ER-диаграмма и описание БД
@@ -50,24 +50,48 @@ go-trip/
 - sbt
 - Docker и Docker Compose
 
-## Быстрый старт
+## Быстрый старт через Docker
 
-1. Запустить PostgreSQL:
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. Запустить приложение:
+1. Создать локальный `.env`:
 
    ```bash
-   sbt run
+   cp .env.example .env
    ```
 
-3. Открыть Swagger UI:
+2. Собрать Docker-образ приложения:
+
+   ```bash
+   sbt native
+   ```
+
+   Проверить:
+
+   ```bash
+   docker images | grep gotrip-backend
+   ```
+
+3. Поднять приложение и PostgreSQL:
+
+   ```bash
+   docker compose up
+   ```
+
+4. Проверить API:
 
    ```text
    http://localhost:8080/docs
+   ```
+
+5. Остановить контейнеры:
+
+   ```bash
+   docker compose down
+   ```
+
+   Чтобы также удалить volume с данными PostgreSQL:
+
+   ```bash
+   docker compose down -v
    ```
 
 При старте приложение загружает конфигурацию, выполняет Flyway-миграции, создает Skunk-пул соединений и поднимает HTTP-сервер.
@@ -76,17 +100,27 @@ go-trip/
 
 Основные настройки находятся в `src/main/resources/application.conf`.
 
-По умолчанию приложение использует:
+Файл содержит локальные значения по умолчанию и поддерживает переопределение через переменные окружения. Пароли и секреты дефолтных значений не имеют.
 
-```text
-host:      0.0.0.0
-port:      8080
-database:  jdbc:postgresql://localhost:5432/gotrip
-user:      gotrip_user
-password:  secret
+Для локального запуска вне Docker по умолчанию используется `localhost:5432`, внутри Docker Compose — сервис `postgres`.
+
+В контейнере приложения настройки переопределяются переменными окружения:
+
+- `GOTRIP_DB_URL=jdbc:postgresql://postgres:5432/gotrip`
+- `GOTRIP_DB_HOST=postgres`
+- `GOTRIP_DB_PORT=5432`
+- `GOTRIP_DB_NAME=gotrip`
+- `GOTRIP_DB_USER=gotrip_user`
+- `GOTRIP_DB_PASSWORD` — пароль БД, задаётся через `.env` или окружение
+- `GOTRIP_SERVER_HOST=0.0.0.0`
+- `GOTRIP_SERVER_PORT=8080`
+
+Если после смены пароля PostgreSQL падает с `password authentication failed`, а volume уже существовал, пересоздайте локальный volume:
+
+```bash
+docker compose down -v
+docker compose up
 ```
-
-Эти значения должны совпадать с параметрами в `docker-compose.yml`.
 
 ## Миграции
 

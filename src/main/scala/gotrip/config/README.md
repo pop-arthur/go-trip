@@ -13,7 +13,7 @@ gotrip {
   database {
     url = "jdbc:postgresql://localhost:5432/gotrip"
     user = "gotrip_user"
-    password = "secret"
+    password = ${GOTRIP_DB_PASSWORD}
     driver = "org.postgresql.Driver"
     connectionPool {
       maxSize = 10
