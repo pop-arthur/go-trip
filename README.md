@@ -84,14 +84,20 @@ go-trip/
 - `GOTRIP_DB_PORT=5432`
 - `GOTRIP_DB_NAME=gotrip`
 - `GOTRIP_DB_USER=gotrip_user`
-- `GOTRIP_DB_PASSWORD=secret`
+- `GOTRIP_DB_PASSWORD` — пароль БД, задаётся через `.env` или окружение
 - `GOTRIP_SERVER_HOST=0.0.0.0`
 - `GOTRIP_SERVER_PORT=8080`
 
 ## Конфигурация
 
-Файл `application.conf` содержит локальные значения по умолчанию и поддерживает переопределение через переменные окружения.
+Файл `application.conf` содержит локальные значения по умолчанию и поддерживает переопределение через переменные окружения. Пароли и секреты дефолтных значений не имеют.
 Для локального запуска вне Docker по умолчанию используется `localhost:5432`, внутри Docker Compose — сервис `postgres`.
+
+Для локальной разработки используйте `.env`:
+
+```bash
+cp .env.example .env
+```
 
 ## Миграции
 

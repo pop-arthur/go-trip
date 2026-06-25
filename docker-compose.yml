@@ -10,7 +10,7 @@ services:
       GOTRIP_DB_PORT: 5432
       GOTRIP_DB_NAME: gotrip
       GOTRIP_DB_USER: gotrip_user
-      GOTRIP_DB_PASSWORD: secret
+      GOTRIP_DB_PASSWORD: ${GOTRIP_DB_PASSWORD:?GOTRIP_DB_PASSWORD is required}
       GOTRIP_SERVER_HOST: 0.0.0.0
       GOTRIP_SERVER_PORT: 8080
     ports:
@@ -21,7 +21,7 @@ services:
     environment:
       POSTGRES_DB: gotrip
       POSTGRES_USER: gotrip_user
-      POSTGRES_PASSWORD: secret
+      POSTGRES_PASSWORD: ${GOTRIP_DB_PASSWORD:?GOTRIP_DB_PASSWORD is required}
     ports:
       - "5432:5432"
     volumes:
