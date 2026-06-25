@@ -4,6 +4,7 @@ import gotrip.domain.validation.DomainValidation.Result
 import gotrip.domain.validation.DomainValidation.*
 
 import java.time.OffsetDateTime
+import java.time.LocalDate
 import scala.annotation.targetName
 
 package object trip {
@@ -16,6 +17,42 @@ package object trip {
   }
   extension (id: TripId) {
     def value: Long = id
+  }
+
+  opaque type TripTitle = String
+  object TripTitle {
+    def apply(value: String): TripTitle = value
+
+    def from(value: String): Result[TripTitle] =
+      validateNonBlank(value, TripTitleIsBlank)(TripTitle.apply)
+  }
+  extension (title: TripTitle) {
+    @targetName("tripTitleValue")
+    def value: String = title
+  }
+
+  opaque type TripStartDate = Option[LocalDate]
+  object TripStartDate {
+    def apply(value: Option[LocalDate]): TripStartDate = value
+
+    def from(value: Option[LocalDate]): Result[TripStartDate] =
+      valid(TripStartDate(value))
+  }
+  extension (startDate: TripStartDate) {
+    @targetName("tripStartDateValue")
+    def value: Option[LocalDate] = startDate
+  }
+
+  opaque type TripEndDate = Option[LocalDate]
+  object TripEndDate {
+    def apply(value: Option[LocalDate]): TripEndDate = value
+
+    def from(value: Option[LocalDate]): Result[TripEndDate] =
+      valid(TripEndDate(value))
+  }
+  extension (endDate: TripEndDate) {
+    @targetName("tripEndDateValue")
+    def value: Option[LocalDate] = endDate
   }
 
   opaque type TripLocationId = Long
