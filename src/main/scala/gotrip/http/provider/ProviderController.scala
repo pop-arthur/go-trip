@@ -2,9 +2,8 @@ package gotrip.http.provider
 
 import cats.effect.IO
 import gotrip.domain.provider.*
-import gotrip.http.{ApiError, ValidationError}
+import gotrip.http.{HttpError, ValidationError}
 import gotrip.service.provider.{ProviderService, ProviderServiceError}
-import sttp.model.StatusCode
 import sttp.tapir.server.ServerEndpoint
 
 final class ProviderController(service: ProviderService[IO]):
@@ -53,7 +52,7 @@ final class ProviderController(service: ProviderService[IO]):
     ProviderEndpoints.adminUpdateProvider.serverLogic { case (id, provider) =>
       ProviderValidator.validate(provider).toEither match
         case Left(errors) =>
-          IO.pure(Left(validationError(ValidationError.toApiError(errors))))
+          IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validProvider) =>
           service.update(id, validProvider).attempt.map {
             case Right(Right(updated)) =>
@@ -86,7 +85,7 @@ final class ProviderController(service: ProviderService[IO]):
   private def create(provider: ProviderCreate): IO[Either[ProviderEndpoints.ErrorResponse, Provider]] =
     ProviderValidator.validate(provider).toEither match
       case Left(errors) =>
-        IO.pure(Left(validationError(ValidationError.toApiError(errors))))
+        IO.pure(Left(ValidationError.toHttpError(errors)))
       case Right(validProvider) =>
         service.create(validProvider).attempt.map {
           case Right(Right(created)) =>
@@ -117,16 +116,13 @@ final class ProviderController(service: ProviderService[IO]):
         notFound(id)
 
       case ProviderServiceError.DuplicateProviderName(name) =>
-        StatusCode.Conflict -> ApiError("CONFLICT", s"Provider with name '${name.value}' already exists")
+        HttpError.Conflict(s"Provider with name '${name.value}' already exists")
 
       case ProviderServiceError.ProviderInUse(id) =>
-        StatusCode.Conflict -> ApiError("CONFLICT", s"Provider with id ${id.value} is used by additional services")
+        HttpError.Conflict(s"Provider with id ${id.value} is used by additional services")
 
   private def notFound(id: ProviderId): ProviderEndpoints.ErrorResponse =
-    StatusCode.NotFound -> ApiError("NOT_FOUND", s"Provider with id ${id.value} was not found")
-
-  private def validationError(error: ApiError): ProviderEndpoints.ErrorResponse =
-    StatusCode.UnprocessableEntity -> error
+    HttpError.NotFound(s"Provider with id ${id.value} was not found")
 
   private def internalError(error: Throwable): ProviderEndpoints.ErrorResponse =
-    StatusCode.InternalServerError -> ApiError("INTERNAL_ERROR", error.getMessage)
+    HttpError.Internal(error.getMessage)

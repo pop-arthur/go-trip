@@ -1,84 +1,111 @@
 # GoTrip Backend
 
-Сервис для управления поездками и заказами (базовая инфраструктура).
+Backend-сервис GoTrip для управления поездками, локациями, пользователями, провайдерами, дополнительными услугами, достижениями, уведомлениями и отзывами.
 
 ## Стек технологий
 
 - **Scala 3.8.4**
+- **sbt 1.12.11**
 - **Cats Effect 3.7.0**
-- **Skunk 1.0.0** (типобезопасная работа с PostgreSQL)
-- **Flyway 12.8.1** (миграции)
-- **PostgreSQL 17** (контейнер Docker)
-- **PureConfig 0.17.10** (конфигурация)
-- **Logback** (логирование)
+- **http4s 0.23.17** + **Tapir 1.13.21**
+- **Circe 0.14.15**
+- **Skunk 1.0.0** для работы с PostgreSQL
+- **Flyway 12.8.1** для миграций
+- **PostgreSQL 17** через Docker Compose
+- **PureConfig 0.17.10**
+- **ScalaTest 3.2.20** + **ScalaMock 7.5.5**
+- **Logback** / **log4cats**
 
-## Структура проекта (текущая)
+## Структура проекта
 
-```
+```text
 go-trip/
-├── docker-compose.yml               # PostgreSQL + приложение
 ├── build.sbt
-├── README.md
+├── docker-compose.yml               # PostgreSQL + приложение
+├── docs/
+│   ├── api/                         # OpenAPI-спецификация
+│   ├── database/                    # ER-диаграмма и описание БД
+│   └── requirements/                # требования и user stories
 └── src/
     ├── main/
     │   ├── resources/
-    │   │   ├── application.conf     # настройки БД
+    │   │   ├── application.conf     # настройки сервера и БД
     │   │   ├── logback.xml
-    │   │   └── db/migration/        # SQL-скрипты Flyway
+    │   │   └── db/migration/        # SQL-миграции Flyway
     │   └── scala/gotrip/
-    │       ├── Main.scala           # точка входа
+    │       ├── Main.scala           # точка входа, миграции, HTTP-сервер
     │       ├── config/              # загрузка конфигурации
-    │       ├── database/            # SkunkSessionPool + Flyway
+    │       ├── database/            # Flyway + Skunk session pool
     │       ├── domain/              # доменные модели
-    │       ├── repository/          # доступ к данным
+    │       ├── http/                # Tapir endpoints, controllers, codecs
+    │       ├── repository/          # PostgreSQL и in-memory репозитории
     │       └── service/             # бизнес-логика
+    └── test/
+        └── scala/gotrip/            # ScalaTest specs
 ```
+
+## Требования
+
+- JDK 21 или новее
+- sbt
+- Docker и Docker Compose
 
 ## Быстрый старт через Docker
 
-Приложение запускается из Docker-образа, собранного через `sbt-native-packager`.
+1. Создать локальный `.env`:
 
-1. **Собрать Docker-образ приложения**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Собрать Docker-образ приложения:
+
    ```bash
    sbt native
    ```
 
    Проверить:
+
    ```bash
    docker images | grep gotrip-backend
    ```
 
-   После сборки локально появится образ:
-   ```bash
-   gotrip-backend:0.1.0-SNAPSHOT
-   ```
+3. Поднять приложение и PostgreSQL:
 
-2. **Поднять приложение и PostgreSQL**
    ```bash
    docker compose up
    ```
 
-3. **Проверить API**
-   - приложение: `http://localhost:8080`
-   - Swagger UI: `http://localhost:8080/docs`
+4. Проверить API:
 
-4. **Остановить контейнеры**
+   ```text
+   http://localhost:8080/docs
+   ```
+
+5. Остановить контейнеры:
+
    ```bash
    docker compose down
    ```
 
    Чтобы также удалить volume с данными PostgreSQL:
+
    ```bash
    docker compose down -v
    ```
 
-## Docker-конфигурация
+При старте приложение загружает конфигурацию, выполняет Flyway-миграции, создает Skunk-пул соединений и поднимает HTTP-сервер.
 
-`docker-compose.yml` поднимает два сервиса:
-- `postgres` — PostgreSQL 17 с healthcheck;
-- `app` — образ `gotrip-backend:0.1.0-SNAPSHOT`, собранный через `sbt native`.
+## Конфигурация
+
+Основные настройки находятся в `src/main/resources/application.conf`.
+
+Файл содержит локальные значения по умолчанию и поддерживает переопределение через переменные окружения. Пароли и секреты дефолтных значений не имеют.
+
+Для локального запуска вне Docker по умолчанию используется `localhost:5432`, внутри Docker Compose — сервис `postgres`.
 
 В контейнере приложения настройки переопределяются переменными окружения:
+
 - `GOTRIP_DB_URL=jdbc:postgresql://postgres:5432/gotrip`
 - `GOTRIP_DB_HOST=postgres`
 - `GOTRIP_DB_PORT=5432`
@@ -88,31 +115,64 @@ go-trip/
 - `GOTRIP_SERVER_HOST=0.0.0.0`
 - `GOTRIP_SERVER_PORT=8080`
 
-## Конфигурация
-
-Файл `application.conf` содержит локальные значения по умолчанию и поддерживает переопределение через переменные окружения. Пароли и секреты дефолтных значений не имеют.
-Для локального запуска вне Docker по умолчанию используется `localhost:5432`, внутри Docker Compose — сервис `postgres`.
-
-Для локальной разработки используйте `.env`:
+Если после смены пароля PostgreSQL падает с `password authentication failed`, а volume уже существовал, пересоздайте локальный volume:
 
 ```bash
-cp .env.example .env
+docker compose down -v
+docker compose up
 ```
 
 ## Миграции
 
-SQL-скрипты лежат в `src/main/resources/db/migration/` и применяются автоматически при старте.  
-Именование: `V{версия}__описание.sql`.  
+SQL-миграции лежат в `src/main/resources/db/migration/` и применяются автоматически при запуске приложения.
 
-## Добавление бизнес-логики
+Формат имени файла:
 
-Уже заложены:
-- domain-модели для локаций
-- репозитории для локаций: in-memory и PostgreSQL через Skunk
-- сервисный слой для поиска и получения локаций
+```text
+V{version}__description.sql
+```
 
-В будущем здесь появятся:
-- HTTP API (http4s / Tapir)
-- тесты (TestContainers)
+Например:
 
-Приложение запускает миграции, инициализирует Skunk-пул соединений и стартует HTTP-сервер.
+```text
+V1__initial_schema.sql
+```
+
+## Тесты
+
+Запустить все тесты:
+
+```bash
+sbt test
+```
+
+На текущий момент есть unit-тесты для `LocationService`.
+
+## OpenAPI
+
+Исходная OpenAPI-спецификация находится в `docs/api/gotrip-openapi.yaml`.
+
+Для локального просмотра статической спецификации можно использовать:
+
+```bash
+npx swagger-ui-watcher docs/api/gotrip-openapi.yaml
+```
+
+Во время работы приложения Swagger UI также доступен из Tapir по адресу:
+
+```text
+http://localhost:8080/docs
+```
+
+## Диагностика
+
+Если приложение падает на этапе `Running Flyway migrations...` с ошибкой `Connection refused`, значит PostgreSQL недоступен на `localhost:5432`.
+
+Проверьте:
+
+```bash
+docker compose ps
+docker compose up -d
+```
+
+Если команда `sbt` не найдена, установите sbt или добавьте его в `PATH`.
