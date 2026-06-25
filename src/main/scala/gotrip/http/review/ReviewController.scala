@@ -2,16 +2,18 @@ package gotrip.http.review
 
 import cats.effect.IO
 import gotrip.domain.review._
-import gotrip.domain.user.UserId
 import gotrip.http.HttpError
+import gotrip.http.auth.AuthSupport
 import gotrip.service.review.ReviewService
 import sttp.tapir.server.ServerEndpoint
 import ReviewCodecs.{ReviewCreateRequest, ReviewUpdateRequest}
 
-final class ReviewController(service: ReviewService[IO]):
+final class ReviewController(service: ReviewService[IO], authSupport: AuthSupport):
 
   val listReviews: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.listReviews.serverLogic { case (targetType, targetId) =>
+    ReviewEndpoints.listReviews
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (targetType, targetId) =>
       (targetType, targetId) match
         case (Some(tt), Some(tid)) =>
           service.findByTarget(tt, tid).attempt.map {
@@ -20,11 +22,13 @@ final class ReviewController(service: ReviewService[IO]):
           }
         case _ =>
           IO.pure(Right(Nil))
-    }
+    }}
 
   val createReview: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.createReview.serverLogic { request =>
-      val userId = UserId(1L)
+    ReviewEndpoints.createReview
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { authUser => request =>
+      val userId = authUser.userId
       if (request.rating < 1 || request.rating > 5)
         IO.pure(Left(HttpError.Validation("Rating must be between 1 and 5")))
       else {
@@ -46,7 +50,9 @@ final class ReviewController(service: ReviewService[IO]):
     }
 
   val getReview: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.getReview.serverLogic { id =>
+    ReviewEndpoints.getReview
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       service.findById(id).attempt.map {
         case Right(Some(r)) => Right(r)
         case Right(None)    => Left(HttpError.NotFound(s"Review ${id.value} not found"))
@@ -55,7 +61,9 @@ final class ReviewController(service: ReviewService[IO]):
     }
 
   val updateReview: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.updateReview.serverLogic { case (id, update) =>
+    ReviewEndpoints.updateReview
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (id, update) =>
       service.findById(id).flatMap {
         case Some(existing) =>
           val updated = existing.copy(
@@ -72,10 +80,12 @@ final class ReviewController(service: ReviewService[IO]):
         case None =>
           IO.pure(Left(HttpError.NotFound(s"Review ${id.value} not found")))
       }
-    }
+    }}
 
   val deleteReview: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.deleteReview.serverLogic { id =>
+    ReviewEndpoints.deleteReview
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       service.delete(id).attempt.map {
         case Right(n) if n == 1 => Right(())
         case Right(n) if n == 0 => Left(HttpError.NotFound(s"Review ${id.value} not found"))

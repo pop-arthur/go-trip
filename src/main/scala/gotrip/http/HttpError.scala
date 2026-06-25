@@ -11,6 +11,16 @@ sealed trait HttpError:
 
 object HttpError:
 
+  final case class Unauthorized(
+    message: String,
+    override val code: String = "UNAUTHORIZED"
+  ) extends HttpError
+
+  final case class Forbidden(
+    message: String,
+    override val code: String = "FORBIDDEN"
+  ) extends HttpError
+
   final case class Validation(
     message: String,
     override val code: String = "VALIDATION_ERROR"
@@ -30,6 +40,24 @@ object HttpError:
     message: String,
     override val code: String = "INTERNAL_ERROR"
   ) extends HttpError
+
+  given Encoder[Unauthorized] =
+    deriveEncoder
+
+  given Decoder[Unauthorized] =
+    deriveDecoder
+
+  given Schema[Unauthorized] =
+    derived
+
+  given Encoder[Forbidden] =
+    deriveEncoder
+
+  given Decoder[Forbidden] =
+    deriveDecoder
+
+  given Schema[Forbidden] =
+    derived
 
   given Encoder[Validation] =
     deriveEncoder

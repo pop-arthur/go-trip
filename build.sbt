@@ -31,6 +31,8 @@ lazy val root = (project in file("."))
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion,
+      "com.github.jwt-scala" %% "jwt-circe" % "11.0.4",
+      "org.mindrot" % "jbcrypt" % "0.4",
 
       "org.tpolecat" %% "skunk-core" % "1.0.0",
       

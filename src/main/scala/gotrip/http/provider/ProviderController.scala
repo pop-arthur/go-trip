@@ -2,14 +2,18 @@ package gotrip.http.provider
 
 import cats.effect.IO
 import gotrip.domain.provider.*
+import gotrip.domain.userrole.Role
 import gotrip.http.{HttpError, ValidationError}
+import gotrip.http.auth.AuthSupport
 import gotrip.service.provider.{ProviderService, ProviderServiceError}
 import sttp.tapir.server.ServerEndpoint
 
-final class ProviderController(service: ProviderService[IO]):
+final class ProviderController(service: ProviderService[IO], authSupport: AuthSupport):
 
   val listProviders: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.listProviders.serverLogic { case (providerType, query) =>
+    ProviderEndpoints.listProviders
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (providerType, query) =>
       service.search(ProviderSearchParams(providerType, query)).attempt.map {
         case Right(providers) =>
           Right(providers)
@@ -17,10 +21,12 @@ final class ProviderController(service: ProviderService[IO]):
         case Left(error) =>
           Left(internalError(error))
       }
-    }
+    }}
 
   val getProvider: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.getProvider.serverLogic { id =>
+    ProviderEndpoints.getProvider
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       service.findById(id).attempt.map {
         case Right(Some(provider)) =>
           Right(provider)
@@ -34,22 +40,30 @@ final class ProviderController(service: ProviderService[IO]):
     }
 
   val createProvider: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.createProvider.serverLogic { provider =>
+    ProviderEndpoints.createProvider
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => provider =>
       create(provider)
     }
 
   val deleteProvider: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.deleteProvider.serverLogic { id =>
+    ProviderEndpoints.deleteProvider
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => id =>
       delete(id)
     }
 
   val adminCreateProvider: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.adminCreateProvider.serverLogic { provider =>
+    ProviderEndpoints.adminCreateProvider
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => provider =>
       create(provider)
     }
 
   val adminUpdateProvider: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.adminUpdateProvider.serverLogic { case (id, provider) =>
+    ProviderEndpoints.adminUpdateProvider
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => { case (id, provider) =>
       ProviderValidator.validate(provider).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -64,10 +78,12 @@ final class ProviderController(service: ProviderService[IO]):
             case Left(error) =>
               Left(internalError(error))
           }
-    }
+    }}
 
   val adminDeleteProvider: ServerEndpoint[Any, IO] =
-    ProviderEndpoints.adminDeleteProvider.serverLogic { id =>
+    ProviderEndpoints.adminDeleteProvider
+      .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
+      .serverLogic { _ => id =>
       delete(id)
     }
 

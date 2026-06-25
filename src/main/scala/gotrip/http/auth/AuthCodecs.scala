@@ -1,9 +1,7 @@
-package gotrip.http.user
+package gotrip.http.auth
 
-import gotrip.domain.user._
-import gotrip.domain.userrole.Role
-import gotrip.http.HttpError
-import gotrip.http.auth.PublicUser
+import gotrip.domain.user.*
+import gotrip.domain.userrole.*
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax._
@@ -13,20 +11,7 @@ import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 import java.time.Instant
 import scala.util.Try
 
-object UserCodecs:
-
-  given Encoder[HttpError.Validation] = deriveEncoder
-  given Decoder[HttpError.Validation] = deriveDecoder
-  given Schema[HttpError.Validation] = derived
-
-  given Encoder[HttpError.NotFound] = deriveEncoder
-  given Decoder[HttpError.NotFound] = deriveDecoder
-  given Schema[HttpError.NotFound] = derived
-
-  given Encoder[HttpError.Internal] = deriveEncoder
-  given Decoder[HttpError.Internal] = deriveDecoder
-  given Schema[HttpError.Internal] = derived
-
+object AuthCodecs:
   given Encoder[UserId] = Encoder.encodeLong.contramap(_.value)
   given Decoder[UserId] = Decoder.decodeLong.map(UserId.apply)
   given Schema[UserId] =
@@ -46,15 +31,6 @@ object UserCodecs:
   given Decoder[UserFullName] = Decoder.decodeOption[String].map(UserFullName.apply)
   given Schema[UserFullName] =
     Schema.schemaForOption[String].map(value => Some(UserFullName(value)))(_.value)
-
-  given Encoder[UserPasswordHash] = Encoder.encodeString.contramap(_.value)
-  given Decoder[UserPasswordHash] = Decoder.decodeString.map(UserPasswordHash.apply)
-  given Schema[UserPasswordHash] =
-    Schema.schemaForString.map(value => Some(UserPasswordHash(value)))(_.value)
-
-  given Encoder[User] = deriveEncoder
-  given Decoder[User] = deriveDecoder
-  given Schema[User] = derived
 
   given Encoder[Role] = Encoder.encodeString.contramap(Role.toString)
   given Decoder[Role] = Decoder.decodeString.emap(value => Role.fromString(value).toRight(s"Invalid role: $value"))
@@ -82,20 +58,47 @@ object UserCodecs:
   }
   given Schema[PublicUser] = derived
 
-  case class UserUpdate(email: Option[UserEmail], fullName: Option[UserFullName])
-  given Encoder[UserUpdate] = Encoder.instance { update =>
+  given Encoder[RegisterRequest] = Encoder.instance { request =>
     Json.obj(
-      "email" -> update.email.asJson,
-      "full_name" -> update.fullName.asJson
+      "email" -> request.email.asJson,
+      "password" -> request.password.asJson,
+      "full_name" -> request.fullName.asJson
     )
   }
-  given Decoder[UserUpdate] = Decoder.instance { cursor =>
+  given Decoder[RegisterRequest] = Decoder.instance { cursor =>
     for
-      email <- cursor.downField("email").as[Option[UserEmail]]
-      fullName <- cursor.downField("full_name").as[Option[Option[String]]].map(_.map(UserFullName.apply))
-    yield UserUpdate(email, fullName)
+      email <- cursor.downField("email").as[UserEmail]
+      password <- cursor.downField("password").as[String]
+      fullName <- cursor.downField("full_name").as[Option[String]].map(UserFullName.apply)
+    yield RegisterRequest(email, password, fullName)
   }
-  given Schema[UserUpdate] = derived
+  given Schema[RegisterRequest] = derived
+
+  given Encoder[LoginRequest] = deriveEncoder
+  given Decoder[LoginRequest] = deriveDecoder
+  given Schema[LoginRequest] = derived
+
+  given Encoder[RefreshRequest] = Encoder.instance(request => Json.obj("refresh_token" -> request.refreshToken.asJson))
+  given Decoder[RefreshRequest] = Decoder.instance(_.downField("refresh_token").as[String].map(RefreshRequest.apply))
+  given Schema[RefreshRequest] = derived
+
+  given Encoder[AuthResponse] = Encoder.instance { response =>
+    Json.obj(
+      "access_token" -> response.accessToken.asJson,
+      "refresh_token" -> response.refreshToken.asJson,
+      "token_type" -> response.tokenType.asJson,
+      "user" -> response.user.asJson
+    )
+  }
+  given Decoder[AuthResponse] = Decoder.instance { cursor =>
+    for
+      accessToken <- cursor.downField("access_token").as[String]
+      refreshToken <- cursor.downField("refresh_token").as[String]
+      tokenType <- cursor.downField("token_type").as[String]
+      user <- cursor.downField("user").as[PublicUser]
+    yield AuthResponse(accessToken, refreshToken, tokenType, user)
+  }
+  given Schema[AuthResponse] = derived
 
   private def parseInstant(value: String): Decoder.Result[Instant] =
     Try(Instant.parse(value)).toEither.left.map(error => io.circe.DecodingFailure(error.getMessage, Nil))

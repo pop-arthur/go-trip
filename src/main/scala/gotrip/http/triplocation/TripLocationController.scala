@@ -4,13 +4,16 @@ import cats.effect.IO
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
 import gotrip.http.{HttpError, ValidationError}
+import gotrip.http.auth.AuthSupport
 import gotrip.service.triplocation.{TripLocationService, TripLocationServiceError}
 import sttp.tapir.server.ServerEndpoint
 
-final class TripLocationController(service: TripLocationService[IO]):
+final class TripLocationController(service: TripLocationService[IO], authSupport: AuthSupport):
 
   val listTripLocations: ServerEndpoint[Any, IO] =
-    TripLocationEndpoints.listTripLocations.serverLogic { tripId =>
+    TripLocationEndpoints.listTripLocations
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => tripId =>
       service.listByTrip(tripId).attempt.map {
         case Right(Right(locations)) =>
           Right(locations)
@@ -24,7 +27,9 @@ final class TripLocationController(service: TripLocationService[IO]):
     }
 
   val addTripLocation: ServerEndpoint[Any, IO] =
-    TripLocationEndpoints.addTripLocation.serverLogic { case (tripId, location) =>
+    TripLocationEndpoints.addTripLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (tripId, location) =>
       TripLocationValidator.validate(location).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -39,10 +44,12 @@ final class TripLocationController(service: TripLocationService[IO]):
             case Left(error) =>
               Left(internalError(error))
           }
-    }
+    }}
 
   val updateTripLocation: ServerEndpoint[Any, IO] =
-    TripLocationEndpoints.updateTripLocation.serverLogic { case (tripId, tripLocationId, location) =>
+    TripLocationEndpoints.updateTripLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (tripId, tripLocationId, location) =>
       TripLocationValidator.validate(location).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
@@ -57,10 +64,12 @@ final class TripLocationController(service: TripLocationService[IO]):
             case Left(error) =>
               Left(internalError(error))
           }
-    }
+    }}
 
   val deleteTripLocation: ServerEndpoint[Any, IO] =
-    TripLocationEndpoints.deleteTripLocation.serverLogic { case (tripId, tripLocationId) =>
+    TripLocationEndpoints.deleteTripLocation
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (tripId, tripLocationId) =>
       service.delete(tripId, tripLocationId).attempt.map {
         case Right(Right(_)) =>
           Right(())
@@ -71,7 +80,7 @@ final class TripLocationController(service: TripLocationService[IO]):
         case Left(error) =>
           Left(internalError(error))
       }
-    }
+    }}
 
   val all: List[ServerEndpoint[Any, IO]] =
     List(listTripLocations, addTripLocation, updateTripLocation, deleteTripLocation)

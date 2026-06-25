@@ -2,6 +2,7 @@ package gotrip.http.triplocation
 
 import gotrip.domain.trip.*
 import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir.*
 import sttp.tapir.json.circe.*
@@ -11,14 +12,16 @@ object TripLocationEndpoints:
 
   type ErrorResponse = HttpError
 
-  val listTripLocations: PublicEndpoint[TripId, ErrorResponse, List[TripLocation], Any] =
+  val listTripLocations: Endpoint[String, TripId, ErrorResponse, List[TripLocation], Any] =
     endpoint.get
+      .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations")
       .errorOut(EndpointErrors.notFound)
       .out(jsonBody[List[TripLocation]])
 
-  val addTripLocation: PublicEndpoint[(TripId, TripLocationCreate), ErrorResponse, TripLocation, Any] =
+  val addTripLocation: Endpoint[String, (TripId, TripLocationCreate), ErrorResponse, TripLocation, Any] =
     endpoint.post
+      .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations")
       .in(jsonBody[TripLocationCreate])
       .errorOut(EndpointErrors.validationOrNotFound)
@@ -26,15 +29,17 @@ object TripLocationEndpoints:
       .out(jsonBody[TripLocation])
 
   val updateTripLocation
-      : PublicEndpoint[(TripId, TripLocationId, TripLocationUpdate), ErrorResponse, TripLocation, Any] =
+      : Endpoint[String, (TripId, TripLocationId, TripLocationUpdate), ErrorResponse, TripLocation, Any] =
     endpoint.patch
+      .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations" / path[TripLocationId]("tripLocationId"))
       .in(jsonBody[TripLocationUpdate])
       .errorOut(EndpointErrors.validationOrNotFound)
       .out(jsonBody[TripLocation])
 
-  val deleteTripLocation: PublicEndpoint[(TripId, TripLocationId), ErrorResponse, Unit, Any] =
+  val deleteTripLocation: Endpoint[String, (TripId, TripLocationId), ErrorResponse, Unit, Any] =
     endpoint.delete
+      .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations" / path[TripLocationId]("tripLocationId"))
       .errorOut(EndpointErrors.notFound)
       .out(statusCode(StatusCode.NoContent))
