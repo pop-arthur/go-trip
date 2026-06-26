@@ -28,7 +28,7 @@ final class AuthCryptoSpec extends AnyWordSpec with Matchers:
   "JwtService" should {
     "validate access tokens and reject refresh tokens as access tokens" in {
       val service = new JwtService[IO](authConfig)
-      val now = Instant.parse("2026-06-24T10:00:00Z")
+      val now = Instant.now()
       val sessionId = UUID.randomUUID()
 
       val accessToken = service
