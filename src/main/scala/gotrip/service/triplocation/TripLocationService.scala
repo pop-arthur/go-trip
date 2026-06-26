@@ -6,25 +6,27 @@ import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
+import gotrip.domain.user.UserId
 import gotrip.repository.triplocation.TripLocationRepository
 
 final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[F]):
 
   import TripLocationServiceError.*
 
-  def listByTrip(tripId: TripId): F[Either[TripLocationServiceError, List[TripLocation]]] =
+  def listByTrip(userId: UserId, tripId: TripId): F[Either[TripLocationServiceError, List[TripLocation]]] =
     (for {
-      _ <- ensureTripExists(tripId)
+      _ <- ensureTripExists(userId, tripId)
       locations <- EitherT.liftF(repository.listByTrip(tripId))
     } yield locations).value
 
   def create(
+    userId: UserId,
     tripId: TripId,
     location: TripLocationCreate
   ): F[Either[TripLocationServiceError, TripLocation]] =
     (for {
       _ <- validateDateRange(location.arrival_date.value, location.departure_date.value)
-      _ <- ensureTripExists(tripId)
+      _ <- ensureTripExists(userId, tripId)
       _ <- ensureLocationExists(location.location_id)
       visitOrder <- EitherT.liftF(location.visit_order.fold(repository.nextVisitOrder(tripId))(_.pure[F]))
       _ <- ensureVisitOrderAvailable(tripId, visitOrder, None)
@@ -32,12 +34,13 @@ final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[
     } yield created).value
 
   def update(
+    userId: UserId,
     tripId: TripId,
     tripLocationId: TripLocationId,
     location: TripLocationUpdate
   ): F[Either[TripLocationServiceError, TripLocation]] =
     (for {
-      _ <- ensureTripExists(tripId)
+      _ <- ensureTripExists(userId, tripId)
       current <- EitherT.fromOptionF(
         repository.findInTrip(tripId, tripLocationId),
         TripLocationNotFound(tripLocationId)
@@ -53,19 +56,20 @@ final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[
     } yield updated).value
 
   def delete(
+    userId: UserId,
     tripId: TripId,
     tripLocationId: TripLocationId
   ): F[Either[TripLocationServiceError, Unit]] =
     (for {
-      _ <- ensureTripExists(tripId)
+      _ <- ensureTripExists(userId, tripId)
       deleted <- EitherT.liftF(repository.delete(tripId, tripLocationId))
       _ <- if deleted then EitherT.rightT[F, TripLocationServiceError](())
            else EitherT.leftT[F, Unit](TripLocationNotFound(tripLocationId))
     } yield ()).value
 
-  private def ensureTripExists(tripId: TripId): EitherT[F, TripLocationServiceError, Unit] =
+  private def ensureTripExists(userId: UserId, tripId: TripId): EitherT[F, TripLocationServiceError, Unit] =
     EitherT {
-      repository.tripExists(tripId).map { exists =>
+      repository.tripExistsForUser(userId, tripId).map { exists =>
         Either.cond(exists, (), TripNotFound(tripId))
       }
     }

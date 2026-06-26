@@ -5,6 +5,7 @@ import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
+import gotrip.domain.user.*
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
@@ -67,6 +68,13 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     sessionPool.use { session =>
       session.prepare(PostgresTripLocationRepository.tripExistsQuery).flatMap { query =>
         query.option(tripId.value).map(_.isDefined)
+      }
+    }
+
+  override def tripExistsForUser(userId: UserId, tripId: TripId): F[Boolean] =
+    sessionPool.use { session =>
+      session.prepare(PostgresTripLocationRepository.tripExistsForUserQuery).flatMap { query =>
+        query.option((userId.value, tripId.value)).map(_.isDefined)
       }
     }
 
@@ -163,6 +171,14 @@ object PostgresTripLocationRepository:
       select id
       from trips
       where id = $int8
+    """.query(int8)
+
+  val tripExistsForUserQuery: Query[(Long, Long), Long] =
+    sql"""
+      select id
+      from trips
+      where user_id = $int8
+        and id = $int8
     """.query(int8)
 
   val locationExistsQuery: Query[Long, Long] =

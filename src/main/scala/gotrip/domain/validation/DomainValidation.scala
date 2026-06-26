@@ -97,6 +97,33 @@ object DomainValidation:
   case object InvalidTripLocationDateRange extends DomainValidation:
     override val errorMessage: String = "Arrival date must be before or equal to departure date"
 
+  case object TripTitleIsBlank extends DomainValidation:
+    override val errorMessage: String = "Trip title must not be blank"
+
+  case object InvalidTripDateRange extends DomainValidation:
+    override val errorMessage: String = "Trip start date must be before or equal to end date"
+
+  case object OrderTitleIsBlank extends DomainValidation:
+    override val errorMessage: String = "Order title must not be blank"
+
+  case object OrderExternalIdIsBlank extends DomainValidation:
+    override val errorMessage: String = "External order id must not be blank"
+
+  case object OrderPriceIsNegative extends DomainValidation:
+    override val errorMessage: String = "Order price amount must be nonnegative"
+
+  case object OrderPriceCurrencyIsBlank extends DomainValidation:
+    override val errorMessage: String = "Order price currency must not be blank"
+
+  case object InvalidOrderDateTimeRange extends DomainValidation:
+    override val errorMessage: String = "Order start datetime must be before or equal to end datetime"
+
+  case object OrderStatusReasonIsBlank extends DomainValidation:
+    override val errorMessage: String = "Order status reason must not be blank"
+
+  case object OrderFileUrlIsBlank extends DomainValidation:
+    override val errorMessage: String = "Order file URL must not be blank"
+
   case object ProviderNameIsBlank extends DomainValidation:
     override val errorMessage: String = "Provider name must not be blank"
 

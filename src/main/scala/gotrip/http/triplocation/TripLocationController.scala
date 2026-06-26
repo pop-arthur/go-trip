@@ -13,8 +13,8 @@ final class TripLocationController(service: TripLocationService[IO], authSupport
   val listTripLocations: ServerEndpoint[Any, IO] =
     TripLocationEndpoints.listTripLocations
       .serverSecurityLogic(authSupport.authenticate)
-      .serverLogic { _ => tripId =>
-      service.listByTrip(tripId).attempt.map {
+      .serverLogic { user => tripId =>
+      service.listByTrip(user.userId, tripId).attempt.map {
         case Right(Right(locations)) =>
           Right(locations)
 
@@ -29,12 +29,12 @@ final class TripLocationController(service: TripLocationService[IO], authSupport
   val addTripLocation: ServerEndpoint[Any, IO] =
     TripLocationEndpoints.addTripLocation
       .serverSecurityLogic(authSupport.authenticate)
-      .serverLogic { _ => { case (tripId, location) =>
+      .serverLogic { user => { case (tripId, location) =>
       TripLocationValidator.validate(location).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validLocation) =>
-          service.create(tripId, validLocation).attempt.map {
+          service.create(user.userId, tripId, validLocation).attempt.map {
             case Right(Right(created)) =>
               Right(created)
 
@@ -49,12 +49,12 @@ final class TripLocationController(service: TripLocationService[IO], authSupport
   val updateTripLocation: ServerEndpoint[Any, IO] =
     TripLocationEndpoints.updateTripLocation
       .serverSecurityLogic(authSupport.authenticate)
-      .serverLogic { _ => { case (tripId, tripLocationId, location) =>
+      .serverLogic { user => { case (tripId, tripLocationId, location) =>
       TripLocationValidator.validate(location).toEither match
         case Left(errors) =>
           IO.pure(Left(ValidationError.toHttpError(errors)))
         case Right(validLocation) =>
-          service.update(tripId, tripLocationId, validLocation).attempt.map {
+          service.update(user.userId, tripId, tripLocationId, validLocation).attempt.map {
             case Right(Right(updated)) =>
               Right(updated)
 
@@ -69,8 +69,8 @@ final class TripLocationController(service: TripLocationService[IO], authSupport
   val deleteTripLocation: ServerEndpoint[Any, IO] =
     TripLocationEndpoints.deleteTripLocation
       .serverSecurityLogic(authSupport.authenticate)
-      .serverLogic { _ => { case (tripId, tripLocationId) =>
-      service.delete(tripId, tripLocationId).attempt.map {
+      .serverLogic { user => { case (tripId, tripLocationId) =>
+      service.delete(user.userId, tripId, tripLocationId).attempt.map {
         case Right(Right(_)) =>
           Right(())
 
