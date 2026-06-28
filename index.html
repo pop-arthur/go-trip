@@ -282,6 +282,7 @@
         .list-item .actions {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .empty-state {
@@ -289,6 +290,23 @@
             text-align: center;
             padding: 40px 0;
             font-size: 15px;
+        }
+
+        .error-state {
+            color: #f0b0b0;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 14px;
+        }
+
+        .back-link {
+            color: #a78bfa;
+            cursor: pointer;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+        .back-link:hover {
+            text-decoration: underline;
         }
 
         /* ========== AUTH ========== */
@@ -509,6 +527,7 @@
             <a data-section="locations"><span class="icon">📍</span> Локации</a>
             <a data-section="providers"><span class="icon">🏢</span> Провайдеры</a>
             <a data-section="services"><span class="icon">🛠️</span> Доп. услуги</a>
+            <a data-section="trips"><span class="icon">✈️</span> Поездки</a>
             <a data-section="admin" class="hidden" id="nav-admin"><span class="icon">⚙️</span> Админ-панель</a>
         </nav>
         <button class="logout-btn" id="logout-btn">Выйти</button>
@@ -531,6 +550,9 @@
         roles: [],
         currentSection: 'profile',
         editing: null,
+        tripDetailId: null,    // текущий просматриваемый trip
+        orderDetailId: null,   // текущий просматриваемый order (для файлов)
+        tripBack: false,       // флаг для возврата к списку поездок
     };
 
     // ============================================================
@@ -707,6 +729,11 @@
         document.querySelectorAll('#main-nav a[data-section]').forEach(link => {
             link.addEventListener('click', () => {
                 const section = link.dataset.section;
+                // Если переходим в поездки, сбрасываем детали
+                if (section !== 'trips') {
+                    state.tripDetailId = null;
+                    state.orderDetailId = null;
+                }
                 state.currentSection = section;
                 renderSection(section);
                 document.querySelectorAll('#main-nav a[data-section]').forEach(l => l.classList.remove('active'));
@@ -726,13 +753,14 @@
             case 'locations': renderLocations(container); break;
             case 'providers': renderProviders(container); break;
             case 'services': renderServices(container); break;
+            case 'trips': renderTrips(container); break;
             case 'admin': renderAdmin(container); break;
             default: container.innerHTML = '<h2>Страница не найдена</h2>';
         }
     }
 
     // ============================================================
-    //  PROFILE
+    //  PROFILE (без изменений, сохранён)
     // ============================================================
     function renderProfile(container) {
         if (!state.user) {
@@ -786,7 +814,7 @@
     }
 
     // ============================================================
-    //  NOTIFICATIONS
+    //  NOTIFICATIONS (без изменений, сохранён)
     // ============================================================
     function renderNotifications(container) {
         container.innerHTML = `
@@ -808,11 +836,20 @@
                 </div>
             </div>
         `;
-        apiFetch('/notification-preferences').then(resp => resp.json()).then(pref => {
-            if (pref && pref.is_enabled !== undefined) {
-                document.getElementById('notif-toggle').checked = pref.is_enabled;
-            }
-        }).catch(() => {});
+        apiFetch('/notification-preferences')
+            .then(resp => {
+                if (!resp.ok) throw new Error(`Ошибка загрузки настроек: ${resp.status}`);
+                return resp.json();
+            })
+            .then(pref => {
+                if (pref && pref.is_enabled !== undefined) {
+                    document.getElementById('notif-toggle').checked = pref.is_enabled;
+                }
+            })
+            .catch(err => {
+                showToast('Не удалось загрузить настройки уведомлений: ' + err.message, 'error');
+                document.getElementById('notif-status').innerHTML = '<div class="error-state">Ошибка загрузки настроек</div>';
+            });
 
         document.getElementById('notif-save-btn').addEventListener('click', async () => {
             const enabled = document.getElementById('notif-toggle').checked;
@@ -832,26 +869,35 @@
             }
         });
 
-        apiFetch('/notifications').then(resp => resp.json()).then(list => {
-            const el = document.getElementById('notif-list');
-            if (!list || list.length === 0) {
-                el.innerHTML = '<div class="empty-state">Нет уведомлений</div>';
-                return;
-            }
-            el.innerHTML = list.map(n => `
-                <div class="list-item">
-                    <div class="info">
-                        <div class="title">${n.title}</div>
-                        <div class="sub">${n.body} — ${new Date(n.sent_at).toLocaleString()}</div>
+        apiFetch('/notifications')
+            .then(resp => {
+                if (!resp.ok) throw new Error(`Ошибка загрузки уведомлений: ${resp.status}`);
+                return resp.json();
+            })
+            .then(list => {
+                const el = document.getElementById('notif-list');
+                if (!list || list.length === 0) {
+                    el.innerHTML = '<div class="empty-state">Нет уведомлений</div>';
+                    return;
+                }
+                el.innerHTML = list.map(n => `
+                    <div class="list-item">
+                        <div class="info">
+                            <div class="title">${n.title}</div>
+                            <div class="sub">${n.body} — ${new Date(n.sent_at).toLocaleString()}</div>
+                        </div>
+                        <span style="font-size:12px;color:#6b5a90;">${n.is_read ? '✔ Прочитано' : '🆕 Новое'}</span>
                     </div>
-                    <span style="font-size:12px;color:#6b5a90;">${n.is_read ? '✔ Прочитано' : '🆕 Новое'}</span>
-                </div>
-            `).join('');
-        }).catch(() => {});
+                `).join('');
+            })
+            .catch(err => {
+                showToast('Не удалось загрузить историю уведомлений: ' + err.message, 'error');
+                document.getElementById('notif-list').innerHTML = '<div class="error-state">Ошибка загрузки истории</div>';
+            });
     }
 
     // ============================================================
-    //  ACHIEVEMENTS (Достижения)
+    //  ACHIEVEMENTS (без изменений, сохранён)
     // ============================================================
     function renderAchievements(container) {
         container.innerHTML = `
@@ -901,7 +947,7 @@
     }
 
     // ============================================================
-    //  REVIEWS
+    //  REVIEWS (без изменений, сохранён)
     // ============================================================
     function renderReviews(container) {
         container.innerHTML = `
@@ -1034,7 +1080,7 @@
     }
 
     // ============================================================
-    //  LOCATIONS
+    //  LOCATIONS (без изменений, сохранён)
     // ============================================================
     function renderLocations(container) {
         container.innerHTML = `
@@ -1173,7 +1219,7 @@
     }
 
     // ============================================================
-    //  PROVIDERS
+    //  PROVIDERS (без изменений, сохранён)
     // ============================================================
     function renderProviders(container) {
         container.innerHTML = `
@@ -1272,7 +1318,7 @@
     }
 
     // ============================================================
-    //  ADDITIONAL SERVICES
+    //  ADDITIONAL SERVICES (без изменений, сохранён)
     // ============================================================
     function renderServices(container) {
         container.innerHTML = `
@@ -1333,7 +1379,468 @@
     }
 
     // ============================================================
-    //  ADMIN PANEL
+    //  TRIPS (НОВЫЙ МОДУЛЬ)
+    // ============================================================
+    function renderTrips(container) {
+        // Если есть tripDetailId, показываем детали поездки
+        if (state.tripDetailId) {
+            renderTripDetail(container);
+            return;
+        }
+        // Иначе список поездок
+        container.innerHTML = `
+            <div class="section active">
+                <h2>Поездки</h2>
+                <div class="card">
+                    <h3>Создать поездку</h3>
+                    <div class="form-row">
+                        <label>Название <input id="trip-title" /></label>
+                        <label>Дата начала <input id="trip-start" type="date" /></label>
+                        <label>Дата окончания <input id="trip-end" type="date" /></label>
+                    </div>
+                    <div class="form-row">
+                        <label>Статус <select id="trip-status">
+                            <option value="PLANNED">Запланирована</option>
+                            <option value="ACTIVE">Активна</option>
+                            <option value="COMPLETED">Завершена</option>
+                            <option value="CANCELLED">Отменена</option>
+                        </select></label>
+                    </div>
+                    <button class="btn btn-primary" id="trip-create-btn">Создать</button>
+                </div>
+                <div class="card">
+                    <h3>Мои поездки</h3>
+                    <div class="form-row">
+                        <label>Статус <select id="trip-filter-status">
+                            <option value="">Все</option>
+                            <option value="PLANNED">Запланирована</option>
+                            <option value="ACTIVE">Активна</option>
+                            <option value="COMPLETED">Завершена</option>
+                            <option value="CANCELLED">Отменена</option>
+                        </select></label>
+                        <label>С <input id="trip-filter-from" type="date" /></label>
+                        <label>По <input id="trip-filter-to" type="date" /></label>
+                        <button class="btn" id="trip-filter-btn">Поиск</button>
+                    </div>
+                    <div id="trip-list"></div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('trip-create-btn').addEventListener('click', async () => {
+            const title = document.getElementById('trip-title').value;
+            const startDate = document.getElementById('trip-start').value;
+            const endDate = document.getElementById('trip-end').value;
+            const status = document.getElementById('trip-status').value;
+            if (!title) { showToast('Название обязательно', 'error'); return; }
+            try {
+                const resp = await apiFetch('/trips', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title,
+                        start_date: startDate || null,
+                        end_date: endDate || null,
+                        status
+                    })
+                });
+                if (resp.ok) {
+                    showToast('Поездка создана');
+                    renderTrips(container);
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + (err.message || ''), 'error');
+                }
+            } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
+        });
+
+        document.getElementById('trip-filter-btn').addEventListener('click', loadTrips);
+        loadTrips();
+
+        async function loadTrips() {
+            const status = document.getElementById('trip-filter-status').value;
+            const fromDate = document.getElementById('trip-filter-from').value;
+            const toDate = document.getElementById('trip-filter-to').value;
+            const params = new URLSearchParams();
+            if (status) params.append('status', status);
+            if (fromDate) params.append('fromDate', fromDate);
+            if (toDate) params.append('toDate', toDate);
+            const url = '/trips' + (params.toString() ? '?' + params.toString() : '');
+            try {
+                const resp = await apiFetch(url);
+                if (resp.ok) {
+                    const list = await resp.json();
+                    const el = document.getElementById('trip-list');
+                    if (!list || list.length === 0) {
+                        el.innerHTML = '<div class="empty-state">Нет поездок</div>';
+                        return;
+                    }
+                    el.innerHTML = list.map(t => `
+                        <div class="list-item">
+                            <div class="info">
+                                <div class="title">${t.title}</div>
+                                <div class="sub">${t.status} ${t.start_date ? 'с ' + t.start_date : ''} ${t.end_date ? 'по ' + t.end_date : ''}</div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-sm btn-outline" onclick="viewTrip(${t.id})">📋</button>
+                                <button class="btn btn-sm btn-outline" onclick="editTrip(${t.id})">✎</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteTrip(${t.id})">✕</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) { showToast('Ошибка загрузки поездок', 'error'); }
+        }
+
+        window.viewTrip = (id) => {
+            state.tripDetailId = id;
+            renderTrips(container);
+        };
+
+        window.editTrip = (id) => {
+            apiFetch(`/trips/${id}`).then(resp => resp.json()).then(trip => {
+                const title = prompt('Название:', trip.title);
+                if (title === null) return;
+                const startDate = prompt('Дата начала (YYYY-MM-DD):', trip.start_date || '');
+                const endDate = prompt('Дата окончания (YYYY-MM-DD):', trip.end_date || '');
+                const status = prompt('Статус (PLANNED/ACTIVE/COMPLETED/CANCELLED):', trip.status);
+                if (!status) return;
+                apiFetch(`/trips/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ title, start_date: startDate || null, end_date: endDate || null, status })
+                }).then(resp => {
+                    if (resp.ok) { showToast('Поездка обновлена'); loadTrips(); }
+                    else showToast('Ошибка', 'error');
+                });
+            }).catch(() => showToast('Ошибка', 'error'));
+        };
+
+        window.deleteTrip = async (id) => {
+            if (!confirm('Удалить поездку?')) return;
+            try {
+                const resp = await apiFetch(`/trips/${id}`, { method: 'DELETE' });
+                if (resp.ok) { showToast('Удалено'); loadTrips(); }
+                else showToast('Ошибка', 'error');
+            } catch (e) { showToast('Ошибка', 'error'); }
+        };
+    }
+
+    // ============================================================
+    //  TRIP DETAIL (отображение поездки, заказы)
+    // ============================================================
+    function renderTripDetail(container) {
+        const tripId = state.tripDetailId;
+        container.innerHTML = `
+            <div class="section active">
+                <div class="back-link" id="trip-back-btn">← Назад к списку</div>
+                <h2 id="trip-detail-title">Поездка #${tripId}</h2>
+                <div class="card">
+                    <h3>Информация о поездке</h3>
+                    <div id="trip-info"></div>
+                </div>
+                <div class="card">
+                    <h3>Заказы</h3>
+                    <button class="btn btn-primary" id="order-create-btn" style="margin-bottom:16px;">+ Создать заказ</button>
+                    <div id="order-list"></div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('trip-back-btn').addEventListener('click', () => {
+            state.tripDetailId = null;
+            renderTrips(container);
+        });
+
+        // Загружаем информацию о поездке
+        apiFetch(`/trips/${tripId}`).then(resp => resp.json()).then(trip => {
+            document.getElementById('trip-detail-title').textContent = `Поездка: ${trip.title}`;
+            document.getElementById('trip-info').innerHTML = `
+                <p><strong>ID:</strong> ${trip.id}</p>
+                <p><strong>Название:</strong> ${trip.title}</p>
+                <p><strong>Дата начала:</strong> ${trip.start_date || '—'}</p>
+                <p><strong>Дата окончания:</strong> ${trip.end_date || '—'}</p>
+                <p><strong>Статус:</strong> ${trip.status}</p>
+            `;
+        }).catch(() => showToast('Ошибка загрузки поездки', 'error'));
+
+        // Загружаем заказы
+        loadOrders();
+
+        // Кнопка создания заказа
+        document.getElementById('order-create-btn').addEventListener('click', () => {
+            showOrderCreateForm(tripId, container);
+        });
+
+        async function loadOrders() {
+            const el = document.getElementById('order-list');
+            try {
+                const resp = await apiFetch(`/trips/${tripId}/orders`);
+                if (resp.ok) {
+                    const orders = await resp.json();
+                    if (!orders || orders.length === 0) {
+                        el.innerHTML = '<div class="empty-state">Нет заказов</div>';
+                        return;
+                    }
+                    el.innerHTML = orders.map(o => `
+                        <div class="list-item">
+                            <div class="info">
+                                <div class="title">${o.title} (${o.service_type})</div>
+                                <div class="sub">${o.status} — ${o.price_amount ? o.price_amount + ' ' + o.price_currency : ''}</div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-sm btn-outline" onclick="viewOrderFiles(${o.id})">📁</button>
+                                <button class="btn btn-sm btn-outline" onclick="editOrder(${o.id})">✎</button>
+                                <button class="btn btn-sm btn-outline" onclick="changeOrderStatus(${o.id})">🔄</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteOrder(${o.id})">✕</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                el.innerHTML = '<div class="error-state">Ошибка загрузки заказов</div>';
+            }
+        }
+
+        window.viewOrderFiles = (orderId) => {
+            state.orderDetailId = orderId;
+            renderOrderFiles(container);
+        };
+
+        window.editOrder = (orderId) => {
+            apiFetch(`/orders/${orderId}`).then(resp => resp.json()).then(order => {
+                const title = prompt('Название:', order.title);
+                if (title === null) return;
+                const status = prompt('Статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):', order.status);
+                if (!status) return;
+                const price = prompt('Цена:', order.price_amount || '');
+                const currency = prompt('Валюта:', order.price_currency || '');
+                apiFetch(`/orders/${orderId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ title, status, price_amount: price ? parseFloat(price) : null, price_currency: currency || null })
+                }).then(resp => {
+                    if (resp.ok) { showToast('Заказ обновлён'); loadOrders(); }
+                    else showToast('Ошибка', 'error');
+                });
+            }).catch(() => showToast('Ошибка', 'error'));
+        };
+
+        window.changeOrderStatus = (orderId) => {
+            const newStatus = prompt('Новый статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):');
+            if (!newStatus) return;
+            const reason = prompt('Причина (опционально):');
+            apiFetch(`/orders/${orderId}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: newStatus, reason: reason || null })
+            }).then(resp => {
+                if (resp.ok) { showToast('Статус обновлён'); loadOrders(); }
+                else showToast('Ошибка', 'error');
+            }).catch(() => showToast('Ошибка', 'error'));
+        };
+
+        window.deleteOrder = async (orderId) => {
+            if (!confirm('Удалить заказ?')) return;
+            try {
+                const resp = await apiFetch(`/orders/${orderId}`, { method: 'DELETE' });
+                if (resp.ok) { showToast('Удалено'); loadOrders(); }
+                else showToast('Ошибка', 'error');
+            } catch (e) { showToast('Ошибка', 'error'); }
+        };
+    }
+
+    // ============================================================
+    //  ORDER CREATE FORM
+    // ============================================================
+    function showOrderCreateForm(tripId, container) {
+        // Встроим форму прямо в контейнер (или можно отдельное окно)
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = 'order-create-card';
+        card.innerHTML = `
+            <h3>Создать заказ</h3>
+            <div class="form-row">
+                <label>Тип услуги <select id="order-service-type">
+                    <option value="FLIGHT">FLIGHT</option><option value="TRAIN">TRAIN</option>
+                    <option value="BUS">BUS</option><option value="HOTEL">HOTEL</option>
+                    <option value="TOUR">TOUR</option><option value="CAR_RENTAL">CAR_RENTAL</option>
+                    <option value="INSURANCE">INSURANCE</option><option value="TAXI">TAXI</option>
+                    <option value="ESIM">ESIM</option><option value="LOUNGE">LOUNGE</option>
+                    <option value="EXTRA_BAGGAGE">EXTRA_BAGGAGE</option><option value="OTHER">OTHER</option>
+                </select></label>
+                <label>Название <input id="order-title" /></label>
+            </div>
+            <div class="form-row">
+                <label>Статус <select id="order-status">
+                    <option value="PENDING_VERIFICATION">PENDING_VERIFICATION</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="DELAYED">DELAYED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="REFUND_PENDING">REFUND_PENDING</option>
+                    <option value="REFUNDED">REFUNDED</option>
+                </select></label>
+                <label>Цена <input id="order-price" type="number" step="any" /></label>
+                <label>Валюта <input id="order-currency" /></label>
+            </div>
+            <div class="form-row">
+                <label>ID провайдера <input id="order-provider" type="number" /></label>
+                <label>Внешний ID <input id="order-ext-id" /></label>
+            </div>
+            <div class="form-row">
+                <label>Начало <input id="order-start" type="datetime-local" /></label>
+                <label>Конец <input id="order-end" type="datetime-local" /></label>
+            </div>
+            <div class="form-row">
+                <label>ID локации отправления <input id="order-dep-loc" type="number" /></label>
+                <label>ID локации прибытия <input id="order-arr-loc" type="number" /></label>
+            </div>
+            <button class="btn btn-primary" id="order-save-btn">Сохранить</button>
+            <button class="btn" id="order-cancel-btn">Отмена</button>
+        `;
+        const listContainer = document.getElementById('order-list');
+        // Вставляем карточку перед списком заказов
+        listContainer.parentNode.insertBefore(card, listContainer);
+
+        document.getElementById('order-cancel-btn').addEventListener('click', () => {
+            card.remove();
+        });
+
+        document.getElementById('order-save-btn').addEventListener('click', async () => {
+            const serviceType = document.getElementById('order-service-type').value;
+            const title = document.getElementById('order-title').value;
+            const status = document.getElementById('order-status').value;
+            const price = parseFloat(document.getElementById('order-price').value);
+            const currency = document.getElementById('order-currency').value;
+            const providerId = document.getElementById('order-provider').value;
+            const extId = document.getElementById('order-ext-id').value;
+            const start = document.getElementById('order-start').value;
+            const end = document.getElementById('order-end').value;
+            const depLoc = document.getElementById('order-dep-loc').value;
+            const arrLoc = document.getElementById('order-arr-loc').value;
+            if (!title) { showToast('Название обязательно', 'error'); return; }
+            const body = {
+                service_type: serviceType,
+                title,
+                status,
+                price_amount: isNaN(price) ? null : price,
+                price_currency: currency || null,
+                external_order_id: extId || null,
+                provider_id: providerId ? parseInt(providerId) : null,
+                start_datetime: start ? new Date(start).toISOString() : null,
+                end_datetime: end ? new Date(end).toISOString() : null,
+                departure_location_id: depLoc ? parseInt(depLoc) : null,
+                arrival_location_id: arrLoc ? parseInt(arrLoc) : null
+            };
+            try {
+                const resp = await apiFetch(`/trips/${tripId}/orders`, {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                });
+                if (resp.ok) {
+                    showToast('Заказ создан');
+                    card.remove();
+                    loadOrders();
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + (err.message || ''), 'error');
+                }
+            } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
+        });
+    }
+
+    // ============================================================
+    //  ORDER FILES (отображение файлов заказа)
+    // ============================================================
+    function renderOrderFiles(container) {
+        const orderId = state.orderDetailId;
+        container.innerHTML = `
+            <div class="section active">
+                <div class="back-link" id="order-files-back-btn">← Назад к заказам</div>
+                <h2>Файлы заказа #${orderId}</h2>
+                <div class="card">
+                    <h3>Добавить файл</h3>
+                    <div class="form-row">
+                        <label>URL файла <input id="file-url" /></label>
+                        <label>Тип файла <select id="file-type">
+                            <option value="PDF">PDF</option>
+                            <option value="IMAGE">IMAGE</option>
+                            <option value="EMAIL">EMAIL</option>
+                            <option value="JSON">JSON</option>
+                            <option value="OTHER">OTHER</option>
+                        </select></label>
+                    </div>
+                    <button class="btn btn-primary" id="file-create-btn">Добавить</button>
+                </div>
+                <div class="card">
+                    <h3>Список файлов</h3>
+                    <div id="file-list"></div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('order-files-back-btn').addEventListener('click', () => {
+            state.orderDetailId = null;
+            renderTripDetail(container);
+        });
+
+        document.getElementById('file-create-btn').addEventListener('click', async () => {
+            const fileUrl = document.getElementById('file-url').value;
+            const fileType = document.getElementById('file-type').value;
+            if (!fileUrl) { showToast('URL обязателен', 'error'); return; }
+            try {
+                const resp = await apiFetch(`/orders/${orderId}/files`, {
+                    method: 'POST',
+                    body: JSON.stringify({ file_url: fileUrl, file_type: fileType })
+                });
+                if (resp.ok) {
+                    showToast('Файл добавлен');
+                    loadFiles();
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + (err.message || ''), 'error');
+                }
+            } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
+        });
+
+        loadFiles();
+
+        async function loadFiles() {
+            const el = document.getElementById('file-list');
+            try {
+                const resp = await apiFetch(`/orders/${orderId}/files`);
+                if (resp.ok) {
+                    const files = await resp.json();
+                    if (!files || files.length === 0) {
+                        el.innerHTML = '<div class="empty-state">Нет файлов</div>';
+                        return;
+                    }
+                    el.innerHTML = files.map(f => `
+                        <div class="list-item">
+                            <div class="info">
+                                <div class="title">${f.file_url}</div>
+                                <div class="sub">${f.file_type} — ${new Date(f.uploaded_at).toLocaleString()}</div>
+                            </div>
+                            <div class="actions">
+                                <button class="btn btn-sm btn-danger" onclick="deleteFile(${f.id})">✕</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                el.innerHTML = '<div class="error-state">Ошибка загрузки файлов</div>';
+            }
+        }
+
+        window.deleteFile = async (fileId) => {
+            if (!confirm('Удалить файл?')) return;
+            try {
+                const resp = await apiFetch(`/orders/${orderId}/files/${fileId}`, { method: 'DELETE' });
+                if (resp.ok) { showToast('Удалено'); loadFiles(); }
+                else showToast('Ошибка', 'error');
+            } catch (e) { showToast('Ошибка', 'error'); }
+        };
+    }
+
+    // ============================================================
+    //  ADMIN PANEL (без изменений, сохранён)
     // ============================================================
     function renderAdmin(container) {
         if (!state.roles.includes('ADMIN')) {
