@@ -2,14 +2,16 @@ package gotrip.service.triplocation
 
 import cats.Monad
 import cats.data.EitherT
+import cats.effect.Sync
 import cats.syntax.applicative.*
 import cats.syntax.functor.*
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
 import gotrip.domain.user.UserId
 import gotrip.repository.triplocation.TripLocationRepository
+import gotrip.service.GeneratedData
 
-final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[F]):
+final class TripLocationService[F[_]: Sync](repository: TripLocationRepository[F]):
 
   import TripLocationServiceError.*
 
@@ -30,7 +32,8 @@ final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[
       _ <- ensureLocationExists(location.location_id)
       visitOrder <- EitherT.liftF(location.visit_order.fold(repository.nextVisitOrder(tripId))(_.pure[F]))
       _ <- ensureVisitOrderAvailable(tripId, visitOrder, None)
-      created <- EitherT.liftF(repository.create(tripId, location, visitOrder))
+      materialized <- EitherT.liftF(materializeTripLocation(tripId, location, visitOrder))
+      created <- EitherT.liftF(repository.create(materialized))
     } yield created).value
 
   def update(
@@ -90,6 +93,22 @@ final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[
       repository.visitOrderExists(tripId, visitOrder, excludeTripLocationId).map { exists =>
         Either.cond(!exists, (), DuplicateVisitOrder(visitOrder))
       }
+    }
+
+  private def materializeTripLocation(
+    tripId: TripId,
+    create: TripLocationCreate,
+    visitOrder: VisitOrder
+  ): F[TripLocation] =
+    GeneratedData.newId[F].map { id =>
+      TripLocation(
+        id = TripLocationId(id),
+        trip_id = tripId,
+        location_id = create.location_id,
+        visit_order = visitOrder,
+        arrival_date = create.arrival_date,
+        departure_date = create.departure_date
+      )
     }
 
   private def validateDateRange(

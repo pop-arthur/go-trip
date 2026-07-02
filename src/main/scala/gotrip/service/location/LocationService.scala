@@ -1,9 +1,12 @@
 package gotrip.service.location
 
+import cats.effect.Sync
+import cats.syntax.flatMap.*
 import gotrip.domain.location.*
 import gotrip.repository.location.LocationRepository
+import gotrip.service.GeneratedData
 
-final class LocationService[F[_]](repository: LocationRepository[F]):
+final class LocationService[F[_]: Sync](repository: LocationRepository[F]):
 
   def search(params: LocationSearchParams): F[List[Location]] =
     repository.search(params)
@@ -12,7 +15,20 @@ final class LocationService[F[_]](repository: LocationRepository[F]):
     repository.findById(id)
 
   def create(location: LocationCreate): F[Location] =
-    repository.create(location)
+    GeneratedData.newId[F].flatMap { id =>
+      repository.create(
+        Location(
+          id = LocationId(id),
+          name = location.name,
+          `type` = location.`type`,
+          country = location.country,
+          city = location.city,
+          address = location.address,
+          latitude = location.latitude,
+          longitude = location.longitude
+        )
+      )
+    }
 
   def update(id: LocationId, location: LocationUpdate): F[Option[Location]] =
     repository.update(id, location)

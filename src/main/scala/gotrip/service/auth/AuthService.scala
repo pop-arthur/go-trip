@@ -10,6 +10,7 @@ import gotrip.http.HttpError
 import gotrip.http.auth.{AuthenticatedUser, AuthResponse, LoginRequest, PublicUser, RefreshRequest, RegisterRequest}
 import gotrip.repository.auth.AuthSessionRepository
 import gotrip.repository.user.UserRepository
+import gotrip.service.GeneratedData
 
 import java.time.Instant
 import java.util.UUID
@@ -33,9 +34,10 @@ final class AuthService[F[_]: Sync: Clock](
           case None =>
             for {
               passwordHash <- passwordHasher.hash(request.password)
-              user <- userRepository.create(request.email, UserPasswordHash(passwordHash), request.fullName)
-              _ <- userRepository.addRole(user.id, Role.USER)
-              response <- issueAuthResponse(user, List(Role.USER))
+              user <- newUser(request.email, UserPasswordHash(passwordHash), request.fullName)
+              created <- userRepository.create(user)
+              _ <- userRepository.addRole(user.id, Role.USER, user.createdAt, user.updatedAt)
+              response <- issueAuthResponse(created, List(Role.USER))
             } yield response.asRight[HttpError]
         }
     )
@@ -125,7 +127,13 @@ final class AuthService[F[_]: Sync: Clock](
     if roles.isEmpty then List(Role.USER) else roles.distinct
 
   private def nowInstant: F[Instant] =
-    Clock[F].realTime.map(duration => Instant.ofEpochMilli(duration.toMillis))
+    GeneratedData.now[F]
+
+  private def newUser(email: UserEmail, passwordHash: UserPasswordHash, fullName: UserFullName): F[User] =
+    for
+      id <- GeneratedData.newId[F]
+      now <- nowInstant
+    yield User(UserId(id), email, passwordHash, fullName, now, now)
 
   private val unauthorized: HttpError =
     HttpError.Unauthorized("Invalid email or password")

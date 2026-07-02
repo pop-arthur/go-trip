@@ -1,5 +1,7 @@
 package gotrip.repository.location
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -34,7 +36,7 @@ final class PostgresLocationRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(location: LocationCreate): F[Location] =
+  override def create(location: Location): F[Location] =
     sessionPool.use { session =>
       PostgresLocationRepository.uniqueLocation(session, PostgresLocationRepository.createFragment(location))
     }
@@ -82,7 +84,7 @@ object PostgresLocationRepository:
     }
 
   private val locationDecoder: Decoder[Location] =
-    (int8 ~ text ~ locationType ~ text.opt ~ text.opt ~ text.opt ~ float8.opt ~ float8.opt)
+    (uuid ~ text ~ locationType ~ text.opt ~ text.opt ~ text.opt ~ float8.opt ~ float8.opt)
       .map {
         case id ~ name ~ decodedLocationType ~ country ~ city ~ address ~ latitude ~ longitude =>
           Location(
@@ -97,11 +99,11 @@ object PostgresLocationRepository:
           )
       }
 
-  val findByIdQuery: Query[Long, Location] =
+  val findByIdQuery: Query[UUID, Location] =
     sql"""
       select id, name::text, type, country::text, city::text, address, latitude, longitude
       from locations
-      where id = $int8
+      where id = $uuid
     """.query(locationDecoder)
 
   val findAllQuery: Query[Void, Location] =
@@ -130,16 +132,17 @@ object PostgresLocationRepository:
       params.query.map(query => s"%${query.toLowerCase}%")
     )
 
-  val deleteQuery: Query[Long, Long] =
+  val deleteQuery: Query[UUID, UUID] =
     sql"""
       delete from locations
-      where id = $int8
+      where id = $uuid
       returning id
-    """.query(int8)
+    """.query(uuid)
 
-  private def createFragment(location: LocationCreate): AppliedFragment =
+  private def createFragment(location: Location): AppliedFragment =
     val fields =
       List(
+        "id" -> sql"$uuid"(location.id.value),
         "name" -> sql"$text"(location.name.value),
         "type" -> sql"$locationType"(location.`type`)
       ) ++ List(
@@ -177,7 +180,7 @@ object PostgresLocationRepository:
       val sets = combineApplied(head :: fields.tail)
       AppliedFragment(sql"update locations set ${sets.fragment}", sets.argument) |+|
         sql"""
-          where id = $int8
+          where id = $uuid
           returning id, name::text, type, country::text, city::text, address, latitude, longitude
         """(id.value)
     }

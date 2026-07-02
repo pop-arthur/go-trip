@@ -1,5 +1,7 @@
 package gotrip.repository.notification
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
 import gotrip.domain.notification._
@@ -7,7 +9,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
 final class PostgresNotificationRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -16,18 +18,18 @@ final class PostgresNotificationRepository[F[_]: Concurrent](
   override def create(notification: UserNotification): F[UserNotification] =
     sessionPool.use { session =>
       session.prepare(PostgresNotificationRepository.insertQuery).flatMap { cmd =>
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
         cmd.unique(
           (
+            notification.id.value,
             notification.userId.value,
             notification.orderId.value,
             NotificationType.toString(notification.notificationType),
             notification.title.value,
             notification.body.value,
             notification.isRead,
-            now,
-            now,
-            now
+            PostgresNotificationRepository.toOffset(notification.sentAt),
+            PostgresNotificationRepository.toOffset(notification.createdAt),
+            PostgresNotificationRepository.toOffset(notification.updatedAt)
           )
         )
       }
@@ -47,17 +49,17 @@ final class PostgresNotificationRepository[F[_]: Concurrent](
       }
     }
 
-  override def markAsRead(id: NotificationId): F[Int] =
+  override def markAsRead(id: NotificationId, updatedAt: Instant): F[Int] =
     sessionPool.use { session =>
       session.prepare(PostgresNotificationRepository.markReadCommand).flatMap { cmd =>
-        cmd.execute(id.value).map(PostgresNotificationRepository.rowsAffected)
+        cmd.execute((PostgresNotificationRepository.toOffset(updatedAt), id.value)).map(PostgresNotificationRepository.rowsAffected)
       }
     }
 
-  override def markAllAsRead(userId: NotificationUserId): F[Int] =
+  override def markAllAsRead(userId: NotificationUserId, updatedAt: Instant): F[Int] =
     sessionPool.use { session =>
       session.prepare(PostgresNotificationRepository.markAllReadCommand).flatMap { cmd =>
-        cmd.execute(userId.value).map(PostgresNotificationRepository.rowsAffected)
+        cmd.execute((PostgresNotificationRepository.toOffset(updatedAt), userId.value)).map(PostgresNotificationRepository.rowsAffected)
       }
     }
 
@@ -84,7 +86,7 @@ object PostgresNotificationRepository:
   }
 
   private val decoder: Decoder[UserNotification] =
-    (int8 ~ int8 ~ int8.opt ~ text ~ text ~ text ~ bool ~ timestamptz ~ timestamptz ~ timestamptz).map {
+    (uuid ~ uuid ~ uuid.opt ~ text ~ text ~ text ~ bool ~ timestamptz ~ timestamptz ~ timestamptz).map {
       case id ~ uid ~ oid ~ ntype ~ title ~ body ~ read ~ sent ~ created ~ updated =>
         UserNotification(
           id = NotificationId(id),
@@ -100,47 +102,49 @@ object PostgresNotificationRepository:
         )
     }
 
-  val insertQuery: Query[(Long, Option[Long], String, String, String, Boolean, OffsetDateTime, OffsetDateTime, OffsetDateTime), UserNotification] =
+  val insertQuery: Query[(UUID, UUID, Option[UUID], String, String, String, Boolean, OffsetDateTime, OffsetDateTime, OffsetDateTime), UserNotification] =
     sql"""
-      INSERT INTO user_notifications (user_id, order_id, type, title, body, is_read, sent_at, created_at, updated_at)
-      VALUES ($int8, ${int8.opt}, $text, $text, $text, $bool, $timestamptz, $timestamptz, $timestamptz)
+      INSERT INTO user_notifications (id, user_id, order_id, type, title, body, is_read, sent_at, created_at, updated_at)
+      VALUES ($uuid, $uuid, ${uuid.opt}, $text, $text, $text, $bool, $timestamptz, $timestamptz, $timestamptz)
       RETURNING id, user_id, order_id, type::text, title::text, body::text, is_read, sent_at, created_at, updated_at
     """.query(decoder)
 
-  val selectById: Query[Long, UserNotification] =
+  val selectById: Query[UUID, UserNotification] =
     sql"""
       SELECT id, user_id, order_id, type::text, title::text, body::text, is_read, sent_at, created_at, updated_at
-      FROM user_notifications WHERE id = $int8
+      FROM user_notifications WHERE id = $uuid
     """.query(decoder)
 
-  val selectByUserId: Query[(Long, Int, Int), UserNotification] =
+  val selectByUserId: Query[(UUID, Int, Int), UserNotification] =
     sql"""
       SELECT id, user_id, order_id, type::text, title::text, body::text, is_read, sent_at, created_at, updated_at
       FROM user_notifications
-      WHERE user_id = $int8
+      WHERE user_id = $uuid
       ORDER BY sent_at DESC
       LIMIT $int4 OFFSET $int4
     """.query(decoder)
 
-  val markReadCommand: Command[Long] =
+  val markReadCommand: Command[(OffsetDateTime, UUID)] =
     sql"""
       UPDATE user_notifications
-      SET is_read = TRUE, updated_at = NOW()
-      WHERE id = $int8
+      SET is_read = TRUE, updated_at = $timestamptz
+      WHERE id = $uuid
     """.command
 
-  val markAllReadCommand: Command[Long] =
+  val markAllReadCommand: Command[(OffsetDateTime, UUID)] =
     sql"""
       UPDATE user_notifications
-      SET is_read = TRUE, updated_at = NOW()
-      WHERE user_id = $int8 AND is_read = FALSE
+      SET is_read = TRUE, updated_at = $timestamptz
+      WHERE user_id = $uuid AND is_read = FALSE
     """.command
 
-  val deleteCommand: Command[Long] =
-    sql"DELETE FROM user_notifications WHERE id = $int8".command
+  val deleteCommand: Command[UUID] =
+    sql"DELETE FROM user_notifications WHERE id = $uuid".command
 
-  val deleteAllForUserCommand: Command[Long] =
-    sql"DELETE FROM user_notifications WHERE user_id = $int8".command
+  val deleteAllForUserCommand: Command[UUID] =
+    sql"DELETE FROM user_notifications WHERE user_id = $uuid".command
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): NotificationRepository[F] =
     new PostgresNotificationRepository(sessionPool)
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)

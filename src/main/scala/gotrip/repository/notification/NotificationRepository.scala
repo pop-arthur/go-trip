@@ -10,8 +10,8 @@ trait NotificationRepository[F[_]]:
   def create(notification: UserNotification): F[UserNotification]
   def findById(id: NotificationId): F[Option[UserNotification]]
   def findByUserId(userId: NotificationUserId, limit: Int = 50, offset: Int = 0): F[List[UserNotification]]
-  def markAsRead(id: NotificationId): F[Int]
-  def markAllAsRead(userId: NotificationUserId): F[Int]
+  def markAsRead(id: NotificationId, updatedAt: java.time.Instant): F[Int]
+  def markAllAsRead(userId: NotificationUserId, updatedAt: java.time.Instant): F[Int]
   def delete(id: NotificationId): F[Int]
   def deleteAllForUser(userId: NotificationUserId): F[Int]
 

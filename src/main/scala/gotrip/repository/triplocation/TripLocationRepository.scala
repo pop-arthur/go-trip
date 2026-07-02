@@ -9,7 +9,7 @@ import skunk.Session
 trait TripLocationRepository[F[_]]:
   def listByTrip(tripId: TripId): F[List[TripLocation]]
   def findInTrip(tripId: TripId, tripLocationId: TripLocationId): F[Option[TripLocation]]
-  def create(tripId: TripId, location: TripLocationCreate, visitOrder: VisitOrder): F[TripLocation]
+  def create(location: TripLocation): F[TripLocation]
   def update(tripId: TripId, tripLocationId: TripLocationId, location: TripLocationUpdate): F[Option[TripLocation]]
   def delete(tripId: TripId, tripLocationId: TripLocationId): F[Boolean]
   def tripExists(tripId: TripId): F[Boolean]

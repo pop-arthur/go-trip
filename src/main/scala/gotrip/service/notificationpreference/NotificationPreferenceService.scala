@@ -1,10 +1,14 @@
 package gotrip.service.notificationpreference
 
+import cats.effect.{Clock, Sync}
+import cats.syntax.flatMap.*
+import cats.syntax.functor.*
 import gotrip.domain.user.UserId
-import gotrip.domain.notificationpreference.NotificationPreference
+import gotrip.domain.notificationpreference.{NotificationPreference, NotificationPreferenceId}
 import gotrip.repository.notificationpreference.NotificationPreferenceRepository
+import gotrip.service.GeneratedData
 
-final class NotificationPreferenceService[F[_]](
+final class NotificationPreferenceService[F[_]: Sync: Clock](
   repo: NotificationPreferenceRepository[F]
 ):
 
@@ -12,10 +16,28 @@ final class NotificationPreferenceService[F[_]](
     repo.getByUserId(userId)
 
   def enable(userId: UserId): F[NotificationPreference] =
-    repo.upsert(userId, isEnabled = true)
+    setStatus(userId, enabled = true)
 
   def disable(userId: UserId): F[NotificationPreference] =
-    repo.upsert(userId, isEnabled = false)
+    setStatus(userId, enabled = false)
 
   def setStatus(userId: UserId, enabled: Boolean): F[NotificationPreference] =
-    repo.upsert(userId, enabled)
+    for
+      existing <- repo.getByUserId(userId)
+      now <- GeneratedData.now[F]
+      preference <- existing match
+        case Some(current) =>
+          repo.upsert(current.copy(isEnabled = enabled, updatedAt = now))
+        case None =>
+          GeneratedData.newId[F].flatMap { id =>
+            repo.upsert(
+              NotificationPreference(
+                id = NotificationPreferenceId(id),
+                userId = userId,
+                isEnabled = enabled,
+                createdAt = now,
+                updatedAt = now
+              )
+            )
+          }
+    yield preference

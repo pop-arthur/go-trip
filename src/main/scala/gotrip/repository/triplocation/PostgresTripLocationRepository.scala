@@ -1,5 +1,7 @@
 package gotrip.repository.triplocation
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -30,15 +32,11 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(
-    tripId: TripId,
-    location: TripLocationCreate,
-    visitOrder: VisitOrder
-  ): F[TripLocation] =
+  override def create(location: TripLocation): F[TripLocation] =
     sessionPool.use { session =>
       PostgresTripLocationRepository.uniqueTripLocation(
         session,
-        PostgresTripLocationRepository.createFragment(tripId, location, visitOrder)
+        PostgresTripLocationRepository.createFragment(location)
       )
     }
 
@@ -105,7 +103,7 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     }
 
 object PostgresTripLocationRepository:
-  private type VisitOrderExistsInput = (Long, Int, Boolean, Long)
+  private type VisitOrderExistsInput = (UUID, Int, Boolean, UUID)
 
   def make[F[_]: Concurrent](
     sessionPool: Resource[F, Session[F]]
@@ -129,7 +127,7 @@ object PostgresTripLocationRepository:
     }
 
   private val tripLocationDecoder: Decoder[TripLocation] =
-    (int8 ~ int8 ~ int8 ~ int4 ~ timestamptz.opt ~ timestamptz.opt)
+    (uuid ~ uuid ~ uuid ~ int4 ~ timestamptz.opt ~ timestamptz.opt)
       .map {
         case id ~ tripId ~ locationId ~ visitOrder ~ arrivalDate ~ departureDate =>
           TripLocation(
@@ -142,79 +140,76 @@ object PostgresTripLocationRepository:
           )
       }
 
-  val listByTripQuery: Query[Long, TripLocation] =
+  val listByTripQuery: Query[UUID, TripLocation] =
     sql"""
       select id, trip_id, location_id, visit_order, arrival_date, departure_date
       from trip_locations
-      where trip_id = $int8
+      where trip_id = $uuid
       order by visit_order, id
     """.query(tripLocationDecoder)
 
-  val findInTripQuery: Query[(Long, Long), TripLocation] =
+  val findInTripQuery: Query[(UUID, UUID), TripLocation] =
     sql"""
       select id, trip_id, location_id, visit_order, arrival_date, departure_date
       from trip_locations
-      where trip_id = $int8
-        and id = $int8
+      where trip_id = $uuid
+        and id = $uuid
     """.query(tripLocationDecoder)
 
-  val deleteQuery: Query[(Long, Long), Long] =
+  val deleteQuery: Query[(UUID, UUID), UUID] =
     sql"""
       delete from trip_locations
-      where trip_id = $int8
-        and id = $int8
+      where trip_id = $uuid
+        and id = $uuid
       returning id
-    """.query(int8)
+    """.query(uuid)
 
-  val tripExistsQuery: Query[Long, Long] =
+  val tripExistsQuery: Query[UUID, UUID] =
     sql"""
       select id
       from trips
-      where id = $int8
-    """.query(int8)
+      where id = $uuid
+    """.query(uuid)
 
-  val tripExistsForUserQuery: Query[(Long, Long), Long] =
+  val tripExistsForUserQuery: Query[(UUID, UUID), UUID] =
     sql"""
       select id
       from trips
-      where user_id = $int8
-        and id = $int8
-    """.query(int8)
+      where user_id = $uuid
+        and id = $uuid
+    """.query(uuid)
 
-  val locationExistsQuery: Query[Long, Long] =
+  val locationExistsQuery: Query[UUID, UUID] =
     sql"""
       select id
       from locations
-      where id = $int8
-    """.query(int8)
+      where id = $uuid
+    """.query(uuid)
 
-  val visitOrderExistsQuery: Query[VisitOrderExistsInput, Long] =
+  val visitOrderExistsQuery: Query[VisitOrderExistsInput, UUID] =
     sql"""
       select id
       from trip_locations
-      where trip_id = $int8
+      where trip_id = $uuid
         and visit_order = $int4
-        and ($bool or id <> $int8)
+        and ($bool or id <> $uuid)
       limit 1
-    """.query(int8)
+    """.query(uuid)
 
-  val nextVisitOrderQuery: Query[Long, Int] =
+  val nextVisitOrderQuery: Query[UUID, Int] =
     sql"""
       select coalesce(max(visit_order), 0) + 1
       from trip_locations
-      where trip_id = $int8
+      where trip_id = $uuid
     """.query(int4)
 
-  private def createFragment(
-    tripId: TripId,
-    location: TripLocationCreate,
-    visitOrder: VisitOrder
-  ): AppliedFragment =
+  private def createFragment(location: TripLocation): AppliedFragment =
     val fields =
       List(
-        "trip_id" -> sql"$int8"(tripId.value),
-        "location_id" -> sql"$int8"(location.location_id.value),
-        "visit_order" -> sql"$int4"(visitOrder.value)
+        "id" -> sql"$uuid"(location.id.value),
+        "trip_id" -> sql"$uuid"(location.trip_id.value),
+        "location_id" -> sql"$uuid"(location.location_id.value),
+        "visit_order" -> sql"$int4"(location.visit_order.value)
       ) ++ List(
         location.arrival_date.value.map(value => "arrival_date" -> sql"$timestamptz"(value)),
         location.departure_date.value.map(value => "departure_date" -> sql"$timestamptz"(value))
@@ -247,8 +242,8 @@ object PostgresTripLocationRepository:
       val sets = combineApplied(head :: fields.tail)
       AppliedFragment(sql"update trip_locations set ${sets.fragment}", sets.argument) |+|
         sql"""
-          where trip_id = $int8
-            and id = $int8
+          where trip_id = $uuid
+            and id = $uuid
           returning id, trip_id, location_id, visit_order, arrival_date, departure_date
         """((tripId.value, tripLocationId.value))
     }
@@ -262,7 +257,7 @@ object PostgresTripLocationRepository:
       tripId.value,
       visitOrder.value,
       excludeTripLocationId.isEmpty,
-      excludeTripLocationId.map(_.value).getOrElse(0L)
+      excludeTripLocationId.map(_.value).getOrElse(UUID.fromString("00000000-0000-0000-0000-000000000000"))
     )
 
   private def combineApplied(fragments: List[AppliedFragment]): AppliedFragment =

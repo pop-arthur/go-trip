@@ -7,8 +7,12 @@ import gotrip.http.auth.AuthSupport
 import gotrip.service.review.ReviewService
 import sttp.tapir.server.ServerEndpoint
 import ReviewCodecs.{ReviewCreateRequest, ReviewUpdateRequest}
+import java.time.Instant
+import java.util.UUID
 
 final class ReviewController(service: ReviewService[IO], authSupport: AuthSupport):
+  private val placeholderId = ReviewId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+  private val placeholderTime = Instant.EPOCH
 
   val listReviews: ServerEndpoint[Any, IO] =
     ReviewEndpoints.listReviews
@@ -33,14 +37,14 @@ final class ReviewController(service: ReviewService[IO], authSupport: AuthSuppor
         IO.pure(Left(HttpError.Validation("Rating must be between 1 and 5")))
       else {
         val review = Review(
-          id = ReviewId(0L),
+          id = placeholderId,
           userId = userId,
           targetType = request.targetType,
           targetId = request.targetId,
           rating = ReviewRating(request.rating),
           text = ReviewText(request.text),
-          createdAt = java.time.Instant.now(),
-          updatedAt = java.time.Instant.now()
+          createdAt = placeholderTime,
+          updatedAt = placeholderTime
         )
         service.create(review).attempt.map {
           case Right(created) => Right(created)
@@ -68,8 +72,7 @@ final class ReviewController(service: ReviewService[IO], authSupport: AuthSuppor
         case Some(existing) =>
           val updated = existing.copy(
             rating = update.rating.map(ReviewRating.apply).getOrElse(existing.rating),
-            text = update.text.map(s => ReviewText(Some(s))).getOrElse(existing.text),
-            updatedAt = java.time.Instant.now()
+            text = update.text.map(s => ReviewText(Some(s))).getOrElse(existing.text)
           )
           service.update(updated).attempt.map {
             case Right(n) if n == 1 => Right(updated)

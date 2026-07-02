@@ -1,5 +1,7 @@
 package gotrip.repository.trip
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -30,32 +32,39 @@ final class PostgresTripRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(userId: UserId, trip: TripCreate): F[Trip] =
+  override def create(trip: Trip): F[Trip] =
     sessionPool.use { session =>
       session.prepare(PostgresTripRepository.createQuery).flatMap { query =>
         query.unique(
           (
-            userId.value,
+            trip.id.value,
+            trip.user_id.value,
             trip.title.value,
             trip.start_date.value,
             trip.end_date.value,
-            trip.status.getOrElse(TripStatus.Planned)
+            trip.status,
+            PostgresTripRepository.toOffset(trip.created_at),
+            PostgresTripRepository.toOffset(trip.updated_at)
           )
         )
       }
     }
 
-  override def update(userId: UserId, tripId: TripId, trip: TripUpdate): F[Option[Trip]] =
+  override def update(trip: Trip): F[Option[Trip]] =
     sessionPool.use { session =>
-      PostgresTripRepository.updateFragment(userId, tripId, trip) match
-        case Some(fragment) =>
-          session.prepare(fragment.fragment.query(PostgresTripRepository.tripDecoder)).flatMap { query =>
-            query.option(fragment.argument)
-          }
-        case None =>
-          session.prepare(PostgresTripRepository.findByUserQuery).flatMap { query =>
-            query.option((userId.value, tripId.value))
-          }
+      session.prepare(PostgresTripRepository.updateQuery).flatMap { query =>
+        query.option(
+          (
+            trip.title.value,
+            trip.start_date.value,
+            trip.end_date.value,
+            trip.status,
+            PostgresTripRepository.toOffset(trip.updated_at),
+            trip.user_id.value,
+            trip.id.value
+          )
+        )
+      }
     }
 
   override def delete(userId: UserId, tripId: TripId): F[Boolean] =
@@ -74,7 +83,7 @@ final class PostgresTripRepository[F[_]: Concurrent](
 
 object PostgresTripRepository:
   private type ListInput = (
-    Long,
+    UUID,
     Boolean,
     TripStatus,
     Boolean,
@@ -89,7 +98,7 @@ object PostgresTripRepository:
     new PostgresTripRepository(sessionPool)
 
   private val tripDecoder: Decoder[Trip] =
-    (int8 ~ int8 ~ text ~ date.opt ~ date.opt ~ SkunkCodecs.tripStatus ~ timestamptz ~ timestamptz)
+    (uuid ~ uuid ~ text ~ date.opt ~ date.opt ~ SkunkCodecs.tripStatus ~ timestamptz ~ timestamptz)
       .map {
         case id ~ userId ~ title ~ startDate ~ endDate ~ status ~ createdAt ~ updatedAt =>
           Trip(
@@ -108,66 +117,59 @@ object PostgresTripRepository:
     sql"""
       select id, user_id, title::text, start_date, end_date, status, created_at, updated_at
       from trips
-      where user_id = $int8
+      where user_id = $uuid
         and ($bool or status = ${SkunkCodecs.tripStatus})
         and ($bool or start_date >= $date)
         and ($bool or end_date <= $date)
       order by coalesce(start_date, date '9999-12-31'), id
     """.query(tripDecoder)
 
-  val findByUserQuery: Query[(Long, Long), Trip] =
+  val findByUserQuery: Query[(UUID, UUID), Trip] =
     sql"""
       select id, user_id, title::text, start_date, end_date, status, created_at, updated_at
       from trips
-      where user_id = $int8
-        and id = $int8
+      where user_id = $uuid
+        and id = $uuid
     """.query(tripDecoder)
 
-  val createQuery: Query[(Long, String, Option[LocalDate], Option[LocalDate], TripStatus), Trip] =
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
+
+  val createQuery: Query[(UUID, UUID, String, Option[LocalDate], Option[LocalDate], TripStatus, OffsetDateTime, OffsetDateTime), Trip] =
     sql"""
-      insert into trips (user_id, title, start_date, end_date, status)
-      values ($int8, $text, ${date.opt}, ${date.opt}, ${SkunkCodecs.tripStatus})
+      insert into trips (id, user_id, title, start_date, end_date, status, created_at, updated_at)
+      values ($uuid, $uuid, $text, ${date.opt}, ${date.opt}, ${SkunkCodecs.tripStatus}, $timestamptz, $timestamptz)
       returning id, user_id, title::text, start_date, end_date, status, created_at, updated_at
     """.query(tripDecoder)
 
-  val deleteQuery: Query[(Long, Long), Long] =
+  val updateQuery: Query[(String, Option[LocalDate], Option[LocalDate], TripStatus, OffsetDateTime, UUID, UUID), Trip] =
+    sql"""
+      update trips
+      set title = $text,
+          start_date = ${date.opt},
+          end_date = ${date.opt},
+          status = ${SkunkCodecs.tripStatus},
+          updated_at = $timestamptz
+      where user_id = $uuid
+        and id = $uuid
+      returning id, user_id, title::text, start_date, end_date, status, created_at, updated_at
+    """.query(tripDecoder)
+
+  val deleteQuery: Query[(UUID, UUID), UUID] =
     sql"""
       delete from trips
-      where user_id = $int8
-        and id = $int8
+      where user_id = $uuid
+        and id = $uuid
       returning id
-    """.query(int8)
+    """.query(uuid)
 
-  val existsForUserQuery: Query[(Long, Long), Long] =
+  val existsForUserQuery: Query[(UUID, UUID), UUID] =
     sql"""
       select id
       from trips
-      where user_id = $int8
-        and id = $int8
-    """.query(int8)
-
-  private def updateFragment(
-    userId: UserId,
-    tripId: TripId,
-    trip: TripUpdate
-  ): Option[AppliedFragment] =
-    val fields =
-      List(
-        trip.title.map(value => sql"title = $text"(value.value)),
-        trip.start_date.map(value => sql"start_date = ${date.opt}"(value.value)),
-        trip.end_date.map(value => sql"end_date = ${date.opt}"(value.value)),
-        trip.status.map(value => sql"status = ${SkunkCodecs.tripStatus}"(value))
-      ).flatten
-
-    fields.headOption.map { head =>
-      val sets = combineApplied(head :: fields.tail)
-      AppliedFragment(sql"update trips set ${sets.fragment}, updated_at = now()", sets.argument) |+|
-        sql"""
-          where user_id = $int8
-            and id = $int8
-          returning id, user_id, title::text, start_date, end_date, status, created_at, updated_at
-        """((userId.value, tripId.value))
-    }
+      where user_id = $uuid
+        and id = $uuid
+    """.query(uuid)
 
   private def toListInput(userId: UserId, params: TripSearchParams): ListInput =
     (
@@ -179,8 +181,3 @@ object PostgresTripRepository:
       params.toDate.isEmpty,
       params.toDate.getOrElse(LocalDate.of(9999, 12, 31))
     )
-
-  private def combineApplied(fragments: List[AppliedFragment]): AppliedFragment =
-    fragments.reduceLeft { (left, right) =>
-      left |+| sql", "(Void) |+| right
-    }

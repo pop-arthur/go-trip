@@ -1,5 +1,7 @@
 package gotrip.repository.userachievement
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
 import gotrip.domain.user._
@@ -9,17 +11,25 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
 final class PostgresUserAchievementRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
 ) extends UserAchievementRepository[F]:
 
-  override def create(userId: UserId, achievementId: AchievementId): F[UserAchievement] =
+  override def create(userAchievement: UserAchievement): F[UserAchievement] =
     sessionPool.use { session =>
       session.prepare(PostgresUserAchievementRepository.insertQuery).flatMap { cmd =>
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        cmd.unique((userId.value, achievementId.value, now, now, now))
+        cmd.unique(
+          (
+            userAchievement.id.value,
+            userAchievement.userId.value,
+            userAchievement.achievementId.value,
+            PostgresUserAchievementRepository.toOffset(userAchievement.unlockedAt),
+            PostgresUserAchievementRepository.toOffset(userAchievement.createdAt),
+            PostgresUserAchievementRepository.toOffset(userAchievement.updatedAt)
+          )
+        )
       }
     }
 
@@ -51,8 +61,11 @@ object PostgresUserAchievementRepository {
     case _                        => 0
   }
 
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
+
   private val decoder: Decoder[UserAchievement] =
-    (int8 ~ int8 ~ int8 ~ timestamptz ~ timestamptz ~ timestamptz).map {
+    (uuid ~ uuid ~ uuid ~ timestamptz ~ timestamptz ~ timestamptz).map {
       case id ~ uid ~ aid ~ unlocked ~ created ~ updated =>
         UserAchievement(
           id = UserAchievementId(id),
@@ -64,32 +77,32 @@ object PostgresUserAchievementRepository {
         )
     }
 
-  val insertQuery: Query[(Long, Long, OffsetDateTime, OffsetDateTime, OffsetDateTime), UserAchievement] =
+  val insertQuery: Query[(UUID, UUID, UUID, OffsetDateTime, OffsetDateTime, OffsetDateTime), UserAchievement] =
     sql"""
-      INSERT INTO user_achievements (user_id, achievement_id, unlocked_at, created_at, updated_at)
-      VALUES ($int8, $int8, $timestamptz, $timestamptz, $timestamptz)
+      INSERT INTO user_achievements (id, user_id, achievement_id, unlocked_at, created_at, updated_at)
+      VALUES ($uuid, $uuid, $uuid, $timestamptz, $timestamptz, $timestamptz)
       ON CONFLICT (user_id, achievement_id) DO NOTHING
       RETURNING id, user_id, achievement_id, unlocked_at, created_at, updated_at
     """.query(decoder)
 
-  val selectByUserId: Query[Long, UserAchievement] =
+  val selectByUserId: Query[UUID, UserAchievement] =
     sql"""
       SELECT id, user_id, achievement_id, unlocked_at, created_at, updated_at
       FROM user_achievements
-      WHERE user_id = $int8
+      WHERE user_id = $uuid
       ORDER BY unlocked_at
     """.query(decoder)
 
-  val selectByAchievementId: Query[Long, UserAchievement] =
+  val selectByAchievementId: Query[UUID, UserAchievement] =
     sql"""
       SELECT id, user_id, achievement_id, unlocked_at, created_at, updated_at
       FROM user_achievements
-      WHERE achievement_id = $int8
+      WHERE achievement_id = $uuid
       ORDER BY unlocked_at
     """.query(decoder)
 
-  val deleteCommand: Command[(Long, Long)] =
-    sql"DELETE FROM user_achievements WHERE user_id = $int8 AND achievement_id = $int8".command
+  val deleteCommand: Command[(UUID, UUID)] =
+    sql"DELETE FROM user_achievements WHERE user_id = $uuid AND achievement_id = $uuid".command
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): UserAchievementRepository[F] =
     new PostgresUserAchievementRepository(sessionPool)

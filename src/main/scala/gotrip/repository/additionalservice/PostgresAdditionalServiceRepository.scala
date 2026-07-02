@@ -1,5 +1,7 @@
 package gotrip.repository.additionalservice
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -29,7 +31,7 @@ final class PostgresAdditionalServiceRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(service: AdditionalServiceCreate): F[AdditionalService] =
+  override def create(service: AdditionalService): F[AdditionalService] =
     sessionPool.use { session =>
       PostgresAdditionalServiceRepository.uniqueAdditionalService(
         session,
@@ -70,7 +72,7 @@ final class PostgresAdditionalServiceRepository[F[_]: Concurrent](
     }
 
 object PostgresAdditionalServiceRepository:
-  private type SearchInput = (Option[ServiceType], Option[Long], Option[Long])
+  private type SearchInput = (Option[ServiceType], Option[UUID], Option[UUID])
 
   def make[F[_]: Concurrent](
     sessionPool: Resource[F, Session[F]]
@@ -94,7 +96,7 @@ object PostgresAdditionalServiceRepository:
     }
 
   private val additionalServiceDecoder: Decoder[AdditionalService] =
-    (int8 ~ text ~ text.opt ~ serviceType ~ int8.opt ~ int8.opt ~ float8.opt ~ text.opt ~ bool)
+    (uuid ~ text ~ text.opt ~ serviceType ~ uuid.opt ~ uuid.opt ~ float8.opt ~ text.opt ~ bool)
       .map {
         case id ~ title ~ description ~ decodedServiceType ~ providerId ~ locationId ~ priceAmount ~ priceCurrency ~ isActive =>
           AdditionalService(
@@ -115,38 +117,38 @@ object PostgresAdditionalServiceRepository:
       select id, title::text, description, service_type, provider_id, location_id, price_amount, price_currency::text, is_active
       from additional_services
       where service_type = coalesce(${serviceType.opt}, service_type)
-        and provider_id is not distinct from coalesce(${int8.opt}, provider_id)
-        and location_id is not distinct from coalesce(${int8.opt}, location_id)
+        and provider_id is not distinct from coalesce(${uuid.opt}, provider_id)
+        and location_id is not distinct from coalesce(${uuid.opt}, location_id)
       order by title
     """.query(additionalServiceDecoder)
 
-  val findByIdQuery: Query[Long, AdditionalService] =
+  val findByIdQuery: Query[UUID, AdditionalService] =
     sql"""
       select id, title::text, description, service_type, provider_id, location_id, price_amount, price_currency::text, is_active
       from additional_services
-      where id = $int8
+      where id = $uuid
     """.query(additionalServiceDecoder)
 
-  val deleteQuery: Query[Long, Long] =
+  val deleteQuery: Query[UUID, UUID] =
     sql"""
       delete from additional_services
-      where id = $int8
+      where id = $uuid
       returning id
-    """.query(int8)
+    """.query(uuid)
 
-  val providerExistsQuery: Query[Long, Long] =
+  val providerExistsQuery: Query[UUID, UUID] =
     sql"""
       select id
       from providers
-      where id = $int8
-    """.query(int8)
+      where id = $uuid
+    """.query(uuid)
 
-  val locationExistsQuery: Query[Long, Long] =
+  val locationExistsQuery: Query[UUID, UUID] =
     sql"""
       select id
       from locations
-      where id = $int8
-    """.query(int8)
+      where id = $uuid
+    """.query(uuid)
 
   private def toSearchInput(params: AdditionalServiceSearchParams): SearchInput =
     (
@@ -155,18 +157,19 @@ object PostgresAdditionalServiceRepository:
       params.locationId.map(_.value)
     )
 
-  private def createFragment(service: AdditionalServiceCreate): AppliedFragment =
+  private def createFragment(service: AdditionalService): AppliedFragment =
     val fields =
       List(
+        "id" -> sql"$uuid"(service.id.value),
         "title" -> sql"$text"(service.title.value),
-        "service_type" -> sql"$serviceType"(service.service_type)
+        "service_type" -> sql"$serviceType"(service.service_type),
+        "is_active" -> sql"$bool"(service.is_active)
       ) ++ List(
         service.description.map(value => "description" -> sql"$text"(value)),
-        service.provider_id.map(value => "provider_id" -> sql"$int8"(value.value)),
-        service.location_id.map(value => "location_id" -> sql"$int8"(value.value)),
+        service.provider_id.map(value => "provider_id" -> sql"$uuid"(value.value)),
+        service.location_id.map(value => "location_id" -> sql"$uuid"(value.value)),
         service.price_amount.map(value => "price_amount" -> sql"$float8"(value)),
-        service.price_currency.map(value => "price_currency" -> sql"$text"(value)),
-        service.is_active.map(value => "is_active" -> sql"$bool"(value))
+        service.price_currency.map(value => "price_currency" -> sql"$text"(value))
       ).flatten
 
     val columns = fields.map(_._1).mkString(", ")
@@ -186,8 +189,8 @@ object PostgresAdditionalServiceRepository:
         service.title.map(value => sql"title = $text"(value.value)),
         service.description.map(value => sql"description = $text"(value)),
         service.service_type.map(value => sql"service_type = $serviceType"(value)),
-        service.provider_id.map(value => sql"provider_id = $int8"(value.value)),
-        service.location_id.map(value => sql"location_id = $int8"(value.value)),
+        service.provider_id.map(value => sql"provider_id = $uuid"(value.value)),
+        service.location_id.map(value => sql"location_id = $uuid"(value.value)),
         service.price_amount.map(value => sql"price_amount = $float8"(value)),
         service.price_currency.map(value => sql"price_currency = $text"(value)),
         service.is_active.map(value => sql"is_active = $bool"(value))
@@ -197,7 +200,7 @@ object PostgresAdditionalServiceRepository:
       val sets = combineApplied(head :: fields.tail)
       AppliedFragment(sql"update additional_services set ${sets.fragment}", sets.argument) |+|
         sql"""
-          where id = $int8
+          where id = $uuid
           returning id, title::text, description, service_type, provider_id, location_id, price_amount, price_currency::text, is_active
         """(id.value)
     }

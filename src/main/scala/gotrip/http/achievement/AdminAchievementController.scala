@@ -8,23 +8,27 @@ import gotrip.http.auth.AuthSupport
 import gotrip.service.achievement.AchievementService
 import sttp.tapir.server.ServerEndpoint
 import AchievementCodecs.{AchievementCreateRequest, AchievementUpdateRequest}
+import java.time.Instant
+import java.util.UUID
 
 final class AdminAchievementController(service: AchievementService[IO], authSupport: AuthSupport):
+  private val placeholderId = AchievementId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
+  private val placeholderTime = Instant.EPOCH
 
   val adminCreate: ServerEndpoint[Any, IO] =
     AdminAchievementEndpoints.adminCreateAchievement
       .serverSecurityLogic(token => authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN))))
       .serverLogic { _ => request =>
       val achievement = Achievement(
-        id = AchievementId(0L),
+        id = placeholderId,
         code = AchievementCode(request.code),
         title = AchievementTitle(request.title),
         description = AchievementDescription(request.description),
         conditionType = request.conditionType,
         conditionValue = request.conditionValue,
         iconUrl = AchievementIconUrl(request.iconUrl),
-        createdAt = java.time.Instant.now(),
-        updatedAt = java.time.Instant.now()
+        createdAt = placeholderTime,
+        updatedAt = placeholderTime
       )
       service.create(achievement).attempt.map {
         case Right(created) => Right(created)
@@ -44,8 +48,7 @@ final class AdminAchievementController(service: AchievementService[IO], authSupp
             description = update.description.map(s => AchievementDescription(Some(s))).getOrElse(existing.description),
             conditionType = update.conditionType.getOrElse(existing.conditionType),
             conditionValue = update.conditionValue.getOrElse(existing.conditionValue),
-            iconUrl = update.iconUrl.map(s => AchievementIconUrl(Some(s))).getOrElse(existing.iconUrl),
-            updatedAt = java.time.Instant.now()
+            iconUrl = update.iconUrl.map(s => AchievementIconUrl(Some(s))).getOrElse(existing.iconUrl)
           )
           service.update(updated).attempt.map {
             case Right(n) if n == 1 => Right(updated)

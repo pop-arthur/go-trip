@@ -1,5 +1,7 @@
 package gotrip.repository.achievement
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
 import gotrip.domain.achievement._
@@ -7,7 +9,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
 final class PostgresAchievementRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -37,17 +39,17 @@ final class PostgresAchievementRepository[F[_]: Concurrent](
   override def create(achievement: Achievement): F[Achievement] =
     sessionPool.use { session =>
       session.prepare(PostgresAchievementRepository.insertQuery).flatMap { cmd =>
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
         cmd.unique(
           (
+            achievement.id.value,
             achievement.code.value,
             achievement.title.value,
             achievement.description.value,
             AchievementConditionType.toString(achievement.conditionType),
             achievement.conditionValue,
             achievement.iconUrl.value,
-            now,
-            now
+            PostgresAchievementRepository.toOffset(achievement.createdAt),
+            PostgresAchievementRepository.toOffset(achievement.updatedAt)
           )
         )
       }
@@ -64,6 +66,7 @@ final class PostgresAchievementRepository[F[_]: Concurrent](
             AchievementConditionType.toString(achievement.conditionType),
             achievement.conditionValue,
             achievement.iconUrl.value,
+            PostgresAchievementRepository.toOffset(achievement.updatedAt),
             achievement.id.value
           )
         ).map(PostgresAchievementRepository.rowsAffected)
@@ -87,7 +90,7 @@ object PostgresAchievementRepository:
   }
 
   private val decoder: Decoder[Achievement] =
-    (int8 ~ text ~ text ~ text.opt ~ text ~ int4 ~ text.opt ~ timestamptz ~ timestamptz).map {
+    (uuid ~ text ~ text ~ text.opt ~ text ~ int4 ~ text.opt ~ timestamptz ~ timestamptz).map {
       case id ~ code ~ title ~ desc ~ condType ~ condVal ~ icon ~ created ~ updated =>
         Achievement(
           id = AchievementId(id),
@@ -109,10 +112,10 @@ object PostgresAchievementRepository:
       ORDER BY id
     """.query(decoder)
 
-  val selectById: Query[Long, Achievement] =
+  val selectById: Query[UUID, Achievement] =
     sql"""
       SELECT id, code::text, title::text, description::text, condition_type::text, condition_value, icon_url::text, created_at, updated_at
-      FROM achievements WHERE id = $int8
+      FROM achievements WHERE id = $uuid
     """.query(decoder)
 
   val selectByCode: Query[String, Achievement] =
@@ -121,23 +124,25 @@ object PostgresAchievementRepository:
       FROM achievements WHERE code = $text
     """.query(decoder)
 
-  val insertQuery: Query[(String, String, Option[String], String, Int, Option[String], OffsetDateTime, OffsetDateTime), Achievement] =
+  val insertQuery: Query[(UUID, String, String, Option[String], String, Int, Option[String], OffsetDateTime, OffsetDateTime), Achievement] =
     sql"""
-      INSERT INTO achievements (code, title, description, condition_type, condition_value, icon_url, created_at, updated_at)
-      VALUES ($text, $text, ${text.opt}, $text, $int4, ${text.opt}, $timestamptz, $timestamptz)
+      INSERT INTO achievements (id, code, title, description, condition_type, condition_value, icon_url, created_at, updated_at)
+      VALUES ($uuid, $text, $text, ${text.opt}, $text, $int4, ${text.opt}, $timestamptz, $timestamptz)
       RETURNING id, code::text, title::text, description::text, condition_type::text, condition_value, icon_url::text, created_at, updated_at
     """.query(decoder)
 
-  val updateCommand: Command[(String, String, Option[String], String, Int, Option[String], Long)] =
+  val updateCommand: Command[(String, String, Option[String], String, Int, Option[String], OffsetDateTime, UUID)] =
     sql"""
       UPDATE achievements
       SET code = $text, title = $text, description = ${text.opt}, condition_type = $text,
-          condition_value = $int4, icon_url = ${text.opt}, updated_at = NOW()
-      WHERE id = $int8
+          condition_value = $int4, icon_url = ${text.opt}, updated_at = $timestamptz
+      WHERE id = $uuid
     """.command
 
-  val deleteCommand: Command[Long] =
-    sql"DELETE FROM achievements WHERE id = $int8".command
+  val deleteCommand: Command[UUID] =
+    sql"DELETE FROM achievements WHERE id = $uuid".command
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): AchievementRepository[F] =
     new PostgresAchievementRepository(sessionPool)
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
