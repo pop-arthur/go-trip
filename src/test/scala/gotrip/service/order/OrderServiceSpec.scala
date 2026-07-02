@@ -1,6 +1,7 @@
 package gotrip.service.order
 
-import cats.Id
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import gotrip.domain.additionalservice.ServiceType
 import gotrip.domain.location.*
 import gotrip.domain.notification.*
@@ -18,88 +19,95 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{Instant, OffsetDateTime}
+import java.util.UUID
 
 final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
   "OrderService" should {
     "reject create when trip is not owned by the user" in {
-      val repository = mock[OrderRepository[Id]]
+      val repository = mock[OrderRepository[IO]]
       val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
 
-      repository.tripExistsForUser.expects(userId, tripId).returning(false)
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(false))
 
-      service.create(userId, tripId, orderCreate) shouldBe Left(OrderServiceError.TripNotFound(tripId))
+      service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe Left(OrderServiceError.TripNotFound(tripId))
     }
 
     "reject create when provider does not exist" in {
-      val repository = mock[OrderRepository[Id]]
+      val repository = mock[OrderRepository[IO]]
       val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
 
-      repository.tripExistsForUser.expects(userId, tripId).returning(true)
-      repository.providerExists.expects(providerId).returning(false)
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
+      repository.providerExists.expects(providerId).returning(IO.pure(false))
 
-      service.create(userId, tripId, orderCreate) shouldBe Left(OrderServiceError.ProviderNotFound(providerId))
+      service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe Left(OrderServiceError.ProviderNotFound(providerId))
     }
 
     "reject create when start datetime is after end datetime" in {
-      val repository = mock[OrderRepository[Id]]
+      val repository = mock[OrderRepository[IO]]
       val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
 
-      repository.tripExistsForUser.expects(userId, tripId).returning(true)
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
 
-      service.create(userId, tripId, invalidDateOrderCreate) shouldBe Left(OrderServiceError.InvalidDateTimeRange)
+      service.create(userId, tripId, invalidDateOrderCreate).unsafeRunSync() shouldBe Left(OrderServiceError.InvalidDateTimeRange)
     }
 
     "write a status event and notification when preferences are enabled" in {
-      val repository = mock[OrderRepository[Id]]
+      val repository = mock[OrderRepository[IO]]
       val notifications = new RecordingNotificationRepository
       val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications)
 
-      repository.findByUser.expects(userId, orderId).returning(Some(order))
-      repository.updateStatus.expects(userId, orderId, statusUpdate).returning(Some(updatedOrder))
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
+      repository.updateStatus.expects(where { (updated: Order) =>
+        updated.id == orderId &&
+        updated.status == OrderStatus.Confirmed
+      }).returning(IO.pure(Some(updatedOrder)))
       repository.insertStatusEvent.expects(where { (event: OrderStatusEvent) =>
         event.order_id == orderId &&
         event.old_status.contains(OrderStatus.PendingVerification) &&
         event.new_status == OrderStatus.Confirmed &&
         event.source == OrderStatusEventSource.UserEdit
-      }).returning(statusEvent)
+      }).returning(IO.pure(statusEvent))
 
-      service.updateStatus(userId, orderId, statusUpdate) shouldBe Right(updatedOrder)
+      service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created.size shouldBe 1
       notifications.created.head.orderId.value shouldBe Some(orderId.value)
     }
 
     "skip notification when preferences are disabled" in {
-      val repository = mock[OrderRepository[Id]]
+      val repository = mock[OrderRepository[IO]]
       val notifications = new RecordingNotificationRepository
       val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications)
 
-      repository.findByUser.expects(userId, orderId).returning(Some(order))
-      repository.updateStatus.expects(userId, orderId, statusUpdate).returning(Some(updatedOrder))
-      repository.insertStatusEvent.expects(*).returning(statusEvent)
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
+      repository.updateStatus.expects(*).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(*).returning(IO.pure(statusEvent))
 
-      service.updateStatus(userId, orderId, statusUpdate) shouldBe Right(updatedOrder)
+      service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created shouldBe empty
     }
   }
 
   private def serviceWith(
-    repository: OrderRepository[Id],
+    repository: OrderRepository[IO],
     preference: Option[NotificationPreference],
     notifications: RecordingNotificationRepository
-  ): OrderService[Id] =
-    OrderService[Id](
+  ): OrderService[IO] =
+    OrderService[IO](
       repository,
       new StaticNotificationPreferenceRepository(preference),
-      NotificationService[Id](notifications)
+      NotificationService[IO](notifications)
     )
 
-  private val userId = UserId(1L)
-  private val tripId = TripId(10L)
-  private val orderId = OrderId(100L)
-  private val providerId = ProviderId(5L)
-  private val departureLocationId = LocationId(20L)
-  private val arrivalLocationId = LocationId(21L)
+  private def uuid(suffix: String): UUID =
+    UUID.fromString(s"00000000-0000-0000-0000-$suffix")
+
+  private val userId = UserId(uuid("000000000001"))
+  private val tripId = TripId(uuid("000000000010"))
+  private val orderId = OrderId(uuid("000000000100"))
+  private val providerId = ProviderId(uuid("000000000005"))
+  private val departureLocationId = LocationId(uuid("000000000020"))
+  private val arrivalLocationId = LocationId(uuid("000000000021"))
   private val startDateTime = OffsetDateTime.parse("2026-06-10T12:00:00Z")
   private val endDateTime = OffsetDateTime.parse("2026-06-10T14:00:00Z")
 
@@ -143,7 +151,7 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
   private val updatedOrder = order.copy(status = OrderStatus.Confirmed)
   private val statusUpdate = OrderStatusUpdate(status = OrderStatus.Confirmed, reason = Some("Confirmed by provider"))
   private val statusEvent = OrderStatusEvent(
-    id = OrderStatusEventId(1L),
+    id = OrderStatusEventId(uuid("000000000001")),
     order_id = orderId,
     old_status = Some(OrderStatus.PendingVerification),
     new_status = OrderStatus.Confirmed,
@@ -154,7 +162,7 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
   )
 
   private val enabledPreference = NotificationPreference(
-    id = NotificationPreferenceId(1L),
+    id = NotificationPreferenceId(uuid("000000000001")),
     userId = userId,
     isEnabled = true,
     createdAt = Instant.parse("2026-06-01T10:00:00Z"),
@@ -165,33 +173,27 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
 private final class StaticNotificationPreferenceRepository(
   preference: Option[NotificationPreference]
-) extends NotificationPreferenceRepository[Id]:
-  override def getByUserId(userId: UserId): Option[NotificationPreference] =
-    preference.filter(_.userId == userId)
+) extends NotificationPreferenceRepository[IO]:
+  override def getByUserId(userId: UserId): IO[Option[NotificationPreference]] =
+    IO.pure(preference.filter(_.userId == userId))
 
-  override def upsert(userId: UserId, isEnabled: Boolean): NotificationPreference =
-    NotificationPreference(
-      id = NotificationPreferenceId(1L),
-      userId = userId,
-      isEnabled = isEnabled,
-      createdAt = Instant.parse("2026-06-01T10:00:00Z"),
-      updatedAt = Instant.parse("2026-06-01T10:00:00Z")
-    )
+  override def upsert(preference: NotificationPreference): IO[NotificationPreference] =
+    IO.pure(preference)
 
-private final class RecordingNotificationRepository extends NotificationRepository[Id]:
+private final class RecordingNotificationRepository extends NotificationRepository[IO]:
   var created: List[UserNotification] = Nil
 
-  override def create(notification: UserNotification): UserNotification =
+  override def create(notification: UserNotification): IO[UserNotification] =
     created = notification :: created
-    notification.copy(id = NotificationId(created.size.toLong))
+    IO.pure(notification)
 
-  override def findById(id: NotificationId): Option[UserNotification] =
-    created.find(_.id == id)
+  override def findById(id: NotificationId): IO[Option[UserNotification]] =
+    IO.pure(created.find(_.id == id))
 
-  override def findByUserId(userId: NotificationUserId, limit: Int, offset: Int): List[UserNotification] =
-    created.filter(_.userId == userId).slice(offset, offset + limit)
+  override def findByUserId(userId: NotificationUserId, limit: Int, offset: Int): IO[List[UserNotification]] =
+    IO.pure(created.filter(_.userId == userId).slice(offset, offset + limit))
 
-  override def markAsRead(id: NotificationId): Int = 0
-  override def markAllAsRead(userId: NotificationUserId): Int = 0
-  override def delete(id: NotificationId): Int = 0
-  override def deleteAllForUser(userId: NotificationUserId): Int = 0
+  override def markAsRead(id: NotificationId, updatedAt: Instant): IO[Int] = IO.pure(0)
+  override def markAllAsRead(userId: NotificationUserId, updatedAt: Instant): IO[Int] = IO.pure(0)
+  override def delete(id: NotificationId): IO[Int] = IO.pure(0)
+  override def deleteAllForUser(userId: NotificationUserId): IO[Int] = IO.pure(0)

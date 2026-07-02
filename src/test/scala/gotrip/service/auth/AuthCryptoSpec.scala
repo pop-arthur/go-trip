@@ -29,16 +29,17 @@ final class AuthCryptoSpec extends AnyWordSpec with Matchers:
     "validate access tokens and reject refresh tokens as access tokens" in {
       val service = new JwtService[IO](authConfig)
       val now = Instant.now()
+      val userId = UserId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
       val sessionId = UUID.randomUUID()
 
       val accessToken = service
-        .issueAccessToken(UserId(1L), UserEmail("traveler@example.com"), List(Role.USER), sessionId, now)
+        .issueAccessToken(userId, UserEmail("traveler@example.com"), List(Role.USER), sessionId, now)
         .unsafeRunSync()
       val refreshToken = service
-        .issueRefreshToken(UserId(1L), UserEmail("traveler@example.com"), List(Role.USER), sessionId, now)
+        .issueRefreshToken(userId, UserEmail("traveler@example.com"), List(Role.USER), sessionId, now)
         .unsafeRunSync()
 
-      service.authenticateAccess(accessToken).unsafeRunSync().map(_.userId) shouldBe Right(UserId(1L))
+      service.authenticateAccess(accessToken).unsafeRunSync().map(_.userId) shouldBe Right(userId)
       service.authenticateAccess(refreshToken).unsafeRunSync() match
         case Left(error) => error.code shouldBe "UNAUTHORIZED"
         case Right(_)    => fail("refresh token was accepted as an access token")

@@ -1,6 +1,7 @@
 package gotrip.service.trip
 
-import cats.Id
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import gotrip.domain.trip.*
 import gotrip.domain.user.*
 import gotrip.repository.trip.TripRepository
@@ -9,48 +10,49 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.{Instant, LocalDate}
+import java.util.UUID
 
 final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
   "TripService" should {
     "create a valid trip for a user" in {
-      val repository = mock[TripRepository[Id]]
-      val service = TripService[Id](repository)
+      val repository = mock[TripRepository[IO]]
+      val service = TripService[IO](repository)
 
-      repository.create.expects(userId, tripCreate).returning(trip)
+      repository.create.expects(*).returning(IO.pure(trip))
 
-      service.create(userId, tripCreate) shouldBe Right(trip)
+      service.create(userId, tripCreate).unsafeRunSync() shouldBe Right(trip)
     }
 
     "reject create when start date is after end date" in {
-      val repository = mock[TripRepository[Id]]
-      val service = TripService[Id](repository)
+      val repository = mock[TripRepository[IO]]
+      val service = TripService[IO](repository)
 
-      service.create(userId, invalidTripCreate) shouldBe Left(TripServiceError.InvalidDateRange)
+      service.create(userId, invalidTripCreate).unsafeRunSync() shouldBe Left(TripServiceError.InvalidDateRange)
     }
 
     "return not found when updating a trip that is not owned by the user" in {
-      val repository = mock[TripRepository[Id]]
-      val service = TripService[Id](repository)
+      val repository = mock[TripRepository[IO]]
+      val service = TripService[IO](repository)
 
-      repository.findByUser.expects(userId, tripId).returning(None)
+      repository.findByUser.expects(userId, tripId).returning(IO.pure(None))
 
-      service.update(userId, tripId, TripUpdate(title = Some(TripTitle("Updated")))) shouldBe
+      service.update(userId, tripId, TripUpdate(title = Some(TripTitle("Updated")))).unsafeRunSync() shouldBe
         Left(TripServiceError.TripNotFound(tripId))
     }
 
     "delete an owned trip" in {
-      val repository = mock[TripRepository[Id]]
-      val service = TripService[Id](repository)
+      val repository = mock[TripRepository[IO]]
+      val service = TripService[IO](repository)
 
-      repository.delete.expects(userId, tripId).returning(true)
+      repository.delete.expects(userId, tripId).returning(IO.pure(true))
 
-      service.delete(userId, tripId) shouldBe Right(())
+      service.delete(userId, tripId).unsafeRunSync() shouldBe Right(())
     }
   }
 
-  private val userId = UserId(1L)
-  private val tripId = TripId(10L)
+  private val userId = UserId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+  private val tripId = TripId(UUID.fromString("00000000-0000-0000-0000-000000000010"))
 
   private val tripCreate = TripCreate(
     title = TripTitle("Vietnam 2026"),
