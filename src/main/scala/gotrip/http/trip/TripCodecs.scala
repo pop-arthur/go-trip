@@ -3,10 +3,11 @@ package gotrip.http.trip
 import gotrip.domain.trip.*
 import gotrip.domain.user.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, DecodeResult, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, DecodeResult, Schema}
 
 import java.time.{Instant, LocalDate}
 import java.time.format.DateTimeFormatter
@@ -45,31 +46,25 @@ object TripCodecs:
     }(_.format(DateTimeFormatter.ISO_LOCAL_DATE))
 
   given Encoder[UserId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[UserId] =
-    Decoder.decodeLong.map(UserId.apply)
+    uuidDecoder(UserId.apply)
 
   given Schema[UserId] =
-    Schema.schemaForLong
-      .map(value => Some(UserId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[UserId](_.value))
+    uuidSchema(UserId.apply, _.value)
 
   given Encoder[TripId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[TripId] =
-    Decoder.decodeLong.map(TripId.apply)
+    uuidDecoder(TripId.apply)
 
   given Schema[TripId] =
-    Schema.schemaForLong
-      .map(value => Some(TripId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[TripId](_.value))
+    uuidSchema(TripId.apply, _.value)
 
   given Codec[String, TripId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(TripId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[TripId](_.value))
+    uuidTextCodec(TripId.apply, _.value)
 
   given Encoder[TripTitle] =
     Encoder.encodeString.contramap(_.value)

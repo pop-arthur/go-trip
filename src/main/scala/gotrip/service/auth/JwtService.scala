@@ -107,7 +107,7 @@ final class JwtService[F[_]: Sync](config: AuthConfig):
           else
             for
               subject <- claim.subject.toRight(unauthorized)
-              userId <- subject.toLongOption.map(UserId.apply).toRight(unauthorized)
+              userId <- Either.catchOnly[IllegalArgumentException](UUID.fromString(subject)).map(UserId.apply).leftMap(_ => unauthorized)
               customClaims <- decode[JwtCustomClaims](claim.content).leftMap(_ => unauthorized)
               _ <- Either.cond(customClaims.tokenType == expectedType.value, (), unauthorized)
               sessionId <- Either.catchOnly[IllegalArgumentException](UUID.fromString(customClaims.sid)).leftMap(_ => unauthorized)

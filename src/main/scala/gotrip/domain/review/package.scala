@@ -1,14 +1,15 @@
 package gotrip.domain
 
 import scala.annotation.targetName
+import java.util.UUID
 
 package object review {
-  opaque type ReviewId = Long
+  opaque type ReviewId = UUID
   object ReviewId {
-    def apply(value: Long): ReviewId = value
+    def apply(value: UUID): ReviewId = value
   }
   extension (id: ReviewId) {
-    @targetName("reviewIdValue") def value: Long = id
+    @targetName("reviewIdValue") def value: UUID = id
   }
 
   opaque type ReviewRating = Int
@@ -27,12 +28,12 @@ package object review {
     @targetName("reviewTextValue") def value: Option[String] = text
   }
 
-  opaque type ReviewTargetId = Long
+  opaque type ReviewTargetId = UUID
   object ReviewTargetId {
-    def apply(value: Long): ReviewTargetId = value
+    def apply(value: UUID): ReviewTargetId = value
   }
   extension (id: ReviewTargetId) {
-    @targetName("reviewTargetIdValue") def value: Long = id
+    @targetName("reviewTargetIdValue") def value: UUID = id
   }
 
   sealed trait ReviewTargetType

@@ -2,25 +2,23 @@ package gotrip.http.auth
 
 import gotrip.domain.user.*
 import gotrip.domain.userrole.*
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax._
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, Schema}
 
 import java.time.Instant
 import scala.util.Try
 
 object AuthCodecs:
-  given Encoder[UserId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[UserId] = Decoder.decodeLong.map(UserId.apply)
-  given Schema[UserId] =
-    Schema.schemaForLong
-      .map(value => Some(UserId(value)))(_.value)
-      .validate(Validator.inRange(1L, Long.MaxValue).contramap[UserId](_.value))
+  given Encoder[UserId] = uuidEncoder(_.value)
+  given Decoder[UserId] = uuidDecoder(UserId.apply)
+  given Schema[UserId] = uuidSchema(UserId.apply, _.value)
 
   given Codec[String, UserId, CodecFormat.TextPlain] =
-    Codec.long.map(UserId.apply)(_.value)
+    uuidTextCodec(UserId.apply, _.value)
 
   given Encoder[UserEmail] = Encoder.encodeString.contramap(_.value)
   given Decoder[UserEmail] = Decoder.decodeString.map(UserEmail.apply)

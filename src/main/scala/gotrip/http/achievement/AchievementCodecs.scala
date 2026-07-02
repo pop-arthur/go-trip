@@ -2,10 +2,11 @@ package gotrip.http.achievement
 
 import gotrip.domain.achievement._
 import gotrip.http.HttpError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, Schema}
 
 object AchievementCodecs {
 
@@ -29,15 +30,13 @@ object AchievementCodecs {
   given Decoder[Achievement] = deriveDecoder
   given Schema[Achievement] = derived
 
-  given Encoder[AchievementId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[AchievementId] = Decoder.decodeLong.map(AchievementId.apply)
+  given Encoder[AchievementId] = uuidEncoder(_.value)
+  given Decoder[AchievementId] = uuidDecoder(AchievementId.apply)
   given Schema[AchievementId] =
-    Schema.schemaForLong
-      .map(value => Some(AchievementId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[AchievementId](_.value))
+    uuidSchema(AchievementId.apply, _.value)
 
   given Codec[String, AchievementId, CodecFormat.TextPlain] =
-    Codec.long.map(AchievementId.apply)(_.value)
+    uuidTextCodec(AchievementId.apply, _.value)
 
   given Encoder[AchievementCode] = Encoder.encodeString.contramap(_.value)
   given Decoder[AchievementCode] = Decoder.decodeString.map(AchievementCode.apply)

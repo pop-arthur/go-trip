@@ -2,6 +2,7 @@ package gotrip.http.review
 
 import gotrip.domain.review._
 import gotrip.domain.user.UserId
+import gotrip.http.UuidCodecs.*
 import gotrip.http.HttpError
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
@@ -23,25 +24,21 @@ object ReviewCodecs:
   given Decoder[HttpError.Internal] = deriveDecoder
   given Schema[HttpError.Internal] = derived
 
-  given Encoder[ReviewId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[ReviewId] = Decoder.decodeLong.map(ReviewId.apply)
+  given Encoder[ReviewId] = uuidEncoder(_.value)
+  given Decoder[ReviewId] = uuidDecoder(ReviewId.apply)
   given Schema[ReviewId] =
-    Schema.schemaForLong
-      .map(value => Some(ReviewId(value)))(_.value)
-      .validate(Validator.inRange(1L, Long.MaxValue).contramap[ReviewId](_.value))
+    uuidSchema(ReviewId.apply, _.value)
 
   given Codec[String, ReviewId, CodecFormat.TextPlain] =
-    Codec.long.map(ReviewId.apply)(_.value)
+    uuidTextCodec(ReviewId.apply, _.value)
 
-  given Encoder[ReviewTargetId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[ReviewTargetId] = Decoder.decodeLong.map(ReviewTargetId.apply)
+  given Encoder[ReviewTargetId] = uuidEncoder(_.value)
+  given Decoder[ReviewTargetId] = uuidDecoder(ReviewTargetId.apply)
   given Schema[ReviewTargetId] =
-    Schema.schemaForLong
-      .map(value => Some(ReviewTargetId(value)))(_.value)
-      .validate(Validator.inRange(1L, Long.MaxValue).contramap[ReviewTargetId](_.value))
+    uuidSchema(ReviewTargetId.apply, _.value)
 
   given Codec[String, ReviewTargetId, CodecFormat.TextPlain] =
-    Codec.long.map(ReviewTargetId.apply)(_.value)
+    uuidTextCodec(ReviewTargetId.apply, _.value)
 
   given Encoder[ReviewTargetType] = Encoder.encodeString.contramap(_.toString)
   given Decoder[ReviewTargetType] = Decoder.decodeString.emap { s =>

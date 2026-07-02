@@ -1,14 +1,15 @@
 package gotrip.domain
 
 import scala.annotation.targetName
+import java.util.UUID
 
 package object userrole {
-  opaque type UserRoleId = Long
+  opaque type UserRoleId = UUID
   object UserRoleId {
-    def apply(value: Long): UserRoleId = value
+    def apply(value: UUID): UserRoleId = value
   }
   extension (id: UserRoleId) {
-    @targetName("userRoleIdValue") def value: Long = id
+    @targetName("userRoleIdValue") def value: UUID = id
   }
 
   sealed trait Role

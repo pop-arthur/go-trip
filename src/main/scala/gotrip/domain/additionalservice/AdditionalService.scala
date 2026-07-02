@@ -6,6 +6,7 @@ import gotrip.domain.location.*
 import gotrip.domain.provider.*
 import gotrip.domain.validation.DomainValidation.Result
 import gotrip.domain.validation.DomainValidation.*
+import java.util.UUID
 
 enum ServiceType:
   case Flight, Train, Bus, Hotel, Tour, CarRental, Insurance, Taxi, Esim, Lounge, ExtraBaggage, Other
@@ -45,8 +46,8 @@ object AdditionalServiceCreate:
     title: String,
     serviceType: ServiceType,
     description: Option[String] = None,
-    providerId: Option[Long] = None,
-    locationId: Option[Long] = None,
+    providerId: Option[UUID] = None,
+    locationId: Option[UUID] = None,
     priceAmount: Option[Double] = None,
     priceCurrency: Option[String] = None,
     isActive: Option[Boolean] = None

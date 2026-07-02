@@ -4,6 +4,7 @@ import gotrip.domain.additionalservice.*
 import gotrip.domain.location.*
 import gotrip.domain.provider.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
@@ -22,20 +23,16 @@ object AdditionalServiceCodecs:
 
   // ServiceId
   given Encoder[ServiceId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[ServiceId] =
-    Decoder.decodeLong.map(ServiceId.apply)
+    uuidDecoder(ServiceId.apply)
 
   given Schema[ServiceId] =
-    Schema.schemaForLong
-      .map(value => Some(ServiceId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[ServiceId](_.value))
+    uuidSchema(ServiceId.apply, _.value)
 
   given Codec[String, ServiceId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(ServiceId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[ServiceId](_.value))
+    uuidTextCodec(ServiceId.apply, _.value)
 
   // ServiceTitle
   given Encoder[ServiceTitle] =
@@ -49,37 +46,29 @@ object AdditionalServiceCodecs:
 
   // ProviderId
   given Encoder[ProviderId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[ProviderId] =
-    Decoder.decodeLong.map(ProviderId.apply)
+    uuidDecoder(ProviderId.apply)
 
   given Schema[ProviderId] =
-    Schema.schemaForLong
-      .map(value => Some(ProviderId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
+    uuidSchema(ProviderId.apply, _.value)
 
   given Codec[String, ProviderId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(ProviderId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
+    uuidTextCodec(ProviderId.apply, _.value)
 
   // LocationId
   given Encoder[LocationId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[LocationId] =
-    Decoder.decodeLong.map(LocationId.apply)
+    uuidDecoder(LocationId.apply)
 
   given Schema[LocationId] =
-    Schema.schemaForLong
-      .map(value => Some(LocationId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[LocationId](_.value))
+    uuidSchema(LocationId.apply, _.value)
 
   given Codec[String, LocationId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(LocationId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[LocationId](_.value))
+    uuidTextCodec(LocationId.apply, _.value)
 
   // ServiceType
   given Encoder[ServiceType] =

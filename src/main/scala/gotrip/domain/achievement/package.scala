@@ -1,14 +1,15 @@
 package gotrip.domain
 
 import scala.annotation.targetName
+import java.util.UUID
 
 package object achievement {
-  opaque type AchievementId = Long
+  opaque type AchievementId = UUID
   object AchievementId {
-    def apply(value: Long): AchievementId = value
+    def apply(value: UUID): AchievementId = value
   }
   extension (id: AchievementId) {
-    @targetName("achievementIdValue") def value: Long = id
+    @targetName("achievementIdValue") def value: UUID = id
   }
 
   opaque type AchievementCode = String

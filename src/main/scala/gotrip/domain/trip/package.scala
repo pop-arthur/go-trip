@@ -6,17 +6,18 @@ import gotrip.domain.validation.DomainValidation.*
 import java.time.OffsetDateTime
 import java.time.LocalDate
 import scala.annotation.targetName
+import java.util.UUID
 
 package object trip {
-  opaque type TripId = Long
+  opaque type TripId = UUID
   object TripId {
-    def apply(value: Long): TripId = value
+    def apply(value: UUID): TripId = value
 
-    def from(value: Long): Result[TripId] =
-      validatePositiveLong(value, IdIsNotPositive)(TripId.apply)
+    def from(value: UUID): Result[TripId] =
+      valid(TripId(value))
   }
   extension (id: TripId) {
-    def value: Long = id
+    def value: UUID = id
   }
 
   opaque type TripTitle = String
@@ -55,16 +56,16 @@ package object trip {
     def value: Option[LocalDate] = endDate
   }
 
-  opaque type TripLocationId = Long
+  opaque type TripLocationId = UUID
   object TripLocationId {
-    def apply(value: Long): TripLocationId = value
+    def apply(value: UUID): TripLocationId = value
 
-    def from(value: Long): Result[TripLocationId] =
-      validatePositiveLong(value, IdIsNotPositive)(TripLocationId.apply)
+    def from(value: UUID): Result[TripLocationId] =
+      valid(TripLocationId(value))
   }
   extension (id: TripLocationId) {
     @targetName("tripLocationIdValue")
-    def value: Long = id
+    def value: UUID = id
   }
 
   opaque type VisitOrder = Int

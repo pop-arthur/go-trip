@@ -7,6 +7,7 @@ import gotrip.domain.provider.*
 import gotrip.domain.trip.*
 import gotrip.domain.user.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.parser.parse
@@ -53,36 +54,34 @@ object OrderCodecs:
   given Schema[Json] =
     Schema.schemaForString.map(value => parse(value).toOption)(_.noSpaces)
 
-  given Encoder[UserId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[UserId] = Decoder.decodeLong.map(UserId.apply)
+  given Encoder[UserId] = uuidEncoder(_.value)
+  given Decoder[UserId] = uuidDecoder(UserId.apply)
   given Schema[UserId] =
-    Schema.schemaForLong.map(value => Some(UserId(value)))(_.value)
+    uuidSchema(UserId.apply, _.value)
 
-  given Encoder[TripId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[TripId] = Decoder.decodeLong.map(TripId.apply)
+  given Encoder[TripId] = uuidEncoder(_.value)
+  given Decoder[TripId] = uuidDecoder(TripId.apply)
   given Schema[TripId] =
-    Schema.schemaForLong.map(value => Some(TripId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[TripId](_.value))
+    uuidSchema(TripId.apply, _.value)
   given Codec[String, TripId, CodecFormat.TextPlain] =
-    Codec.long.map(TripId.apply)(_.value).validate(Validator.positive[Long].contramap[TripId](_.value))
+    uuidTextCodec(TripId.apply, _.value)
 
-  given Encoder[OrderId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[OrderId] = Decoder.decodeLong.map(OrderId.apply)
+  given Encoder[OrderId] = uuidEncoder(_.value)
+  given Decoder[OrderId] = uuidDecoder(OrderId.apply)
   given Schema[OrderId] =
-    Schema.schemaForLong.map(value => Some(OrderId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[OrderId](_.value))
+    uuidSchema(OrderId.apply, _.value)
   given Codec[String, OrderId, CodecFormat.TextPlain] =
-    Codec.long.map(OrderId.apply)(_.value).validate(Validator.positive[Long].contramap[OrderId](_.value))
+    uuidTextCodec(OrderId.apply, _.value)
 
-  given Encoder[ProviderId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[ProviderId] = Decoder.decodeLong.map(ProviderId.apply)
+  given Encoder[ProviderId] = uuidEncoder(_.value)
+  given Decoder[ProviderId] = uuidDecoder(ProviderId.apply)
   given Schema[ProviderId] =
-    Schema.schemaForLong.map(value => Some(ProviderId(value)))(_.value)
+    uuidSchema(ProviderId.apply, _.value)
 
-  given Encoder[LocationId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[LocationId] = Decoder.decodeLong.map(LocationId.apply)
+  given Encoder[LocationId] = uuidEncoder(_.value)
+  given Decoder[LocationId] = uuidDecoder(LocationId.apply)
   given Schema[LocationId] =
-    Schema.schemaForLong.map(value => Some(LocationId(value)))(_.value)
+    uuidSchema(LocationId.apply, _.value)
 
   given Encoder[OrderTitle] = Encoder.encodeString.contramap(_.value)
   given Decoder[OrderTitle] = Decoder.decodeString.map(OrderTitle.apply)

@@ -2,6 +2,7 @@ package gotrip.http.location
 
 import gotrip.domain.location.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
@@ -48,20 +49,16 @@ object LocationCodecs:
   
   // LocationId
   given Encoder[LocationId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[LocationId] =
-    Decoder.decodeLong.map(LocationId.apply)
+    uuidDecoder(LocationId.apply)
 
   given Schema[LocationId] =
-    Schema.schemaForLong
-      .map(value => Some(LocationId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[LocationId](_.value))
+    uuidSchema(LocationId.apply, _.value)
 
   given Codec[String, LocationId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(LocationId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[LocationId](_.value))
+    uuidTextCodec(LocationId.apply, _.value)
 
   // LocationName
   given Encoder[LocationName] =
