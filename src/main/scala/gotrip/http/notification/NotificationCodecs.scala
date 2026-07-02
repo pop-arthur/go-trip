@@ -2,10 +2,14 @@ package gotrip.http.notification
 
 import gotrip.domain.notification._
 import gotrip.http.HttpError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, DecodeResult, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, DecodeResult, Schema}
+
+import java.util.UUID
+import scala.util.Try
 
 object NotificationCodecs:
 
@@ -13,30 +17,27 @@ object NotificationCodecs:
   given Decoder[HttpError.Internal] = deriveDecoder
   given Schema[HttpError.Internal] = derived
 
-  given Encoder[NotificationId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[NotificationId] = Decoder.decodeLong.map(NotificationId.apply)
+  given Encoder[NotificationId] = uuidEncoder(_.value)
+  given Decoder[NotificationId] = uuidDecoder(NotificationId.apply)
   given Schema[NotificationId] =
-    Schema.schemaForLong
-      .map(value => Some(NotificationId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[NotificationId](_.value))
+    uuidSchema(NotificationId.apply, _.value)
 
   given Codec[String, NotificationId, CodecFormat.TextPlain] =
-    Codec.long.map(NotificationId.apply)(_.value)
+    uuidTextCodec(NotificationId.apply, _.value)
 
-  given Encoder[NotificationUserId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[NotificationUserId] = Decoder.decodeLong.map(NotificationUserId.apply)
+  given Encoder[NotificationUserId] = uuidEncoder(_.value)
+  given Decoder[NotificationUserId] = uuidDecoder(NotificationUserId.apply)
   given Schema[NotificationUserId] =
-    Schema.schemaForLong
-      .map(value => Some(NotificationUserId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[NotificationUserId](_.value))
+    uuidSchema(NotificationUserId.apply, _.value)
 
   given Codec[String, NotificationUserId, CodecFormat.TextPlain] =
-    Codec.long.map(NotificationUserId.apply)(_.value)
+    uuidTextCodec(NotificationUserId.apply, _.value)
 
-  given Encoder[NotificationOrderId] = Encoder.encodeOption[Long].contramap(_.value)
-  given Decoder[NotificationOrderId] = Decoder.decodeOption[Long].map(NotificationOrderId.apply)
+  given Encoder[NotificationOrderId] = Encoder.encodeOption[UUID].contramap(_.value)
+  given Decoder[NotificationOrderId] = Decoder.decodeOption[UUID].map(NotificationOrderId.apply)
   given Schema[NotificationOrderId] =
-    Schema.schemaForOption[Long].map(value => Some(NotificationOrderId(value)))(_.value)
+    Schema.schemaForOption[String]
+      .map(value => Some(NotificationOrderId(value.flatMap(uuid => Try(UUID.fromString(uuid)).toOption))))(_.value.map(_.toString))
 
   given Encoder[NotificationTitle] = Encoder.encodeString.contramap(_.value)
   given Decoder[NotificationTitle] = Decoder.decodeString.map(NotificationTitle.apply)

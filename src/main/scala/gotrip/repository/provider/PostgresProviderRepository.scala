@@ -1,5 +1,7 @@
 package gotrip.repository.provider
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -27,7 +29,7 @@ final class PostgresProviderRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(provider: ProviderCreate): F[Provider] =
+  override def create(provider: Provider): F[Provider] =
     sessionPool.use { session =>
       PostgresProviderRepository.uniqueProvider(session, PostgresProviderRepository.createFragment(provider))
     }
@@ -66,7 +68,7 @@ final class PostgresProviderRepository[F[_]: Concurrent](
 
 object PostgresProviderRepository:
   private type SearchInput = (Option[ProviderType], Option[String])
-  private type NameExistsInput = (String, Boolean, Long)
+  private type NameExistsInput = (String, Boolean, UUID)
 
   def make[F[_]: Concurrent](
     sessionPool: Resource[F, Session[F]]
@@ -90,7 +92,7 @@ object PostgresProviderRepository:
     }
 
   private val providerDecoder: Decoder[Provider] =
-    (int8 ~ text ~ providerType ~ text.opt ~ text.opt)
+    (uuid ~ text ~ providerType ~ text.opt ~ text.opt)
       .map {
         case id ~ name ~ decodedProviderType ~ website ~ supportContact =>
           Provider(
@@ -111,36 +113,36 @@ object PostgresProviderRepository:
       order by name
     """.query(providerDecoder)
 
-  val findByIdQuery: Query[Long, Provider] =
+  val findByIdQuery: Query[UUID, Provider] =
     sql"""
       select id, name::text, type, website::text, support_contact::text
       from providers
-      where id = $int8
+      where id = $uuid
     """.query(providerDecoder)
 
-  val deleteQuery: Query[Long, Long] =
+  val deleteQuery: Query[UUID, UUID] =
     sql"""
       delete from providers
-      where id = $int8
+      where id = $uuid
       returning id
-    """.query(int8)
+    """.query(uuid)
 
-  val nameExistsQuery: Query[NameExistsInput, Long] =
+  val nameExistsQuery: Query[NameExistsInput, UUID] =
     sql"""
       select id
       from providers
       where lower(name) = lower($text)
-        and ($bool or id <> $int8)
+        and ($bool or id <> $uuid)
       limit 1
-    """.query(int8)
+    """.query(uuid)
 
-  val hasAdditionalServicesQuery: Query[Long, Long] =
+  val hasAdditionalServicesQuery: Query[UUID, UUID] =
     sql"""
       select id
       from additional_services
-      where provider_id = $int8
+      where provider_id = $uuid
       limit 1
-    """.query(int8)
+    """.query(uuid)
 
   private def toSearchInput(params: ProviderSearchParams): SearchInput =
     (
@@ -155,12 +157,13 @@ object PostgresProviderRepository:
     (
       name.value,
       excludeProviderId.isEmpty,
-      excludeProviderId.map(_.value).getOrElse(0L)
+      excludeProviderId.map(_.value).getOrElse(UUID.fromString("00000000-0000-0000-0000-000000000000"))
     )
 
-  private def createFragment(provider: ProviderCreate): AppliedFragment =
+  private def createFragment(provider: Provider): AppliedFragment =
     val fields =
       List(
+        "id" -> sql"$uuid"(provider.id.value),
         "name" -> sql"$text"(provider.name.value),
         "type" -> sql"$providerType"(provider.`type`)
       ) ++ List(
@@ -192,7 +195,7 @@ object PostgresProviderRepository:
       val sets = combineApplied(head :: fields.tail)
       AppliedFragment(sql"update providers set ${sets.fragment}", sets.argument) |+|
         sql"""
-          where id = $int8
+          where id = $uuid
           returning id, name::text, type, website::text, support_contact::text
         """(id.value)
     }

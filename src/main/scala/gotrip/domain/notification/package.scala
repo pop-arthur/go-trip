@@ -1,30 +1,31 @@
 package gotrip.domain
 
 import scala.annotation.targetName
+import java.util.UUID
 
 package object notification {
-  opaque type NotificationId = Long
+  opaque type NotificationId = UUID
   object NotificationId {
-    def apply(value: Long): NotificationId = value
+    def apply(value: UUID): NotificationId = value
   }
   extension (id: NotificationId) {
-    @targetName("notificationIdValue") def value: Long = id
+    @targetName("notificationIdValue") def value: UUID = id
   }
 
-  opaque type NotificationUserId = Long
+  opaque type NotificationUserId = UUID
   object NotificationUserId {
-    def apply(value: Long): NotificationUserId = value
+    def apply(value: UUID): NotificationUserId = value
   }
   extension (id: NotificationUserId) {
-    @targetName("notificationUserIdValue") def value: Long = id
+    @targetName("notificationUserIdValue") def value: UUID = id
   }
 
-  opaque type NotificationOrderId = Option[Long]
+  opaque type NotificationOrderId = Option[UUID]
   object NotificationOrderId {
-    def apply(value: Option[Long]): NotificationOrderId = value
+    def apply(value: Option[UUID]): NotificationOrderId = value
   }
   extension (id: NotificationOrderId) {
-    @targetName("notificationOrderIdValue") def value: Option[Long] = id
+    @targetName("notificationOrderIdValue") def value: Option[UUID] = id
   }
 
   opaque type NotificationTitle = String

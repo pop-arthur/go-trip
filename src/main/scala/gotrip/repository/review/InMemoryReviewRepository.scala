@@ -4,26 +4,16 @@ import cats.Applicative
 import cats.syntax.all._
 import gotrip.domain.user.UserId
 import gotrip.domain.review._
-import java.time.Instant
 import scala.collection.mutable
 
 object InMemoryReviewRepository {
   def make[F[_]: Applicative]: F[ReviewRepository[F]] = {
     val store = mutable.Map.empty[ReviewId, Review]
-    var nextId = 1L
-
-    def newId(): ReviewId = { val id = nextId; nextId += 1; ReviewId(id) }
 
     new ReviewRepository[F] {
       override def create(review: Review): F[Review] = {
-        val now = Instant.now()
-        val newReview = review.copy(
-          id = newId(),
-          createdAt = now,
-          updatedAt = now
-        )
-        store += (newReview.id -> newReview)
-        newReview.pure[F]
+        store += (review.id -> review)
+        review.pure[F]
       }
 
       override def findById(id: ReviewId): F[Option[Review]] = store.get(id).pure[F]
@@ -37,8 +27,7 @@ object InMemoryReviewRepository {
       override def update(review: Review): F[Int] = {
         store.get(review.id) match {
           case Some(_) =>
-            val updated = review.copy(updatedAt = Instant.now())
-            store += (updated.id -> updated)
+            store += (review.id -> review)
             1.pure[F]
           case None => 0.pure[F]
         }

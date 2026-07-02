@@ -2,12 +2,15 @@ package gotrip.service.orderfile
 
 import cats.Monad
 import cats.data.EitherT
+import cats.effect.{Clock, Sync}
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import gotrip.domain.order.*
 import gotrip.domain.user.UserId
 import gotrip.repository.orderfile.OrderFileRepository
+import gotrip.service.GeneratedData
 
-final class OrderFileService[F[_]: Monad](repository: OrderFileRepository[F]):
+final class OrderFileService[F[_]: Sync: Clock](repository: OrderFileRepository[F]):
 
   import OrderFileServiceError.*
 
@@ -31,7 +34,8 @@ final class OrderFileService[F[_]: Monad](repository: OrderFileRepository[F]):
   ): F[Either[OrderFileServiceError, OrderFile]] =
     (for {
       _ <- ensureOrderExists(userId, orderId)
-      created <- EitherT.fromOptionF(repository.create(userId, orderId, file), OrderNotFound(orderId))
+      materialized <- EitherT.liftF(materializeFile(orderId, file))
+      created <- EitherT.fromOptionF(repository.create(userId, materialized), OrderNotFound(orderId))
     } yield created).value
 
   def delete(
@@ -52,6 +56,19 @@ final class OrderFileService[F[_]: Monad](repository: OrderFileRepository[F]):
         Either.cond(exists, (), OrderNotFound(orderId))
       }
     }
+
+  private def materializeFile(orderId: OrderId, create: OrderFileCreate): F[OrderFile] =
+    for
+      id <- GeneratedData.newId[F]
+      now <- GeneratedData.now[F]
+    yield OrderFile(
+      id = OrderFileId(id),
+      order_id = orderId,
+      file_url = create.file_url,
+      file_type = create.file_type,
+      parsed_data = create.parsed_data,
+      uploaded_at = now
+    )
 
 enum OrderFileServiceError:
   case OrderNotFound(id: OrderId)

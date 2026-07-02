@@ -2,11 +2,12 @@ package gotrip.http.orderfile
 
 import gotrip.domain.order.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import gotrip.http.order.OrderCodecs
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, DecodeResult, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, DecodeResult, Schema}
 
 object OrderFileCodecs:
   import OrderCodecs.given
@@ -16,20 +17,16 @@ object OrderFileCodecs:
   given Schema[ApiError] = derived
 
   given Encoder[OrderFileId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[OrderFileId] =
-    Decoder.decodeLong.map(OrderFileId.apply)
+    uuidDecoder(OrderFileId.apply)
 
   given Schema[OrderFileId] =
-    Schema.schemaForLong
-      .map(value => Some(OrderFileId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[OrderFileId](_.value))
+    uuidSchema(OrderFileId.apply, _.value)
 
   given Codec[String, OrderFileId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(OrderFileId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[OrderFileId](_.value))
+    uuidTextCodec(OrderFileId.apply, _.value)
 
   given Encoder[OrderFileUrl] =
     Encoder.encodeString.contramap(_.value)

@@ -1,5 +1,7 @@
 package gotrip.repository.notificationpreference
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
 import gotrip.domain.user._
@@ -8,7 +10,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
 final class PostgresNotificationPreferenceRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -21,18 +23,27 @@ final class PostgresNotificationPreferenceRepository[F[_]: Concurrent](
       }
     }
 
-  override def upsert(userId: UserId, isEnabled: Boolean): F[NotificationPreference] =
+  override def upsert(preference: NotificationPreference): F[NotificationPreference] =
     sessionPool.use { session =>
       session.prepare(PostgresNotificationPreferenceRepository.upsertQuery).flatMap { cmd =>
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        cmd.unique((userId.value, isEnabled, now, now))
+        cmd.unique(
+          (
+            preference.id.value,
+            preference.userId.value,
+            preference.isEnabled,
+            PostgresNotificationPreferenceRepository.toOffset(preference.createdAt),
+            PostgresNotificationPreferenceRepository.toOffset(preference.updatedAt)
+          )
+        )
       }
     }
 
 object PostgresNotificationPreferenceRepository {
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
 
   private val decoder: Decoder[NotificationPreference] =
-    (int8 ~ int8 ~ bool ~ timestamptz ~ timestamptz).map {
+    (uuid ~ uuid ~ bool ~ timestamptz ~ timestamptz).map {
       case id ~ uid ~ enabled ~ created ~ updated =>
         NotificationPreference(
           id = NotificationPreferenceId(id),
@@ -43,17 +54,17 @@ object PostgresNotificationPreferenceRepository {
         )
     }
 
-  val selectByUserId: Query[Long, NotificationPreference] =
+  val selectByUserId: Query[UUID, NotificationPreference] =
     sql"""
       SELECT id, user_id, is_enabled, created_at, updated_at
       FROM notification_preferences
-      WHERE user_id = $int8
+      WHERE user_id = $uuid
     """.query(decoder)
 
-  val upsertQuery: Query[(Long, Boolean, OffsetDateTime, OffsetDateTime), NotificationPreference] =
+  val upsertQuery: Query[(UUID, UUID, Boolean, OffsetDateTime, OffsetDateTime), NotificationPreference] =
     sql"""
-      INSERT INTO notification_preferences (user_id, is_enabled, created_at, updated_at)
-      VALUES ($int8, $bool, $timestamptz, $timestamptz)
+      INSERT INTO notification_preferences (id, user_id, is_enabled, created_at, updated_at)
+      VALUES ($uuid, $uuid, $bool, $timestamptz, $timestamptz)
       ON CONFLICT (user_id) DO UPDATE
       SET is_enabled = EXCLUDED.is_enabled, updated_at = EXCLUDED.updated_at
       RETURNING id, user_id, is_enabled, created_at, updated_at

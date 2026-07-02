@@ -7,6 +7,7 @@ import gotrip.domain.validation.DomainValidation.Result
 import gotrip.domain.validation.DomainValidation.*
 
 import java.time.OffsetDateTime
+import java.util.UUID
 
 final case class TripLocation(
   id: TripLocationId,
@@ -39,7 +40,7 @@ final case class TripLocationCreate(
 object TripLocationCreate:
 
   def from(
-    locationId: Long,
+    locationId: UUID,
     visitOrder: Option[Int] = None,
     arrivalDate: Option[OffsetDateTime] = None,
     departureDate: Option[OffsetDateTime] = None

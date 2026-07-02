@@ -7,7 +7,7 @@ import skunk.Session
 trait ProviderRepository[F[_]]:
   def search(params: ProviderSearchParams): F[List[Provider]]
   def findById(id: ProviderId): F[Option[Provider]]
-  def create(provider: ProviderCreate): F[Provider]
+  def create(provider: Provider): F[Provider]
   def update(id: ProviderId, provider: ProviderUpdate): F[Option[Provider]]
   def delete(id: ProviderId): F[Boolean]
   def nameExists(name: ProviderName, excludeProviderId: Option[ProviderId] = None): F[Boolean]

@@ -1,5 +1,7 @@
 package gotrip.repository.order
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -16,7 +18,7 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
-import java.time.{Instant, LocalDate, OffsetDateTime}
+import java.time.{Instant, LocalDate, OffsetDateTime, ZoneOffset}
 
 final class PostgresOrderRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -36,40 +38,37 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(userId: UserId, tripId: TripId, order: OrderCreate): F[Order] =
+  override def create(order: Order): F[Order] =
     sessionPool.use { session =>
       session.prepare(PostgresOrderRepository.createQuery).flatMap { query =>
         query.unique(
           (
-            userId.value,
-            tripId.value,
+            order.id.value,
+            order.user_id.value,
+            order.trip_id.value,
             order.provider_id.map(_.value),
             order.service_type,
             order.external_order_id,
             order.title.value,
-            order.status.map(SkunkCodecs.encodeOrderStatus).getOrElse("PENDING_VERIFICATION"),
+            SkunkCodecs.encodeOrderStatus(order.status),
             order.price_amount,
             order.price_currency,
             order.start_datetime,
             order.end_datetime,
             order.departure_location_id.map(_.value),
-            order.arrival_location_id.map(_.value)
+            order.arrival_location_id.map(_.value),
+            PostgresOrderRepository.toOffset(order.created_at),
+            PostgresOrderRepository.toOffset(order.updated_at)
           )
         )
       }
     }
 
-  override def update(userId: UserId, orderId: OrderId, order: OrderUpdate): F[Option[Order]] =
+  override def update(order: Order): F[Option[Order]] =
     sessionPool.use { session =>
-      PostgresOrderRepository.updateFragment(userId, orderId, order) match
-        case Some(fragment) =>
-          session.prepare(fragment.fragment.query(PostgresOrderRepository.orderDecoder)).flatMap { query =>
-            query.option(fragment.argument)
-          }
-        case None =>
-          session.prepare(PostgresOrderRepository.findByUserQuery).flatMap { query =>
-            query.option((userId.value, orderId.value))
-          }
+      session.prepare(PostgresOrderRepository.updateQuery).flatMap { query =>
+        query.option(PostgresOrderRepository.toOrderUpdateInput(order))
+      }
     }
 
   override def delete(userId: UserId, orderId: OrderId): F[Boolean] =
@@ -79,16 +78,16 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       }
     }
 
-  override def updateStatus(userId: UserId, orderId: OrderId, update: OrderStatusUpdate): F[Option[Order]] =
+  override def updateStatus(order: Order): F[Option[Order]] =
     sessionPool.use { session =>
       session.prepare(PostgresOrderRepository.updateStatusQuery).flatMap { query =>
         query.option(
           (
-            SkunkCodecs.encodeOrderStatus(update.status),
-            update.new_start_datetime.isEmpty,
-            update.new_start_datetime,
-            userId.value,
-            orderId.value
+            SkunkCodecs.encodeOrderStatus(order.status),
+            order.start_datetime,
+            PostgresOrderRepository.toOffset(order.updated_at),
+            order.user_id.value,
+            order.id.value
           )
         )
       }
@@ -99,12 +98,14 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       session.prepare(PostgresOrderRepository.insertStatusEventQuery).flatMap { query =>
         query.unique(
           (
+            event.id.value,
             event.order_id.value,
             event.old_status.map(SkunkCodecs.encodeOrderStatus),
             SkunkCodecs.encodeOrderStatus(event.new_status),
             event.reason,
             event.payload.map(_.noSpaces),
-            SkunkCodecs.encodeOrderStatusEventSource(event.source)
+            SkunkCodecs.encodeOrderStatusEventSource(event.source),
+            PostgresOrderRepository.toOffset(event.created_at)
           )
         )
       }
@@ -133,8 +134,8 @@ final class PostgresOrderRepository[F[_]: Concurrent](
 
 object PostgresOrderRepository:
   private type ListInput = (
-    Long,
-    Long,
+    UUID,
+    UUID,
     Boolean,
     ServiceType,
     Boolean,
@@ -151,8 +152,8 @@ object PostgresOrderRepository:
     new PostgresOrderRepository(sessionPool)
 
   private val orderDecoder: Decoder[Order] =
-    (int8 ~ int8 ~ int8 ~ int8.opt ~ SkunkCodecs.serviceType ~ text.opt ~ text ~ text ~ float8.opt ~ text.opt ~
-      timestamptz.opt ~ timestamptz.opt ~ int8.opt ~ int8.opt ~ timestamptz ~ timestamptz)
+    (uuid ~ uuid ~ uuid ~ uuid.opt ~ SkunkCodecs.serviceType ~ text.opt ~ text ~ text ~ float8.opt ~ text.opt ~
+      timestamptz.opt ~ timestamptz.opt ~ uuid.opt ~ uuid.opt ~ timestamptz ~ timestamptz)
       .map {
         case id ~ userId ~ tripId ~ providerId ~ serviceType ~ externalOrderId ~ title ~ status ~ priceAmount ~
             priceCurrency ~ startDateTime ~ endDateTime ~ departureLocationId ~ arrivalLocationId ~ createdAt ~ updatedAt =>
@@ -177,7 +178,7 @@ object PostgresOrderRepository:
       }
 
   private val statusEventDecoder: Decoder[OrderStatusEvent] =
-    (int8 ~ int8 ~ text.opt ~ text ~ text.opt ~ text.opt ~ text ~ timestamptz).map {
+    (uuid ~ uuid ~ text.opt ~ text ~ text.opt ~ text.opt ~ text ~ timestamptz).map {
       case id ~ orderId ~ oldStatus ~ newStatus ~ reason ~ payload ~ source ~ createdAt =>
         OrderStatusEvent(
           id = OrderStatusEventId(id),
@@ -197,8 +198,8 @@ object PostgresOrderRepository:
              price_amount::float8, price_currency::text, start_datetime, end_datetime,
              departure_location_id, arrival_location_id, created_at, updated_at
       from orders
-      where user_id = $int8
-        and trip_id = $int8
+      where user_id = $uuid
+        and trip_id = $uuid
         and ($bool or service_type = ${SkunkCodecs.serviceType})
         and ($bool or status = $text)
         and ($bool or start_datetime::date >= $date)
@@ -206,105 +207,121 @@ object PostgresOrderRepository:
       order by coalesce(start_datetime, timestamptz '9999-12-31 00:00:00+00'), id
     """.query(orderDecoder)
 
-  val findByUserQuery: Query[(Long, Long), Order] =
+  val findByUserQuery: Query[(UUID, UUID), Order] =
     sql"""
       select id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
              price_amount::float8, price_currency::text, start_datetime, end_datetime,
              departure_location_id, arrival_location_id, created_at, updated_at
       from orders
-      where user_id = $int8
-        and id = $int8
+      where user_id = $uuid
+        and id = $uuid
     """.query(orderDecoder)
 
+  private type OrderUpdateInput =
+    (Option[UUID], ServiceType, Option[String], String, String, Option[Double], Option[String], Option[OffsetDateTime], Option[OffsetDateTime], Option[UUID], Option[UUID], OffsetDateTime, UUID, UUID)
+
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
+
   val createQuery
-      : Query[(Long, Long, Option[Long], ServiceType, Option[String], String, String, Option[Double], Option[String], Option[OffsetDateTime], Option[OffsetDateTime], Option[Long], Option[Long]), Order] =
+      : Query[(UUID, UUID, UUID, Option[UUID], ServiceType, Option[String], String, String, Option[Double], Option[String], Option[OffsetDateTime], Option[OffsetDateTime], Option[UUID], Option[UUID], OffsetDateTime, OffsetDateTime), Order] =
     sql"""
       insert into orders (
-        user_id, trip_id, provider_id, service_type, external_order_id, title, status,
-        price_amount, price_currency, start_datetime, end_datetime, departure_location_id, arrival_location_id
+        id, user_id, trip_id, provider_id, service_type, external_order_id, title, status,
+        price_amount, price_currency, start_datetime, end_datetime, departure_location_id, arrival_location_id,
+        created_at, updated_at
       )
       values (
-        $int8, $int8, ${int8.opt}, ${SkunkCodecs.serviceType}, ${text.opt}, $text, $text,
-        ${float8.opt}, ${text.opt}, ${timestamptz.opt}, ${timestamptz.opt}, ${int8.opt}, ${int8.opt}
+        $uuid, $uuid, $uuid, ${uuid.opt}, ${SkunkCodecs.serviceType}, ${text.opt}, $text, $text,
+        ${float8.opt}, ${text.opt}, ${timestamptz.opt}, ${timestamptz.opt}, ${uuid.opt}, ${uuid.opt},
+        $timestamptz, $timestamptz
       )
       returning id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
                 price_amount::float8, price_currency::text, start_datetime, end_datetime,
                 departure_location_id, arrival_location_id, created_at, updated_at
     """.query(orderDecoder)
 
-  val deleteQuery: Query[(Long, Long), Long] =
+  val deleteQuery: Query[(UUID, UUID), UUID] =
     sql"""
       delete from orders
-      where user_id = $int8
-        and id = $int8
+      where user_id = $uuid
+        and id = $uuid
       returning id
-    """.query(int8)
+    """.query(uuid)
 
-  val updateStatusQuery: Query[(String, Boolean, Option[OffsetDateTime], Long, Long), Order] =
+  val updateQuery: Query[OrderUpdateInput, Order] =
+    sql"""
+      update orders
+      set provider_id = ${uuid.opt},
+          service_type = ${SkunkCodecs.serviceType},
+          external_order_id = ${text.opt},
+          title = $text,
+          status = $text,
+          price_amount = ${float8.opt},
+          price_currency = ${text.opt},
+          start_datetime = ${timestamptz.opt},
+          end_datetime = ${timestamptz.opt},
+          departure_location_id = ${uuid.opt},
+          arrival_location_id = ${uuid.opt},
+          updated_at = $timestamptz
+      where user_id = $uuid
+        and id = $uuid
+      returning id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
+                price_amount::float8, price_currency::text, start_datetime, end_datetime,
+                departure_location_id, arrival_location_id, created_at, updated_at
+    """.query(orderDecoder)
+
+  val updateStatusQuery: Query[(String, Option[OffsetDateTime], OffsetDateTime, UUID, UUID), Order] =
     sql"""
       update orders
       set status = $text,
-          start_datetime = case when $bool then start_datetime else ${timestamptz.opt} end,
-          updated_at = now()
-      where user_id = $int8
-        and id = $int8
+          start_datetime = ${timestamptz.opt},
+          updated_at = $timestamptz
+      where user_id = $uuid
+        and id = $uuid
       returning id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
                 price_amount::float8, price_currency::text, start_datetime, end_datetime,
                 departure_location_id, arrival_location_id, created_at, updated_at
     """.query(orderDecoder)
 
-  val insertStatusEventQuery: Query[(Long, Option[String], String, Option[String], Option[String], String), OrderStatusEvent] =
+  val insertStatusEventQuery: Query[(UUID, UUID, Option[String], String, Option[String], Option[String], String, OffsetDateTime), OrderStatusEvent] =
     sql"""
-      insert into order_status_events (order_id, old_status, new_status, reason, payload, source)
-      values ($int8, ${text.opt}, $text, ${text.opt}, ${text.opt}::jsonb, $text)
+      insert into order_status_events (id, order_id, old_status, new_status, reason, payload, source, created_at)
+      values ($uuid, $uuid, ${text.opt}, $text, ${text.opt}, ${text.opt}::jsonb, $text, $timestamptz)
       returning id, order_id, old_status, new_status, reason, payload::text, source, created_at
     """.query(statusEventDecoder)
 
-  val tripExistsForUserQuery: Query[(Long, Long), Long] =
+  val tripExistsForUserQuery: Query[(UUID, UUID), UUID] =
     sql"""
       select id
       from trips
-      where user_id = $int8
-        and id = $int8
-    """.query(int8)
+      where user_id = $uuid
+        and id = $uuid
+    """.query(uuid)
 
-  val providerExistsQuery: Query[Long, Long] =
-    sql"select id from providers where id = $int8".query(int8)
+  val providerExistsQuery: Query[UUID, UUID] =
+    sql"select id from providers where id = $uuid".query(uuid)
 
-  val locationExistsQuery: Query[Long, Long] =
-    sql"select id from locations where id = $int8".query(int8)
+  val locationExistsQuery: Query[UUID, UUID] =
+    sql"select id from locations where id = $uuid".query(uuid)
 
-  private def updateFragment(
-    userId: UserId,
-    orderId: OrderId,
-    order: OrderUpdate
-  ): Option[AppliedFragment] =
-    val fields =
-      List(
-        order.provider_id.map(value => sql"provider_id = ${int8.opt}"(Some(value.value))),
-        order.service_type.map(value => sql"service_type = ${SkunkCodecs.serviceType}"(value)),
-        order.external_order_id.map(value => sql"external_order_id = ${text.opt}"(Some(value))),
-        order.title.map(value => sql"title = $text"(value.value)),
-        order.status.map(value => sql"status = $text"(SkunkCodecs.encodeOrderStatus(value))),
-        order.price_amount.map(value => sql"price_amount = ${float8.opt}"(Some(value))),
-        order.price_currency.map(value => sql"price_currency = ${text.opt}"(Some(value))),
-        order.start_datetime.map(value => sql"start_datetime = ${timestamptz.opt}"(Some(value))),
-        order.end_datetime.map(value => sql"end_datetime = ${timestamptz.opt}"(Some(value))),
-        order.departure_location_id.map(value => sql"departure_location_id = ${int8.opt}"(Some(value.value))),
-        order.arrival_location_id.map(value => sql"arrival_location_id = ${int8.opt}"(Some(value.value)))
-      ).flatten
-
-    fields.headOption.map { head =>
-      val sets = combineApplied(head :: fields.tail)
-      AppliedFragment(sql"update orders set ${sets.fragment}, updated_at = now()", sets.argument) |+|
-        sql"""
-          where user_id = $int8
-            and id = $int8
-          returning id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
-                    price_amount::float8, price_currency::text, start_datetime, end_datetime,
-                    departure_location_id, arrival_location_id, created_at, updated_at
-        """((userId.value, orderId.value))
-    }
+  private def toOrderUpdateInput(order: Order): OrderUpdateInput =
+    (
+      order.provider_id.map(_.value),
+      order.service_type,
+      order.external_order_id,
+      order.title.value,
+      SkunkCodecs.encodeOrderStatus(order.status),
+      order.price_amount,
+      order.price_currency,
+      order.start_datetime,
+      order.end_datetime,
+      order.departure_location_id.map(_.value),
+      order.arrival_location_id.map(_.value),
+      toOffset(order.updated_at),
+      order.user_id.value,
+      order.id.value
+    )
 
   private def toListInput(userId: UserId, tripId: TripId, params: OrderSearchParams): ListInput =
     (
@@ -319,8 +336,3 @@ object PostgresOrderRepository:
       params.toDate.isEmpty,
       params.toDate.getOrElse(LocalDate.of(9999, 12, 31))
     )
-
-  private def combineApplied(fragments: List[AppliedFragment]): AppliedFragment =
-    fragments.reduceLeft { (left, right) =>
-      left |+| sql", "(Void) |+| right
-    }

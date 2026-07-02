@@ -1,14 +1,15 @@
 package gotrip.domain
 
 import scala.annotation.targetName
+import java.util.UUID
 
 package object user {
-  opaque type UserId = Long
+  opaque type UserId = UUID
   object UserId {
-    def apply(value: Long): UserId = value
+    def apply(value: UUID): UserId = value
   }
   extension (id: UserId) {
-    @targetName("userIdValue") def value: Long = id
+    @targetName("userIdValue") def value: UUID = id
   }
 
   opaque type UserEmail = String

@@ -11,6 +11,7 @@ import gotrip.domain.validation.DomainValidation.*
 import io.circe.Json
 
 import java.time.{Instant, LocalDate, OffsetDateTime}
+import java.util.UUID
 
 enum OrderStatus:
   case PendingVerification, Confirmed, Delayed, Cancelled, Completed, RefundPending, Refunded
@@ -69,7 +70,7 @@ final case class OrderCreate(
 object OrderCreate:
 
   def from(
-    providerId: Option[Long] = None,
+    providerId: Option[UUID] = None,
     serviceType: ServiceType,
     externalOrderId: Option[String] = None,
     title: String,
@@ -78,8 +79,8 @@ object OrderCreate:
     priceCurrency: Option[String] = None,
     startDateTime: Option[OffsetDateTime] = None,
     endDateTime: Option[OffsetDateTime] = None,
-    departureLocationId: Option[Long] = None,
-    arrivalLocationId: Option[Long] = None
+    departureLocationId: Option[UUID] = None,
+    arrivalLocationId: Option[UUID] = None
   ): Result[OrderCreate] =
     (
       validateOptional(providerId)(ProviderId.from),

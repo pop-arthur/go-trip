@@ -8,7 +8,7 @@ import skunk.Session
 trait OrderFileRepository[F[_]]:
   def listByOrder(userId: UserId, orderId: OrderId): F[List[OrderFile]]
   def findByOrder(userId: UserId, orderId: OrderId, fileId: OrderFileId): F[Option[OrderFile]]
-  def create(userId: UserId, orderId: OrderId, file: OrderFileCreate): F[Option[OrderFile]]
+  def create(userId: UserId, file: OrderFile): F[Option[OrderFile]]
   def delete(userId: UserId, orderId: OrderId, fileId: OrderFileId): F[Boolean]
   def orderExistsForUser(userId: UserId, orderId: OrderId): F[Boolean]
 

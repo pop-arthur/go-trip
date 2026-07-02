@@ -2,10 +2,11 @@ package gotrip.http.provider
 
 import gotrip.domain.provider.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, Schema}
 
 object ProviderCodecs:
   // API errors
@@ -20,20 +21,16 @@ object ProviderCodecs:
 
   // ProviderId
   given Encoder[ProviderId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[ProviderId] =
-    Decoder.decodeLong.map(ProviderId.apply)
+    uuidDecoder(ProviderId.apply)
 
   given Schema[ProviderId] =
-    Schema.schemaForLong
-      .map(value => Some(ProviderId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
+    uuidSchema(ProviderId.apply, _.value)
 
   given Codec[String, ProviderId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(ProviderId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[ProviderId](_.value))
+    uuidTextCodec(ProviderId.apply, _.value)
 
   // ProviderName
   given Encoder[ProviderName] =

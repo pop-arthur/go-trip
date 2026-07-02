@@ -1,5 +1,7 @@
 package gotrip.repository.review
 
+import java.util.UUID
+
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
 import gotrip.domain.user._
@@ -8,7 +10,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 
 final class PostgresReviewRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -17,16 +19,16 @@ final class PostgresReviewRepository[F[_]: Concurrent](
   override def create(review: Review): F[Review] =
     sessionPool.use { session =>
       session.prepare(PostgresReviewRepository.insertQuery).flatMap { cmd =>
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
         cmd.unique(
           (
+            review.id.value,
             review.userId.value,
             ReviewTargetType.toString(review.targetType),
             review.targetId.value,
             review.rating.value,
             review.text.value,
-            now,
-            now
+            PostgresReviewRepository.toOffset(review.createdAt),
+            PostgresReviewRepository.toOffset(review.updatedAt)
           )
         )
       }
@@ -60,6 +62,7 @@ final class PostgresReviewRepository[F[_]: Concurrent](
           (
             review.rating.value,
             review.text.value,
+            PostgresReviewRepository.toOffset(review.updatedAt),
             review.id.value
           )
         ).map(PostgresReviewRepository.rowsAffected)
@@ -81,6 +84,8 @@ final class PostgresReviewRepository[F[_]: Concurrent](
     }
 
 object PostgresReviewRepository {
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
 
   private def rowsAffected(c: Completion): Int = c match {
     case Completion.Insert(count) => count
@@ -90,7 +95,7 @@ object PostgresReviewRepository {
   }
 
   private val decoder: Decoder[Review] =
-    (int8 ~ int8 ~ text ~ int8 ~ int4 ~ text.opt ~ timestamptz ~ timestamptz).map {
+    (uuid ~ uuid ~ text ~ uuid ~ int4 ~ text.opt ~ timestamptz ~ timestamptz).map {
       case id ~ uid ~ ttype ~ tid ~ rating ~ text ~ created ~ updated =>
         Review(
           id = ReviewId(id),
@@ -104,49 +109,49 @@ object PostgresReviewRepository {
         )
     }
 
-  val insertQuery: Query[(Long, String, Long, Int, Option[String], OffsetDateTime, OffsetDateTime), Review] =
+  val insertQuery: Query[(UUID, UUID, String, UUID, Int, Option[String], OffsetDateTime, OffsetDateTime), Review] =
     sql"""
-      INSERT INTO reviews (user_id, target_type, target_id, rating, text, created_at, updated_at)
-      VALUES ($int8, $text, $int8, $int4, ${text.opt}, $timestamptz, $timestamptz)
+      INSERT INTO reviews (id, user_id, target_type, target_id, rating, text, created_at, updated_at)
+      VALUES ($uuid, $uuid, $text, $uuid, $int4, ${text.opt}, $timestamptz, $timestamptz)
       RETURNING id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
     """.query(decoder)
 
-  val selectById: Query[Long, Review] =
+  val selectById: Query[UUID, Review] =
     sql"""
       SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
-      FROM reviews WHERE id = $int8
+      FROM reviews WHERE id = $uuid
     """.query(decoder)
 
-  val selectByTarget: Query[(String, Long), Review] =
+  val selectByTarget: Query[(String, UUID), Review] =
     sql"""
       SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
       FROM reviews
-      WHERE target_type = $text AND target_id = $int8
+      WHERE target_type = $text AND target_id = $uuid
       ORDER BY created_at DESC
     """.query(decoder)
 
-  val selectByUserId: Query[Long, Review] =
+  val selectByUserId: Query[UUID, Review] =
     sql"""
       SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
-      FROM reviews WHERE user_id = $int8
+      FROM reviews WHERE user_id = $uuid
       ORDER BY created_at DESC
     """.query(decoder)
 
-  val updateCommand: Command[(Int, Option[String], Long)] =
+  val updateCommand: Command[(Int, Option[String], OffsetDateTime, UUID)] =
     sql"""
       UPDATE reviews
-      SET rating = $int4, text = ${text.opt}, updated_at = NOW()
-      WHERE id = $int8
+      SET rating = $int4, text = ${text.opt}, updated_at = $timestamptz
+      WHERE id = $uuid
     """.command
 
-  val deleteCommand: Command[Long] =
-    sql"DELETE FROM reviews WHERE id = $int8".command
+  val deleteCommand: Command[UUID] =
+    sql"DELETE FROM reviews WHERE id = $uuid".command
 
-  val averageQuery: Query[(String, Long), Double] =
+  val averageQuery: Query[(String, UUID), Double] =
     sql"""
       SELECT COALESCE(AVG(rating), 0.0)::double precision
       FROM reviews
-      WHERE target_type = $text AND target_id = $int8
+      WHERE target_type = $text AND target_id = $uuid
     """.query(float8)
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): ReviewRepository[F] =

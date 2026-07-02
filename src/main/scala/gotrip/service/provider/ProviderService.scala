@@ -2,11 +2,14 @@ package gotrip.service.provider
 
 import cats.Monad
 import cats.data.EitherT
+import cats.effect.Sync
+import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import gotrip.domain.provider.*
 import gotrip.repository.provider.ProviderRepository
+import gotrip.service.GeneratedData
 
-final class ProviderService[F[_]: Monad](repository: ProviderRepository[F]):
+final class ProviderService[F[_]: Sync](repository: ProviderRepository[F]):
 
   import ProviderServiceError.*
 
@@ -19,7 +22,8 @@ final class ProviderService[F[_]: Monad](repository: ProviderRepository[F]):
   def create(provider: ProviderCreate): F[Either[ProviderServiceError, Provider]] =
     (for {
       _ <- ensureNameAvailable(provider.name, None)
-      created <- EitherT.liftF(repository.create(provider))
+      materialized <- EitherT.liftF(materializeProvider(provider))
+      created <- EitherT.liftF(repository.create(materialized))
     } yield created).value
 
   def update(id: ProviderId, provider: ProviderUpdate): F[Either[ProviderServiceError, Provider]] =
@@ -55,6 +59,17 @@ final class ProviderService[F[_]: Monad](repository: ProviderRepository[F]):
       repository.hasAdditionalServices(id).map { inUse =>
         Either.cond(!inUse, (), ProviderInUse(id))
       }
+    }
+
+  private def materializeProvider(create: ProviderCreate): F[Provider] =
+    GeneratedData.newId[F].map { id =>
+      Provider(
+        id = ProviderId(id),
+        name = create.name,
+        `type` = create.`type`,
+        website = create.website,
+        support_contact = create.support_contact
+      )
     }
 
 enum ProviderServiceError:

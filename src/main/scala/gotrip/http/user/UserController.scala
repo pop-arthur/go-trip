@@ -36,8 +36,7 @@ final class UserController(
           case Some(user) =>
             val updatedUser = user.copy(
               email = update.email.getOrElse(user.email),
-              fullName = update.fullName.getOrElse(user.fullName),
-              updatedAt = java.time.Instant.now()
+              fullName = update.fullName.getOrElse(user.fullName)
             )
             service.update(updatedUser).attempt.flatMap {
               case Right(n) if n == 1 =>

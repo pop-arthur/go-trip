@@ -2,10 +2,11 @@ package gotrip.http.notificationpreference
 
 import gotrip.domain.notificationpreference._
 import gotrip.http.HttpError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
-import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
+import sttp.tapir.{Codec, CodecFormat, Schema}
 import gotrip.http.user.UserCodecs.given
 
 object NotificationPreferenceCodecs:
@@ -26,15 +27,13 @@ object NotificationPreferenceCodecs:
   given Decoder[NotificationPreference] = deriveDecoder
   given Schema[NotificationPreference] = derived
 
-  given Encoder[NotificationPreferenceId] = Encoder.encodeLong.contramap(_.value)
-  given Decoder[NotificationPreferenceId] = Decoder.decodeLong.map(NotificationPreferenceId.apply)
+  given Encoder[NotificationPreferenceId] = uuidEncoder(_.value)
+  given Decoder[NotificationPreferenceId] = uuidDecoder(NotificationPreferenceId.apply)
   given Schema[NotificationPreferenceId] =
-    Schema.schemaForLong
-      .map(value => Some(NotificationPreferenceId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[NotificationPreferenceId](_.value))
+    uuidSchema(NotificationPreferenceId.apply, _.value)
 
   given Codec[String, NotificationPreferenceId, CodecFormat.TextPlain] =
-    Codec.long.map(NotificationPreferenceId.apply)(_.value)
+    uuidTextCodec(NotificationPreferenceId.apply, _.value)
 
   case class NotificationPreferenceUpdate(isEnabled: Boolean)
   given Encoder[NotificationPreferenceUpdate] = deriveEncoder

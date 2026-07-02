@@ -9,7 +9,7 @@ import gotrip.domain.notificationpreference.NotificationPreference
 
 trait NotificationPreferenceRepository[F[_]]:
   def getByUserId(userId: UserId): F[Option[NotificationPreference]]
-  def upsert(userId: UserId, isEnabled: Boolean): F[NotificationPreference]
+  def upsert(preference: NotificationPreference): F[NotificationPreference]
 
 object NotificationPreferenceRepository:
   def makeInMemory[F[_]: Applicative]: F[NotificationPreferenceRepository[F]] =

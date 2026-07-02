@@ -4,17 +4,18 @@ import gotrip.domain.validation.DomainValidation.Result
 import gotrip.domain.validation.DomainValidation.*
 
 import scala.annotation.targetName
+import java.util.UUID
 
 package object provider {
-  opaque type ProviderId = Long
+  opaque type ProviderId = UUID
   object ProviderId {
-    def apply(value: Long): ProviderId = value
+    def apply(value: UUID): ProviderId = value
 
-    def from(value: Long): Result[ProviderId] =
-      validatePositiveLong(value, IdIsNotPositive)(ProviderId.apply)
+    def from(value: UUID): Result[ProviderId] =
+      valid(ProviderId(value))
   }
   extension (id: ProviderId) {
-    def value: Long = id
+    def value: UUID = id
   }
 
   opaque type ProviderName = String

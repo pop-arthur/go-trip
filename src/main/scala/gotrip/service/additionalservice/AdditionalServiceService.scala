@@ -2,13 +2,15 @@ package gotrip.service.additionalservice
 
 import cats.Monad
 import cats.data.EitherT
+import cats.effect.Sync
 import cats.syntax.functor.*
 import gotrip.domain.additionalservice.*
 import gotrip.domain.location.*
 import gotrip.domain.provider.*
 import gotrip.repository.additionalservice.AdditionalServiceRepository
+import gotrip.service.GeneratedData
 
-final class AdditionalServiceService[F[_]: Monad](repository: AdditionalServiceRepository[F]):
+final class AdditionalServiceService[F[_]: Sync](repository: AdditionalServiceRepository[F]):
 
   import AdditionalServiceServiceError.*
 
@@ -22,7 +24,8 @@ final class AdditionalServiceService[F[_]: Monad](repository: AdditionalServiceR
     (for {
       _ <- ensureProviderExists(service.provider_id)
       _ <- ensureLocationExists(service.location_id)
-      created <- EitherT.liftF(repository.create(service))
+      materialized <- EitherT.liftF(materializeService(service))
+      created <- EitherT.liftF(repository.create(materialized))
     } yield created).value
 
   def update(
@@ -63,6 +66,21 @@ final class AdditionalServiceService[F[_]: Monad](repository: AdditionalServiceR
           Either.cond(exists, (), LocationNotFound(id))
         }
       }
+    }
+
+  private def materializeService(create: AdditionalServiceCreate): F[AdditionalService] =
+    GeneratedData.newId[F].map { id =>
+      AdditionalService(
+        id = ServiceId(id),
+        title = create.title,
+        description = create.description,
+        service_type = create.service_type,
+        provider_id = create.provider_id,
+        location_id = create.location_id,
+        price_amount = create.price_amount,
+        price_currency = create.price_currency,
+        is_active = create.is_active.getOrElse(true)
+      )
     }
 
 enum AdditionalServiceServiceError:

@@ -1,6 +1,7 @@
 package gotrip.service.orderfile
 
-import cats.Id
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import gotrip.domain.order.*
 import gotrip.domain.user.*
 import gotrip.repository.orderfile.OrderFileRepository
@@ -9,53 +10,54 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.util.UUID
 
 final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
   "OrderFileService" should {
     "list files for an owned order" in {
-      val repository = mock[OrderFileRepository[Id]]
-      val service = OrderFileService[Id](repository)
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
 
-      repository.orderExistsForUser.expects(userId, orderId).returning(true)
-      repository.listByOrder.expects(userId, orderId).returning(List(orderFile))
+      repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
+      repository.listByOrder.expects(userId, orderId).returning(IO.pure(List(orderFile)))
 
-      service.listByOrder(userId, orderId) shouldBe Right(List(orderFile))
+      service.listByOrder(userId, orderId).unsafeRunSync() shouldBe Right(List(orderFile))
     }
 
     "return order not found when listing files for an inaccessible order" in {
-      val repository = mock[OrderFileRepository[Id]]
-      val service = OrderFileService[Id](repository)
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
 
-      repository.orderExistsForUser.expects(userId, orderId).returning(false)
+      repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(false))
 
-      service.listByOrder(userId, orderId) shouldBe Left(OrderFileServiceError.OrderNotFound(orderId))
+      service.listByOrder(userId, orderId).unsafeRunSync() shouldBe Left(OrderFileServiceError.OrderNotFound(orderId))
     }
 
     "create metadata for an owned order" in {
-      val repository = mock[OrderFileRepository[Id]]
-      val service = OrderFileService[Id](repository)
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
 
-      repository.orderExistsForUser.expects(userId, orderId).returning(true)
-      repository.create.expects(userId, orderId, orderFileCreate).returning(Some(orderFile))
+      repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
+      repository.create.expects(userId, *).returning(IO.pure(Some(orderFile)))
 
-      service.create(userId, orderId, orderFileCreate) shouldBe Right(orderFile)
+      service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe Right(orderFile)
     }
 
     "delete metadata for an owned order" in {
-      val repository = mock[OrderFileRepository[Id]]
-      val service = OrderFileService[Id](repository)
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
 
-      repository.orderExistsForUser.expects(userId, orderId).returning(true)
-      repository.delete.expects(userId, orderId, fileId).returning(true)
+      repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
+      repository.delete.expects(userId, orderId, fileId).returning(IO.pure(true))
 
-      service.delete(userId, orderId, fileId) shouldBe Right(())
+      service.delete(userId, orderId, fileId).unsafeRunSync() shouldBe Right(())
     }
   }
 
-  private val userId = UserId(1L)
-  private val orderId = OrderId(10L)
-  private val fileId = OrderFileId(100L)
+  private val userId = UserId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+  private val orderId = OrderId(UUID.fromString("00000000-0000-0000-0000-000000000010"))
+  private val fileId = OrderFileId(UUID.fromString("00000000-0000-0000-0000-000000000100"))
 
   private val orderFileCreate = OrderFileCreate(
     file_url = OrderFileUrl("https://cdn.gotrip.example.com/orders/10/ticket.pdf"),

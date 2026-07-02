@@ -120,7 +120,7 @@ private object PostgresAuthSessionRepository:
     case _                        => 0
 
   private val sessionDecoder: Decoder[AuthSession] =
-    (uuid ~ int8 ~ text ~ timestamptz ~ timestamptz.opt ~ timestamptz ~ timestamptz).map {
+    (uuid ~ uuid ~ text ~ timestamptz ~ timestamptz.opt ~ timestamptz ~ timestamptz).map {
       case id ~ userId ~ refreshTokenHash ~ expiresAt ~ revokedAt ~ createdAt ~ updatedAt =>
         AuthSession(
           id = id,
@@ -133,10 +133,10 @@ private object PostgresAuthSessionRepository:
         )
     }
 
-  val insertQuery: Query[(UUID, Long, String, OffsetDateTime, Option[OffsetDateTime], OffsetDateTime, OffsetDateTime), AuthSession] =
+  val insertQuery: Query[(UUID, UUID, String, OffsetDateTime, Option[OffsetDateTime], OffsetDateTime, OffsetDateTime), AuthSession] =
     sql"""
       INSERT INTO auth_sessions (id, user_id, refresh_token_hash, expires_at, revoked_at, created_at, updated_at)
-      VALUES ($uuid, $int8, $text, $timestamptz, ${timestamptz.opt}, $timestamptz, $timestamptz)
+      VALUES ($uuid, $uuid, $text, $timestamptz, ${timestamptz.opt}, $timestamptz, $timestamptz)
       RETURNING id, user_id, refresh_token_hash, expires_at, revoked_at, created_at, updated_at
     """.query(sessionDecoder)
 

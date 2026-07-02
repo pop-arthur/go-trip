@@ -9,7 +9,7 @@ import gotrip.domain.achievement.AchievementId
 import gotrip.domain.userachievement.UserAchievement
 
 trait UserAchievementRepository[F[_]]:
-  def create(userId: UserId, achievementId: AchievementId): F[UserAchievement]
+  def create(userAchievement: UserAchievement): F[UserAchievement]
   def findByUserId(userId: UserId): F[List[UserAchievement]]
   def findByAchievementId(achievementId: AchievementId): F[List[UserAchievement]]
   def delete(userId: UserId, achievementId: AchievementId): F[Int]

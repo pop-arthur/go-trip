@@ -3,6 +3,7 @@ package gotrip.http.triplocation
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
 import gotrip.http.ApiError
+import gotrip.http.UuidCodecs.*
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
@@ -39,49 +40,39 @@ object TripLocationCodecs:
 
   // LocationId
   given Encoder[LocationId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[LocationId] =
-    Decoder.decodeLong.map(LocationId.apply)
+    uuidDecoder(LocationId.apply)
 
   given Schema[LocationId] =
-    Schema.schemaForLong
-      .map(value => Some(LocationId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[LocationId](_.value))
+    uuidSchema(LocationId.apply, _.value)
 
   // TripId
   given Encoder[TripId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[TripId] =
-    Decoder.decodeLong.map(TripId.apply)
+    uuidDecoder(TripId.apply)
 
   given Schema[TripId] =
-    Schema.schemaForLong
-      .map(value => Some(TripId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[TripId](_.value))
+    uuidSchema(TripId.apply, _.value)
 
   given Codec[String, TripId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(TripId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[TripId](_.value))
+    uuidTextCodec(TripId.apply, _.value)
 
   // TripLocationId
   given Encoder[TripLocationId] =
-    Encoder.encodeLong.contramap(_.value)
+    uuidEncoder(_.value)
 
   given Decoder[TripLocationId] =
-    Decoder.decodeLong.map(TripLocationId.apply)
+    uuidDecoder(TripLocationId.apply)
 
   given Schema[TripLocationId] =
-    Schema.schemaForLong
-      .map(value => Some(TripLocationId(value)))(_.value)
-      .validate(Validator.positive[Long].contramap[TripLocationId](_.value))
+    uuidSchema(TripLocationId.apply, _.value)
 
   given Codec[String, TripLocationId, CodecFormat.TextPlain] =
-    Codec.long
-      .map(TripLocationId.apply)(_.value)
-      .validate(Validator.positive[Long].contramap[TripLocationId](_.value))
+    uuidTextCodec(TripLocationId.apply, _.value)
 
   // VisitOrder
   given Encoder[VisitOrder] =
