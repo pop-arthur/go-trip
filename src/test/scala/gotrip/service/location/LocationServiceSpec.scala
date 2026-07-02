@@ -51,7 +51,16 @@ final class LocationServiceSpec extends AnyWordSpec with Matchers with MockFacto
       val service = LocationService[IO](repository)
 
       repository.create
-        .expects(*)
+        .expects(where { (materialized: Location) =>
+          materialized.id.value != new UUID(0L, 0L) &&
+          materialized.name == locationCreate.name &&
+          materialized.`type` == locationCreate.`type` &&
+          materialized.country == locationCreate.country &&
+          materialized.city == locationCreate.city &&
+          materialized.address == locationCreate.address &&
+          materialized.latitude == locationCreate.latitude &&
+          materialized.longitude == locationCreate.longitude
+        })
         .returning(IO.pure(createdLocation))
 
       service.create(locationCreate).unsafeRunSync() shouldBe createdLocation
