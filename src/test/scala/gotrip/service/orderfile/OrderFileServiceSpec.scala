@@ -39,9 +39,46 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
       val service = OrderFileService[IO](repository)
 
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
-      repository.create.expects(userId, *).returning(IO.pure(Some(orderFile)))
+      repository.create.expects(where { (actualUserId: UserId, created: OrderFile) =>
+        actualUserId == userId &&
+        created.id.value != new UUID(0L, 0L) &&
+        created.order_id == orderId &&
+        created.file_url == orderFileCreate.file_url &&
+        created.file_type == orderFileCreate.file_type &&
+        created.parsed_data == orderFileCreate.parsed_data
+      }).returning(IO.pure(Some(orderFile)))
 
       service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe Right(orderFile)
+    }
+
+    "find metadata for an owned order" in {
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
+
+      repository.findByOrder.expects(userId, orderId, fileId).returning(IO.pure(Some(orderFile)))
+
+      service.findByOrder(userId, orderId, fileId).unsafeRunSync() shouldBe Right(orderFile)
+    }
+
+    "return file not found when metadata does not exist" in {
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
+
+      repository.findByOrder.expects(userId, orderId, fileId).returning(IO.pure(None))
+
+      service.findByOrder(userId, orderId, fileId).unsafeRunSync() shouldBe
+        Left(OrderFileServiceError.OrderFileNotFound(fileId))
+    }
+
+    "return order not found when create cannot persist metadata for the user order" in {
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
+
+      repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
+      repository.create.expects(userId, *).returning(IO.pure(None))
+
+      service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe
+        Left(OrderFileServiceError.OrderNotFound(orderId))
     }
 
     "delete metadata for an owned order" in {
@@ -52,6 +89,17 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
       repository.delete.expects(userId, orderId, fileId).returning(IO.pure(true))
 
       service.delete(userId, orderId, fileId).unsafeRunSync() shouldBe Right(())
+    }
+
+    "return file not found when deleting missing metadata" in {
+      val repository = mock[OrderFileRepository[IO]]
+      val service = OrderFileService[IO](repository)
+
+      repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
+      repository.delete.expects(userId, orderId, fileId).returning(IO.pure(false))
+
+      service.delete(userId, orderId, fileId).unsafeRunSync() shouldBe
+        Left(OrderFileServiceError.OrderFileNotFound(fileId))
     }
   }
 

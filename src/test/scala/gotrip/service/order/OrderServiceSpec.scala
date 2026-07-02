@@ -24,6 +24,62 @@ import java.util.UUID
 final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
   "OrderService" should {
+    "list orders for an owned trip" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
+      repository.listByTrip.expects(userId, tripId, searchParams).returning(IO.pure(List(order)))
+
+      service.listByTrip(userId, tripId, searchParams).unsafeRunSync() shouldBe Right(List(order))
+    }
+
+    "return trip not found when listing orders for an inaccessible trip" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(false))
+
+      service.listByTrip(userId, tripId, searchParams).unsafeRunSync() shouldBe Left(OrderServiceError.TripNotFound(tripId))
+    }
+
+    "return order not found when finding an inaccessible order" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(None))
+
+      service.findByUser(userId, orderId).unsafeRunSync() shouldBe Left(OrderServiceError.OrderNotFound(orderId))
+    }
+
+    "create an order with default status" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
+      repository.providerExists.expects(providerId).returning(IO.pure(true))
+      repository.locationExists.expects(departureLocationId).returning(IO.pure(true))
+      repository.locationExists.expects(arrivalLocationId).returning(IO.pure(true))
+      repository.create.expects(where { (created: Order) =>
+        created.id.value != new UUID(0L, 0L) &&
+        created.user_id == userId &&
+        created.trip_id == tripId &&
+        created.provider_id.contains(providerId) &&
+        created.service_type == orderCreate.service_type &&
+        created.external_order_id == orderCreate.external_order_id &&
+        created.title == orderCreate.title &&
+        created.status == OrderStatus.PendingVerification &&
+        created.price_amount == orderCreate.price_amount &&
+        created.price_currency == orderCreate.price_currency &&
+        created.start_datetime == orderCreate.start_datetime &&
+        created.end_datetime == orderCreate.end_datetime &&
+        created.departure_location_id.contains(departureLocationId) &&
+        created.arrival_location_id.contains(arrivalLocationId)
+      }).returning(IO.pure(order))
+
+      service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe Right(order)
+    }
+
     "reject create when trip is not owned by the user" in {
       val repository = mock[OrderRepository[IO]]
       val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
@@ -50,6 +106,95 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
       repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
 
       service.create(userId, tripId, invalidDateOrderCreate).unsafeRunSync() shouldBe Left(OrderServiceError.InvalidDateTimeRange)
+    }
+
+    "reject create when departure location does not exist" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
+      repository.providerExists.expects(providerId).returning(IO.pure(true))
+      repository.locationExists.expects(departureLocationId).returning(IO.pure(false))
+
+      service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.LocationNotFound(departureLocationId))
+    }
+
+    "reject create when arrival location does not exist" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
+      repository.providerExists.expects(providerId).returning(IO.pure(true))
+      repository.locationExists.expects(departureLocationId).returning(IO.pure(true))
+      repository.locationExists.expects(arrivalLocationId).returning(IO.pure(false))
+
+      service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.LocationNotFound(arrivalLocationId))
+    }
+
+    "update an order with merged fields" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
+      repository.providerExists.expects(providerId).returning(IO.pure(true))
+      repository.locationExists.expects(arrivalLocationId).returning(IO.pure(true))
+      repository.update.expects(where { (updated: Order) =>
+        updated.id == orderId &&
+        updated.provider_id.contains(providerId) &&
+        updated.service_type == ServiceType.Hotel &&
+        updated.external_order_id == order.external_order_id &&
+        updated.title == OrderTitle("Hotel in Bangkok") &&
+        updated.status == order.status &&
+        updated.price_amount == Some(280.0) &&
+        updated.price_currency == order.price_currency &&
+        updated.start_datetime == order.start_datetime &&
+        updated.end_datetime == Some(endDateTime.plusDays(2)) &&
+        updated.departure_location_id == order.departure_location_id &&
+        updated.arrival_location_id.contains(arrivalLocationId) &&
+        updated.created_at == order.created_at &&
+        updated.updated_at != order.updated_at
+      }).returning(IO.pure(Some(updatedOrderDetails)))
+
+      service.update(userId, orderId, orderUpdate).unsafeRunSync() shouldBe Right(updatedOrderDetails)
+    }
+
+    "return not found when updating an inaccessible order" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(None))
+
+      service.update(userId, orderId, orderUpdate).unsafeRunSync() shouldBe Left(OrderServiceError.OrderNotFound(orderId))
+    }
+
+    "reject update when merged datetime range is invalid" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
+
+      service.update(userId, orderId, invalidOrderUpdate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.InvalidDateTimeRange)
+    }
+
+    "delete an order" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.delete.expects(userId, orderId).returning(IO.pure(true))
+
+      service.delete(userId, orderId).unsafeRunSync() shouldBe Right(())
+    }
+
+    "return not found when deleting an inaccessible order" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.delete.expects(userId, orderId).returning(IO.pure(false))
+
+      service.delete(userId, orderId).unsafeRunSync() shouldBe Left(OrderServiceError.OrderNotFound(orderId))
     }
 
     "write a status event and notification when preferences are enabled" in {
@@ -85,6 +230,26 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
       service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created shouldBe empty
+    }
+
+    "return not found when updating status of an inaccessible order" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(None))
+
+      service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.OrderNotFound(orderId))
+    }
+
+    "reject status update when new start datetime is after current end datetime" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
+
+      service.updateStatus(userId, orderId, invalidStatusUpdate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.InvalidDateTimeRange)
     }
   }
 
@@ -129,6 +294,24 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
     start_datetime = Some(endDateTime.plusHours(1))
   )
 
+  private val searchParams = OrderSearchParams(
+    serviceType = Some(ServiceType.Flight),
+    status = Some(OrderStatus.PendingVerification)
+  )
+
+  private val orderUpdate = OrderUpdate(
+    provider_id = Some(providerId),
+    service_type = Some(ServiceType.Hotel),
+    title = Some(OrderTitle("Hotel in Bangkok")),
+    price_amount = Some(280.0),
+    end_datetime = Some(endDateTime.plusDays(2)),
+    arrival_location_id = Some(arrivalLocationId)
+  )
+
+  private val invalidOrderUpdate = OrderUpdate(
+    start_datetime = Some(endDateTime.plusHours(1))
+  )
+
   private val order = Order(
     id = orderId,
     user_id = userId,
@@ -149,7 +332,15 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
   )
 
   private val updatedOrder = order.copy(status = OrderStatus.Confirmed)
+  private val updatedOrderDetails = order.copy(
+    service_type = ServiceType.Hotel,
+    title = OrderTitle("Hotel in Bangkok"),
+    price_amount = Some(280.0),
+    end_datetime = Some(endDateTime.plusDays(2)),
+    updated_at = Instant.parse("2026-06-01T10:05:00Z")
+  )
   private val statusUpdate = OrderStatusUpdate(status = OrderStatus.Confirmed, reason = Some("Confirmed by provider"))
+  private val invalidStatusUpdate = statusUpdate.copy(new_start_datetime = Some(endDateTime.plusHours(1)))
   private val statusEvent = OrderStatusEvent(
     id = OrderStatusEventId(uuid("000000000001")),
     order_id = orderId,
