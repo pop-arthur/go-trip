@@ -16,9 +16,6 @@ services:
       GOTRIP_DB_PASSWORD: ${GOTRIP_DB_PASSWORD:?GOTRIP_DB_PASSWORD is required}
       GOTRIP_SERVER_HOST: 0.0.0.0
       GOTRIP_SERVER_PORT: 8080
-      GOTRIP_ADMIN_EMAIL: ${GOTRIP_ADMIN_EMAIL:-}
-      GOTRIP_ADMIN_PASSWORD: ${GOTRIP_ADMIN_PASSWORD:-}
-      GOTRIP_ADMIN_FULL_NAME: ${GOTRIP_ADMIN_FULL_NAME:-GoTrip Admin}
     ports:
       - "8080:8080"
 
@@ -37,6 +34,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  frontend:
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    ports:
+      - "8081:80"
+    depends_on:
+      - app
 
 volumes:
   postgres-data:
