@@ -5,6 +5,7 @@ import gotrip.domain.location.*
 import gotrip.domain.order.*
 import gotrip.domain.provider.*
 import gotrip.domain.trip.*
+import gotrip.domain.userrole.Role
 import gotrip.http.{HttpError, ValidationError}
 import gotrip.http.auth.AuthSupport
 import gotrip.service.order.{OrderService, OrderServiceError}
@@ -90,8 +91,33 @@ final class OrderController(service: OrderService[IO], authSupport: AuthSupport)
             }
       }}
 
+  val adminSimulateStatusChange: ServerEndpoint[Any, IO] =
+    OrderEndpoints.adminSimulateStatusChange
+      .serverSecurityLogic(token =>
+        authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN)))
+      )
+      .serverLogic { _ => { case (orderId, update) =>
+        OrderValidator.validate(update).toEither match
+          case Left(errors) =>
+            IO.pure(Left(ValidationError.toHttpError(errors)))
+          case Right(validUpdate) =>
+            service.adminUpdateStatus(orderId, validUpdate).attempt.map {
+              case Right(Right(updated)) => Right(updated)
+              case Right(Left(error))    => Left(serviceError(error))
+              case Left(error)           => Left(internalError(error))
+            }
+      }}
+
   val all: List[ServerEndpoint[Any, IO]] =
-    List(listTripOrders, createOrder, getOrder, updateOrder, deleteOrder, updateOrderStatus)
+    List(
+      listTripOrders,
+      createOrder,
+      getOrder,
+      updateOrder,
+      deleteOrder,
+      updateOrderStatus,
+      adminSimulateStatusChange
+    )
 
   private def serviceError(error: OrderServiceError): OrderEndpoints.ErrorResponse =
     error match
