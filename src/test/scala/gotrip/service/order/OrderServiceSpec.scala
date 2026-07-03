@@ -251,6 +251,65 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
       service.updateStatus(userId, orderId, invalidStatusUpdate).unsafeRunSync() shouldBe
         Left(OrderServiceError.InvalidDateTimeRange)
     }
+
+    "admin update status for any order and notify the owner" in {
+      val repository = mock[OrderRepository[IO]]
+      val notifications = new RecordingNotificationRepository
+      val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications)
+
+      repository.findById.expects(orderId).returning(IO.pure(Some(order)))
+      repository.updateStatus.expects(where { (updated: Order) =>
+        updated.id == orderId &&
+        updated.user_id == userId &&
+        updated.status == OrderStatus.Confirmed
+      }).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(where { (event: OrderStatusEvent) =>
+        event.order_id == orderId &&
+        event.old_status.contains(OrderStatus.PendingVerification) &&
+        event.new_status == OrderStatus.Confirmed &&
+        event.source == OrderStatusEventSource.AdminSimulation
+      }).returning(IO.pure(statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)))
+
+      service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
+      notifications.created.size shouldBe 1
+      notifications.created.head.userId.value shouldBe userId.value
+      notifications.created.head.orderId.value shouldBe Some(orderId.value)
+    }
+
+    "return not found when admin updating a missing order status" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findById.expects(orderId).returning(IO.pure(None))
+
+      service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.OrderNotFound(orderId))
+    }
+
+    "reject admin status update when new start datetime is after current end datetime" in {
+      val repository = mock[OrderRepository[IO]]
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+
+      repository.findById.expects(orderId).returning(IO.pure(Some(order)))
+
+      service.adminUpdateStatus(orderId, invalidStatusUpdate).unsafeRunSync() shouldBe
+        Left(OrderServiceError.InvalidDateTimeRange)
+    }
+
+    "skip admin status update notification when preferences are disabled" in {
+      val repository = mock[OrderRepository[IO]]
+      val notifications = new RecordingNotificationRepository
+      val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications)
+
+      repository.findById.expects(orderId).returning(IO.pure(Some(order)))
+      repository.updateStatus.expects(*).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(where { (event: OrderStatusEvent) =>
+        event.source == OrderStatusEventSource.AdminSimulation
+      }).returning(IO.pure(statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)))
+
+      service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
+      notifications.created shouldBe empty
+    }
   }
 
   private def serviceWith(

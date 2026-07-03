@@ -85,12 +85,16 @@ final class OrderService[F[_]: Sync: Clock](
   ): F[Either[OrderServiceError, Order]] =
     (for {
       current <- EitherT.fromOptionF(repository.findByUser(userId, orderId), OrderNotFound(orderId))
-      _ <- validateDateTimeRange(update.new_start_datetime.orElse(current.start_datetime), current.end_datetime)
-      materialized <- EitherT.liftF(materializeStatusUpdate(current, update))
-      updated <- EitherT.fromOptionF(repository.updateStatus(materialized), OrderNotFound(orderId))
-      event <- EitherT.liftF(statusEvent(current, update, source))
-      _ <- EitherT.liftF(repository.insertStatusEvent(event))
-      _ <- EitherT.liftF(sendStatusNotificationIfEnabled(updated, update.reason))
+      updated <- updateStatusForCurrent(orderId, current, update, source)
+    } yield updated).value
+
+  def adminUpdateStatus(
+    orderId: OrderId,
+    update: OrderStatusUpdate
+  ): F[Either[OrderServiceError, Order]] =
+    (for {
+      current <- EitherT.fromOptionF(repository.findById(orderId), OrderNotFound(orderId))
+      updated <- updateStatusForCurrent(orderId, current, update, OrderStatusEventSource.AdminSimulation)
     } yield updated).value
 
   private def ensureTripExists(userId: UserId, tripId: TripId): EitherT[F, OrderServiceError, Unit] =
@@ -139,6 +143,21 @@ final class OrderService[F[_]: Sync: Clock](
 
   private def nextEndDateTime(current: Order, update: OrderUpdate): Option[OffsetDateTime] =
     update.end_datetime.orElse(current.end_datetime)
+
+  private def updateStatusForCurrent(
+    orderId: OrderId,
+    current: Order,
+    update: OrderStatusUpdate,
+    source: OrderStatusEventSource
+  ): EitherT[F, OrderServiceError, Order] =
+    for {
+      _ <- validateDateTimeRange(update.new_start_datetime.orElse(current.start_datetime), current.end_datetime)
+      materialized <- EitherT.liftF(materializeStatusUpdate(current, update))
+      updated <- EitherT.fromOptionF(repository.updateStatus(materialized), OrderNotFound(orderId))
+      event <- EitherT.liftF(statusEvent(current, update, source))
+      _ <- EitherT.liftF(repository.insertStatusEvent(event))
+      _ <- EitherT.liftF(sendStatusNotificationIfEnabled(updated, update.reason))
+    } yield updated
 
   private def materializeOrder(userId: UserId, tripId: TripId, create: OrderCreate): F[Order] =
     for

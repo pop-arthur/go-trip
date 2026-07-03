@@ -38,6 +38,13 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       }
     }
 
+  override def findById(orderId: OrderId): F[Option[Order]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresOrderRepository.findByIdQuery).flatMap { query =>
+        query.option(orderId.value)
+      }
+    }
+
   override def create(order: Order): F[Order] =
     sessionPool.use { session =>
       session.prepare(PostgresOrderRepository.createQuery).flatMap { query =>
@@ -215,6 +222,15 @@ object PostgresOrderRepository:
       from orders
       where user_id = $uuid
         and id = $uuid
+    """.query(orderDecoder)
+
+  val findByIdQuery: Query[UUID, Order] =
+    sql"""
+      select id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
+             price_amount::float8, price_currency::text, start_datetime, end_datetime,
+             departure_location_id, arrival_location_id, created_at, updated_at
+      from orders
+      where id = $uuid
     """.query(orderDecoder)
 
   private type OrderUpdateInput =

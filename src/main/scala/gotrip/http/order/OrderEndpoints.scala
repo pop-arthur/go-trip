@@ -66,3 +66,11 @@ object OrderEndpoints:
       .in(jsonBody[OrderStatusUpdate])
       .errorOut(EndpointErrors.validationOrNotFound)
       .out(jsonBody[Order])
+
+  val adminSimulateStatusChange: Endpoint[String, (OrderId, OrderStatusUpdate), ErrorResponse, Order, Any] =
+    endpoint.post
+      .securityIn(AuthEndpoints.bearer)
+      .in("admin" / "orders" / path[OrderId]("orderId") / "simulate-status-change")
+      .in(jsonBody[OrderStatusUpdate])
+      .errorOut(EndpointErrors.validationOrNotFound)
+      .out(jsonBody[Order])
