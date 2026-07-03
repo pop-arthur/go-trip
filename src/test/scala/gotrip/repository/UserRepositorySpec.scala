@@ -1,35 +1,68 @@
 package gotrip.repository
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
 import gotrip.domain.user.*
 import gotrip.domain.userrole.Role
 import gotrip.repository.user.UserRepository
-import org.scalatest.matchers.should.Matchers
-import org.scalatest.wordspec.AnyWordSpec
 
-final class UserRepositorySpec extends AnyWordSpec with Matchers with PostgresRepositorySpecBase with RepositoryFixtures:
+final class UserRepositorySpec extends PostgresRepositorySpecBase with RepositoryFixtures:
 
-  "UserRepository" should {
-    "create, find, update, delete users and manage roles" in {
-      val users = UserRepository.makePostgres[IO](sessionPool)
-      val user = sampleUser(1)
+  repositoryTest("UserRepository creates and finds users") {
+    val users = UserRepository.makePostgres[IO](sessionPool)
+    val user = sampleUser(1)
 
-      users.create(user).unsafeRunSync() shouldBe user
-      users.findById(user.id).unsafeRunSync() shouldBe Some(user)
-      users.findByEmail(user.email).unsafeRunSync() shouldBe Some(user)
+    for
+      created <- users.create(user)
+      byId <- users.findById(user.id)
+      byEmail <- users.findByEmail(user.email)
+    yield
+      assertEquals(created, user)
+      assertEquals(byId, Some(user))
+      assertEquals(byEmail, Some(user))
+  }
 
-      val updated = user.copy(email = UserEmail("updated@example.test"), fullName = UserFullName(Some("Updated User")), updatedAt = t(2))
-      users.update(updated).unsafeRunSync() shouldBe 1
-      users.findByEmail(updated.email).unsafeRunSync() shouldBe Some(updated)
+  repositoryTest("UserRepository updates users") {
+    val users = UserRepository.makePostgres[IO](sessionPool)
+    val user = sampleUser(1)
+    val updated = user.copy(email = UserEmail("updated@example.test"), fullName = UserFullName(Some("Updated User")), updatedAt = t(2))
 
-      users.addRole(user.id, Role.USER, t(3), t(3)).unsafeRunSync() shouldBe 1
-      users.addRole(user.id, Role.ADMIN, t(4), t(4)).unsafeRunSync() shouldBe 1
-      users.getRoles(user.id).unsafeRunSync().toSet shouldBe Set(Role.USER, Role.ADMIN)
-      users.removeRole(user.id, Role.USER).unsafeRunSync() shouldBe 1
-      users.getRoles(user.id).unsafeRunSync() shouldBe List(Role.ADMIN)
+    for
+      _ <- users.create(user)
+      updatedRows <- users.update(updated)
+      byUpdatedEmail <- users.findByEmail(updated.email)
+    yield
+      assertEquals(updatedRows, 1)
+      assertEquals(byUpdatedEmail, Some(updated))
+  }
 
-      users.delete(user.id).unsafeRunSync() shouldBe 1
-      users.findById(user.id).unsafeRunSync() shouldBe None
-    }
+  repositoryTest("UserRepository adds, gets, and removes roles") {
+    val users = UserRepository.makePostgres[IO](sessionPool)
+    val user = sampleUser(1)
+
+    for
+      _ <- users.create(user)
+      userRoleRows <- users.addRole(user.id, Role.USER, t(3), t(3))
+      adminRoleRows <- users.addRole(user.id, Role.ADMIN, t(4), t(4))
+      roles <- users.getRoles(user.id)
+      removedRoleRows <- users.removeRole(user.id, Role.USER)
+      rolesAfterRemove <- users.getRoles(user.id)
+    yield
+      assertEquals(userRoleRows, 1)
+      assertEquals(adminRoleRows, 1)
+      assertEquals(roles.toSet, Set[Role](Role.USER, Role.ADMIN))
+      assertEquals(removedRoleRows, 1)
+      assertEquals(rolesAfterRemove, List(Role.ADMIN))
+  }
+
+  repositoryTest("UserRepository deletes users") {
+    val users = UserRepository.makePostgres[IO](sessionPool)
+    val user = sampleUser(1)
+
+    for
+      _ <- users.create(user)
+      deletedRows <- users.delete(user.id)
+      byIdAfterDelete <- users.findById(user.id)
+    yield
+      assertEquals(deletedRows, 1)
+      assertEquals(byIdAfterDelete, None)
   }

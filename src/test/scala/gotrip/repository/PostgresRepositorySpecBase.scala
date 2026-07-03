@@ -1,51 +1,54 @@
 package gotrip.repository
 
 import cats.effect.{IO, Resource}
-import cats.effect.std.Console
-import cats.effect.unsafe.implicits.global
+import cats.effect.std.{Console, Semaphore}
 import fs2.io.net.Network
 import gotrip.config.{ConnectionPoolConfig, DatabaseConfig}
 import gotrip.database.{Migration, SkunkSessionPool}
-import org.scalatest.BeforeAndAfterAll
-import org.scalatest.BeforeAndAfterEach
-import org.scalatest.Suite
+import munit.AnyFixture
+import munit.CatsEffectSuite
 import org.testcontainers.containers.PostgreSQLContainer
 import skunk.Session
 
 import java.sql.{Connection, DriverManager}
 
-trait PostgresRepositorySpecBase extends BeforeAndAfterAll with BeforeAndAfterEach:
-  this: Suite =>
+trait PostgresRepositorySpecBase extends CatsEffectSuite:
 
-  private val postgres = new ScalaPostgreSQLContainer("postgres:17")
-    .withDatabaseName("gotrip")
-    .withUsername("gotrip_user")
-    .withPassword("gotrip_password")
+  private val databaseFixture = ResourceSuiteLocalFixture("postgres", postgresResource)
+  private val testGateFixture = ResourceSuiteLocalFixture("repository test gate", Resource.eval(Semaphore[IO](1)))
 
-  private var poolRelease: IO[Unit] = IO.unit
-  protected var sessionPool: Resource[IO, Session[IO]] =
-    Resource.eval(IO.raiseError(new IllegalStateException("session pool is not ready")))
+  override def munitFixtures: Seq[AnyFixture[?]] =
+    List(databaseFixture, testGateFixture)
 
-  override protected def beforeAll(): Unit =
-    super.beforeAll()
-    postgres.start()
-    val config = databaseConfig
-    Migration.migrate[IO](config).unsafeRunSync()
-    val allocated = SkunkSessionPool[IO](config).allocated.unsafeRunSync()
-    sessionPool = allocated._1
-    poolRelease = allocated._2
+  protected def sessionPool: Resource[IO, Session[IO]] =
+    databaseFixture().sessionPool
 
-  override protected def afterEach(): Unit =
-    truncateApplicationTables()
-    super.afterEach()
+  protected def repositoryTest(name: String)(body: => IO[Unit]): Unit =
+    test(name) {
+      testGateFixture().permit.use { _ =>
+        body.guarantee(databaseFixture().truncate)
+      }
+    }
 
-  override protected def afterAll(): Unit =
-    try poolRelease.unsafeRunSync()
-    finally
-      postgres.stop()
-      super.afterAll()
+  private def postgresResource: Resource[IO, RepositoryDatabase] =
+    for
+      postgres <- Resource.make(IO.blocking {
+        val container = new ScalaPostgreSQLContainer("postgres:17")
+          .withDatabaseName("gotrip")
+          .withUsername("gotrip_user")
+          .withPassword("gotrip_password")
+        container.start()
+        container
+      })(container => IO.blocking(container.stop()))
+      config = databaseConfig(postgres)
+      _ <- Resource.eval(Migration.migrate[IO](config))
+      allocated <- SkunkSessionPool[IO](config)
+    yield RepositoryDatabase(
+      sessionPool = allocated,
+      truncate = truncateApplicationTables(postgres)
+    )
 
-  protected def databaseConfig: DatabaseConfig =
+  private def databaseConfig(postgres: PostgreSQLContainer[?]): DatabaseConfig =
     DatabaseConfig(
       url = postgres.getJdbcUrl,
       host = postgres.getHost,
@@ -57,14 +60,16 @@ trait PostgresRepositorySpecBase extends BeforeAndAfterAll with BeforeAndAfterEa
       connectionPool = ConnectionPoolConfig(maxSize = 4, minimumIdle = 1)
     )
 
-  private def truncateApplicationTables(): Unit =
-    withConnection { connection =>
-      val tableNames = applicationTables(connection)
-      if tableNames.nonEmpty then
-        val quotedTables = tableNames.map(name => s""""public"."$name"""").mkString(", ")
-        val statement = connection.createStatement()
-        try statement.execute(s"truncate table $quotedTables restart identity cascade")
-        finally statement.close()
+  private def truncateApplicationTables(postgres: PostgreSQLContainer[?]): IO[Unit] =
+    IO.blocking {
+      withConnection(postgres) { connection =>
+        val tableNames = applicationTables(connection)
+        if tableNames.nonEmpty then
+          val quotedTables = tableNames.map(name => s""""public"."$name"""").mkString(", ")
+          val statement = connection.createStatement()
+          try statement.execute(s"truncate table $quotedTables restart identity cascade")
+          finally statement.close()
+      }
     }
 
   private def applicationTables(connection: Connection): List[String] =
@@ -77,9 +82,14 @@ trait PostgresRepositorySpecBase extends BeforeAndAfterAll with BeforeAndAfterEa
       tables.result()
     finally resultSet.close()
 
-  private def withConnection[A](use: Connection => A): A =
+  private def withConnection[A](postgres: PostgreSQLContainer[?])(use: Connection => A): A =
     val connection = DriverManager.getConnection(postgres.getJdbcUrl, postgres.getUsername, postgres.getPassword)
     try use(connection)
     finally connection.close()
+
+private final case class RepositoryDatabase(
+  sessionPool: Resource[IO, Session[IO]],
+  truncate: IO[Unit]
+)
 
 private final class ScalaPostgreSQLContainer(imageName: String) extends PostgreSQLContainer[ScalaPostgreSQLContainer](imageName)
