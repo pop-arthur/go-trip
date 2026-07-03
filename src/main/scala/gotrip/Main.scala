@@ -20,6 +20,7 @@ import gotrip.http.notificationpreference.NotificationPreferenceController
 import gotrip.http.achievement.{AchievementController, AdminAchievementController}
 import gotrip.http.userachievement.UserAchievementController
 import gotrip.http.review.ReviewController
+import gotrip.http.recommendation.RecommendationController
 
 import gotrip.repository.additionalservice.AdditionalServiceRepository
 import gotrip.repository.location.LocationRepository
@@ -50,6 +51,7 @@ import gotrip.service.notificationpreference.NotificationPreferenceService
 import gotrip.service.achievement.AchievementService
 import gotrip.service.userachievement.UserAchievementService
 import gotrip.service.review.ReviewService
+import gotrip.service.recommendation.RecommendationService
 
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
@@ -113,6 +115,11 @@ object Main extends IOApp.Simple {
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
         val reviewService = new ReviewService[IO](reviewRepository)
+        val recommendationService = new RecommendationService[IO](
+          orderRepository,
+          tripLocationRepository,
+          additionalServiceRepository
+        )
         val authService = new AuthService[IO](
           userRepository,
           authSessionRepository,
@@ -138,6 +145,7 @@ object Main extends IOApp.Simple {
         val adminAchievementController = new AdminAchievementController(achievementService, authSupport)
         val userAchievementController = new UserAchievementController(userAchievementService, authSupport)
         val reviewController = new ReviewController(reviewService, authSupport)
+        val recommendationController = new RecommendationController(recommendationService, authSupport)
 
         // ---- Сборка всех эндпоинтов ----
         val serverEndpoints =
@@ -155,7 +163,8 @@ object Main extends IOApp.Simple {
           achievementController.all ++
           adminAchievementController.all ++
           userAchievementController.all ++
-          reviewController.all
+          reviewController.all ++
+          recommendationController.all
 
         // ---- Swagger ----
         val swaggerEndpoints = SwaggerInterpreter()
