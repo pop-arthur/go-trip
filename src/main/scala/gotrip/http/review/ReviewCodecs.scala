@@ -69,6 +69,16 @@ object ReviewCodecs:
   given Decoder[Review] = deriveDecoder
   given Schema[Review] = derived
 
+  case class ReviewRatingSummary(
+    targetType: ReviewTargetType,
+    targetId: ReviewTargetId,
+    averageRating: Option[Double],
+    reviewCount: Int
+  )
+  given Encoder[ReviewRatingSummary] = deriveEncoder
+  given Decoder[ReviewRatingSummary] = deriveDecoder
+  given Schema[ReviewRatingSummary] = derived
+
   case class ReviewCreateRequest(
     targetType: ReviewTargetType,
     targetId: ReviewTargetId,

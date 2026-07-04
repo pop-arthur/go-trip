@@ -6,7 +6,7 @@ import gotrip.http.HttpError
 import gotrip.http.auth.AuthSupport
 import gotrip.service.review.ReviewService
 import sttp.tapir.server.ServerEndpoint
-import ReviewCodecs.{ReviewCreateRequest, ReviewUpdateRequest}
+import ReviewCodecs.{ReviewCreateRequest, ReviewRatingSummary, ReviewUpdateRequest}
 import java.time.Instant
 import java.util.UUID
 
@@ -27,6 +27,30 @@ final class ReviewController(service: ReviewService[IO], authSupport: AuthSuppor
         case _ =>
           IO.pure(Right(Nil))
     }}
+
+  val ratingSummary: ServerEndpoint[Any, IO] =
+    ReviewEndpoints.ratingSummary
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (targetType, targetId) =>
+        service.findByTarget(targetType, targetId).attempt.map {
+          case Right(reviews) =>
+            val reviewCount = reviews.size
+            val averageRating =
+              if reviewCount == 0 then None
+              else Some(reviews.map(_.rating.value).sum.toDouble / reviewCount)
+
+            Right(
+              ReviewRatingSummary(
+                targetType = targetType,
+                targetId = targetId,
+                averageRating = averageRating,
+                reviewCount = reviewCount
+              )
+            )
+          case Left(error) =>
+            Left(HttpError.Internal(error.getMessage))
+        }
+      }}
 
   val createReview: ServerEndpoint[Any, IO] =
     ReviewEndpoints.createReview
@@ -98,4 +122,4 @@ final class ReviewController(service: ReviewService[IO], authSupport: AuthSuppor
     }
 
   val all: List[ServerEndpoint[Any, IO]] =
-    List(listReviews, createReview, getReview, updateReview, deleteReview)
+    List(listReviews, createReview, ratingSummary, getReview, updateReview, deleteReview)

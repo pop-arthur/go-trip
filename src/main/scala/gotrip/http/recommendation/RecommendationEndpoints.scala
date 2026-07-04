@@ -3,7 +3,7 @@ package gotrip.http.recommendation
 import gotrip.domain.order.OrderId
 import gotrip.domain.recommendation.Recommendation
 import gotrip.domain.trip.TripId
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import gotrip.http.order.OrderCodecs.given
 import gotrip.http.recommendation.RecommendationCodecs.given
@@ -16,6 +16,7 @@ object RecommendationEndpoints:
 
   val getTripRecommendations: Endpoint[String, TripId, ErrorResponse, List[Recommendation], Any] =
     endpoint.get
+      .tag(SwaggerTags.Recommendations)
       .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "recommendations")
       .errorOut(EndpointErrors.notFound)
@@ -23,6 +24,7 @@ object RecommendationEndpoints:
 
   val getOrderRecommendations: Endpoint[String, OrderId, ErrorResponse, List[Recommendation], Any] =
     endpoint.get
+      .tag(SwaggerTags.Recommendations)
       .securityIn(AuthEndpoints.bearer)
       .in("orders" / path[OrderId]("orderId") / "recommendations")
       .errorOut(EndpointErrors.notFound)

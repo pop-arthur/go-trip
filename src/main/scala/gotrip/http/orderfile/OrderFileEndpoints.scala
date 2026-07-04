@@ -1,7 +1,7 @@
 package gotrip.http.orderfile
 
 import gotrip.domain.order.*
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import gotrip.http.order.OrderCodecs
 import sttp.model.StatusCode
@@ -16,6 +16,7 @@ object OrderFileEndpoints:
 
   val listOrderFiles: Endpoint[String, OrderId, ErrorResponse, List[OrderFile], Any] =
     endpoint.get
+      .tag(SwaggerTags.OrderFiles)
       .securityIn(AuthEndpoints.bearer)
       .in("orders" / path[OrderId]("orderId") / "files")
       .errorOut(EndpointErrors.notFound)
@@ -23,6 +24,7 @@ object OrderFileEndpoints:
 
   val createOrderFile: Endpoint[String, (OrderId, OrderFileCreate), ErrorResponse, OrderFile, Any] =
     endpoint.post
+      .tag(SwaggerTags.OrderFiles)
       .securityIn(AuthEndpoints.bearer)
       .in("orders" / path[OrderId]("orderId") / "files")
       .in(jsonBody[OrderFileCreate])
@@ -32,6 +34,7 @@ object OrderFileEndpoints:
 
   val getOrderFile: Endpoint[String, (OrderId, OrderFileId), ErrorResponse, OrderFile, Any] =
     endpoint.get
+      .tag(SwaggerTags.OrderFiles)
       .securityIn(AuthEndpoints.bearer)
       .in("orders" / path[OrderId]("orderId") / "files" / path[OrderFileId]("fileId"))
       .errorOut(EndpointErrors.notFound)
@@ -39,6 +42,7 @@ object OrderFileEndpoints:
 
   val deleteOrderFile: Endpoint[String, (OrderId, OrderFileId), ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.OrderFiles)
       .securityIn(AuthEndpoints.bearer)
       .in("orders" / path[OrderId]("orderId") / "files" / path[OrderFileId]("fileId"))
       .errorOut(EndpointErrors.notFound)

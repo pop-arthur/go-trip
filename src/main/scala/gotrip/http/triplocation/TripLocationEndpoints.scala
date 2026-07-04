@@ -1,7 +1,7 @@
 package gotrip.http.triplocation
 
 import gotrip.domain.trip.*
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir.*
@@ -14,6 +14,7 @@ object TripLocationEndpoints:
 
   val listTripLocations: Endpoint[String, TripId, ErrorResponse, List[TripLocation], Any] =
     endpoint.get
+      .tag(SwaggerTags.TripLocations)
       .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations")
       .errorOut(EndpointErrors.notFound)
@@ -21,6 +22,7 @@ object TripLocationEndpoints:
 
   val addTripLocation: Endpoint[String, (TripId, TripLocationCreate), ErrorResponse, TripLocation, Any] =
     endpoint.post
+      .tag(SwaggerTags.TripLocations)
       .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations")
       .in(jsonBody[TripLocationCreate])
@@ -31,6 +33,7 @@ object TripLocationEndpoints:
   val updateTripLocation
       : Endpoint[String, (TripId, TripLocationId, TripLocationUpdate), ErrorResponse, TripLocation, Any] =
     endpoint.patch
+      .tag(SwaggerTags.TripLocations)
       .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations" / path[TripLocationId]("tripLocationId"))
       .in(jsonBody[TripLocationUpdate])
@@ -39,6 +42,7 @@ object TripLocationEndpoints:
 
   val deleteTripLocation: Endpoint[String, (TripId, TripLocationId), ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.TripLocations)
       .securityIn(AuthEndpoints.bearer)
       .in("trips" / path[TripId]("tripId") / "locations" / path[TripLocationId]("tripLocationId"))
       .errorOut(EndpointErrors.notFound)
