@@ -6,7 +6,7 @@ import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.json.circe._
-import ReviewCodecs.{ReviewCreateRequest, ReviewUpdateRequest, given}
+import ReviewCodecs.{ReviewCreateRequest, ReviewRatingSummary, ReviewUpdateRequest, given}
 
 object ReviewEndpoints:
   import ReviewCodecs.given
@@ -33,6 +33,16 @@ object ReviewEndpoints:
       .errorOut(EndpointErrors.validationOrNotFound)
       .out(statusCode(StatusCode.Created))
       .out(jsonBody[Review])
+
+  val ratingSummary: Endpoint[String, (ReviewTargetType, ReviewTargetId), ErrorResponse, ReviewRatingSummary, Any] =
+    endpoint.get
+      .tag(SwaggerTags.Reviews)
+      .securityIn(AuthEndpoints.bearer)
+      .in("reviews" / "rating-summary")
+      .in(query[ReviewTargetType]("targetType"))
+      .in(query[ReviewTargetId]("targetId"))
+      .errorOut(EndpointErrors.internalOnly)
+      .out(jsonBody[ReviewRatingSummary])
 
   val getReview: Endpoint[String, ReviewId, ErrorResponse, Review, Any] =
     endpoint.get
