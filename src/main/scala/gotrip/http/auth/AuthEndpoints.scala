@@ -1,6 +1,6 @@
 package gotrip.http.auth
 
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.json.circe._
@@ -16,6 +16,7 @@ object AuthEndpoints:
 
   val register: PublicEndpoint[RegisterRequest, ErrorResponse, AuthResponse, Any] =
     endpoint.post
+      .tag(SwaggerTags.Auth)
       .in("auth" / "register")
       .in(jsonBody[RegisterRequest])
       .errorOut(EndpointErrors.validationOrConflict)
@@ -23,6 +24,7 @@ object AuthEndpoints:
 
   val login: PublicEndpoint[LoginRequest, ErrorResponse, AuthResponse, Any] =
     endpoint.post
+      .tag(SwaggerTags.Auth)
       .in("auth" / "login")
       .in(jsonBody[LoginRequest])
       .errorOut(EndpointErrors.validation)
@@ -30,6 +32,7 @@ object AuthEndpoints:
 
   val refresh: PublicEndpoint[RefreshRequest, ErrorResponse, AuthResponse, Any] =
     endpoint.post
+      .tag(SwaggerTags.Auth)
       .in("auth" / "refresh")
       .in(jsonBody[RefreshRequest])
       .errorOut(EndpointErrors.validation)
@@ -37,6 +40,7 @@ object AuthEndpoints:
 
   val logout: Endpoint[String, Unit, ErrorResponse, Unit, Any] =
     endpoint.post
+      .tag(SwaggerTags.Auth)
       .securityIn(bearer)
       .in("auth" / "logout")
       .errorOut(EndpointErrors.internalOnly)

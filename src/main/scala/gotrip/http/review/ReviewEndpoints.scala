@@ -1,7 +1,7 @@
 package gotrip.http.review
 
 import gotrip.domain.review.{Review, ReviewId, ReviewTargetType, ReviewTargetId}
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir._
@@ -16,6 +16,7 @@ object ReviewEndpoints:
   val listReviews
       : Endpoint[String, (Option[ReviewTargetType], Option[ReviewTargetId]), ErrorResponse, List[Review], Any] =
     endpoint.get
+      .tag(SwaggerTags.Reviews)
       .securityIn(AuthEndpoints.bearer)
       .in("reviews")
       .in(query[Option[ReviewTargetType]]("targetType"))
@@ -25,6 +26,7 @@ object ReviewEndpoints:
 
   val createReview: Endpoint[String, ReviewCreateRequest, ErrorResponse, Review, Any] =
     endpoint.post
+      .tag(SwaggerTags.Reviews)
       .securityIn(AuthEndpoints.bearer)
       .in("reviews")
       .in(jsonBody[ReviewCreateRequest])
@@ -34,6 +36,7 @@ object ReviewEndpoints:
 
   val getReview: Endpoint[String, ReviewId, ErrorResponse, Review, Any] =
     endpoint.get
+      .tag(SwaggerTags.Reviews)
       .securityIn(AuthEndpoints.bearer)
       .in("reviews" / path[ReviewId]("reviewId"))
       .errorOut(EndpointErrors.notFound)
@@ -41,6 +44,7 @@ object ReviewEndpoints:
 
   val updateReview: Endpoint[String, (ReviewId, ReviewUpdateRequest), ErrorResponse, Review, Any] =
     endpoint.patch
+      .tag(SwaggerTags.Reviews)
       .securityIn(AuthEndpoints.bearer)
       .in("reviews" / path[ReviewId]("reviewId"))
       .in(jsonBody[ReviewUpdateRequest])
@@ -49,6 +53,7 @@ object ReviewEndpoints:
 
   val deleteReview: Endpoint[String, ReviewId, ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.Reviews)
       .securityIn(AuthEndpoints.bearer)
       .in("reviews" / path[ReviewId]("reviewId"))
       .errorOut(EndpointErrors.notFound)
