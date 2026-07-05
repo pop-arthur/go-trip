@@ -61,16 +61,17 @@ trait PostgresRepositorySpecBase extends CatsEffectSuite:
     )
 
   private def truncateApplicationTables(postgres: PostgreSQLContainer[?]): IO[Unit] =
-    IO.blocking {
-      withConnection(postgres) { connection =>
+    connectionResource(postgres).use { connection =>
+      IO.blocking {
         val tableNames = applicationTables(connection)
+
         if tableNames.nonEmpty then
           val quotedTables = tableNames.map(name => s""""public"."$name"""").mkString(", ")
           val statement = connection.createStatement()
           try statement.execute(s"truncate table $quotedTables restart identity cascade")
           finally statement.close()
       }
-    }
+    }  
 
   private def applicationTables(connection: Connection): List[String] =
     val resultSet = connection.getMetaData.getTables(null, "public", "%", Array("TABLE"))
@@ -82,10 +83,18 @@ trait PostgresRepositorySpecBase extends CatsEffectSuite:
       tables.result()
     finally resultSet.close()
 
-  private def withConnection[A](postgres: PostgreSQLContainer[?])(use: Connection => A): A =
-    val connection = DriverManager.getConnection(postgres.getJdbcUrl, postgres.getUsername, postgres.getPassword)
-    try use(connection)
-    finally connection.close()
+  private def connectionResource(postgres: PostgreSQLContainer[?]): Resource[IO, Connection] =
+    Resource.make {
+      IO.blocking {
+        DriverManager.getConnection(
+          postgres.getJdbcUrl,
+          postgres.getUsername,
+          postgres.getPassword
+        )
+      }
+    } { connection =>
+      IO.blocking(connection.close())
+  }
 
 private final case class RepositoryDatabase(
   sessionPool: Resource[IO, Session[IO]],
