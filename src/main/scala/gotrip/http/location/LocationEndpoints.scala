@@ -1,7 +1,7 @@
 package gotrip.http.location
 
 import gotrip.domain.location.*
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir.*
@@ -15,6 +15,7 @@ object LocationEndpoints:
   val listLocations
       : Endpoint[String, (Option[LocationType], Option[String], Option[String], Option[String]), ErrorResponse, List[Location], Any] =
     endpoint.get
+      .tag(SwaggerTags.Locations)
       .securityIn(AuthEndpoints.bearer)
       .in("locations")
       .in(query[Option[LocationType]]("type"))
@@ -26,6 +27,7 @@ object LocationEndpoints:
 
   val getLocation: Endpoint[String, LocationId, ErrorResponse, Location, Any] =
     endpoint.get
+      .tag(SwaggerTags.Locations)
       .securityIn(AuthEndpoints.bearer)
       .in("locations" / path[LocationId]("locationId"))
       .errorOut(EndpointErrors.notFound)
@@ -33,6 +35,7 @@ object LocationEndpoints:
 
   val createLocation: Endpoint[String, LocationCreate, ErrorResponse, Location, Any] =
     endpoint.post
+      .tag(SwaggerTags.Locations)
       .securityIn(AuthEndpoints.bearer)
       .in("locations")
       .in(jsonBody[LocationCreate])
@@ -42,6 +45,7 @@ object LocationEndpoints:
 
   val updateLocation: Endpoint[String, (LocationId, LocationUpdate), ErrorResponse, Location, Any] =
     endpoint.patch
+      .tag(SwaggerTags.Locations)
       .securityIn(AuthEndpoints.bearer)
       .in("locations" / path[LocationId]("locationId"))
       .in(jsonBody[LocationUpdate])
@@ -50,6 +54,7 @@ object LocationEndpoints:
 
   val deleteLocation: Endpoint[String, LocationId, ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.Locations)
       .securityIn(AuthEndpoints.bearer)
       .in("locations" / path[LocationId]("locationId"))
       .errorOut(EndpointErrors.notFound)

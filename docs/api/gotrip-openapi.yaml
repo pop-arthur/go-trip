@@ -98,6 +98,8 @@ paths:
     "$ref": "./paths/recommendations.yaml#/paths/~1orders~1{orderId}~1recommendations"
   "/reviews":
     "$ref": "./paths/reviews.yaml#/paths/~1reviews"
+  "/reviews/rating-summary":
+    "$ref": "./paths/reviews.yaml#/paths/~1reviews~1rating-summary"
   "/reviews/{reviewId}":
     "$ref": "./paths/reviews.yaml#/paths/~1reviews~1{reviewId}"
   "/achievements":
@@ -1230,6 +1232,28 @@ components:
           type: string
           format: date-time
           example: '2026-06-10T10:00:00Z'
+    ReviewRatingSummary:
+      type: object
+      required:
+      - targetType
+      - targetId
+      - reviewCount
+      properties:
+        targetType:
+          "$ref": "#/components/schemas/ReviewTargetType"
+        targetId:
+          type: string
+          format: uuid
+          example: 00000000-0000-4000-8000-000000000401
+        averageRating:
+          type: number
+          format: double
+          nullable: true
+          example: 4.5
+        reviewCount:
+          type: integer
+          minimum: 0
+          example: 2
     ReviewCreateRequest:
       type: object
       required:

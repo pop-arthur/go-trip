@@ -1,0 +1,22 @@
+package gotrip.http
+
+object SwaggerTags:
+  val Auth = "Auth"
+  val Users = "Users"
+  val Trips = "Trips"
+  val TripLocations = "Trip locations"
+  val Locations = "Locations"
+  val Orders = "Orders"
+  val OrderFiles = "Order files"
+  val Providers = "Providers"
+  val AdditionalServices = "Additional services"
+  val Achievements = "Achievements"
+  val UserAchievements = "User achievements"
+  val Notifications = "Notifications"
+  val NotificationPreferences = "Notification preferences"
+  val Reviews = "Reviews"
+  val Recommendations = "Recommendations"
+  val AdminProviders = "Admin providers"
+  val AdminAdditionalServices = "Admin additional services"
+  val AdminAchievements = "Admin achievements"
+  val AdminOrders = "Admin orders"

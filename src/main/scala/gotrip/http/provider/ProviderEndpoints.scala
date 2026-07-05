@@ -1,7 +1,7 @@
 package gotrip.http.provider
 
 import gotrip.domain.provider.*
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir.*
@@ -14,6 +14,7 @@ object ProviderEndpoints:
 
   val listProviders: Endpoint[String, (Option[ProviderType], Option[String]), ErrorResponse, List[Provider], Any] =
     endpoint.get
+      .tag(SwaggerTags.Providers)
       .securityIn(AuthEndpoints.bearer)
       .in("providers")
       .in(query[Option[ProviderType]]("type"))
@@ -23,6 +24,7 @@ object ProviderEndpoints:
 
   val getProvider: Endpoint[String, ProviderId, ErrorResponse, Provider, Any] =
     endpoint.get
+      .tag(SwaggerTags.Providers)
       .securityIn(AuthEndpoints.bearer)
       .in("providers" / path[ProviderId]("providerId"))
       .errorOut(EndpointErrors.notFound)
@@ -30,6 +32,7 @@ object ProviderEndpoints:
 
   val createProvider: Endpoint[String, ProviderCreate, ErrorResponse, Provider, Any] =
     endpoint.post
+      .tag(SwaggerTags.Providers)
       .securityIn(AuthEndpoints.bearer)
       .in("providers")
       .in(jsonBody[ProviderCreate])
@@ -39,6 +42,7 @@ object ProviderEndpoints:
 
   val deleteProvider: Endpoint[String, ProviderId, ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.Providers)
       .securityIn(AuthEndpoints.bearer)
       .in("providers" / path[ProviderId]("providerId"))
       .errorOut(EndpointErrors.notFoundOrConflict)
@@ -46,6 +50,7 @@ object ProviderEndpoints:
 
   val adminCreateProvider: Endpoint[String, ProviderCreate, ErrorResponse, Provider, Any] =
     endpoint.post
+      .tag(SwaggerTags.AdminProviders)
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "providers")
       .in(jsonBody[ProviderCreate])
@@ -55,6 +60,7 @@ object ProviderEndpoints:
 
   val adminUpdateProvider: Endpoint[String, (ProviderId, ProviderUpdate), ErrorResponse, Provider, Any] =
     endpoint.patch
+      .tag(SwaggerTags.AdminProviders)
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "providers" / path[ProviderId]("providerId"))
       .in(jsonBody[ProviderUpdate])
@@ -63,6 +69,7 @@ object ProviderEndpoints:
 
   val adminDeleteProvider: Endpoint[String, ProviderId, ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.AdminProviders)
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "providers" / path[ProviderId]("providerId"))
       .errorOut(EndpointErrors.notFoundOrConflict)
