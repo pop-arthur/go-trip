@@ -21,6 +21,7 @@ import gotrip.http.achievement.{AchievementController, AdminAchievementControlle
 import gotrip.http.userachievement.UserAchievementController
 import gotrip.http.review.ReviewController
 import gotrip.http.recommendation.RecommendationController
+import gotrip.http.statistics.StatisticsController
 
 import gotrip.repository.additionalservice.AdditionalServiceRepository
 import gotrip.repository.location.LocationRepository
@@ -36,6 +37,7 @@ import gotrip.repository.achievement.AchievementRepository
 import gotrip.repository.userachievement.UserAchievementRepository
 import gotrip.repository.review.ReviewRepository
 import gotrip.repository.auth.AuthSessionRepository
+import gotrip.repository.statistics.StatisticsRepository
 
 import gotrip.service.auth.{AuthService, JwtService, PasswordHasher}
 import gotrip.service.additionalservice.AdditionalServiceService
@@ -52,6 +54,7 @@ import gotrip.service.achievement.AchievementService
 import gotrip.service.userachievement.UserAchievementService
 import gotrip.service.review.ReviewService
 import gotrip.service.recommendation.RecommendationService
+import gotrip.service.statistics.StatisticsService
 
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
@@ -98,6 +101,7 @@ object Main extends IOApp.Simple {
         val userAchievementRepository = UserAchievementRepository.makePostgres[IO](sessionPool)
         val reviewRepository = ReviewRepository.makePostgres[IO](sessionPool)
         val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
+        val statisticsRepository = StatisticsRepository.make[IO](sessionPool)
 
         // ---- Service Layer ----
         val jwtService = new JwtService[IO](authConfig)
@@ -120,6 +124,7 @@ object Main extends IOApp.Simple {
           tripLocationRepository,
           additionalServiceRepository
         )
+        val statisticsService = new StatisticsService[IO](statisticsRepository)
         val authService = new AuthService[IO](
           userRepository,
           authSessionRepository,
@@ -146,6 +151,7 @@ object Main extends IOApp.Simple {
         val userAchievementController = new UserAchievementController(userAchievementService, authSupport)
         val reviewController = new ReviewController(reviewService, authSupport)
         val recommendationController = new RecommendationController(recommendationService, authSupport)
+        val statisticsController = new StatisticsController(statisticsService, authSupport)
 
         // ---- Сборка всех эндпоинтов ----
         val serverEndpoints =
@@ -164,7 +170,8 @@ object Main extends IOApp.Simple {
           adminAchievementController.all ++
           userAchievementController.all ++
           reviewController.all ++
-          recommendationController.all
+          recommendationController.all ++
+          statisticsController.all
 
         // ---- Swagger ----
         val swaggerEndpoints = SwaggerInterpreter()
