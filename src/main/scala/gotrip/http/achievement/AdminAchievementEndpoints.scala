@@ -1,7 +1,7 @@
 package gotrip.http.achievement
 
 import gotrip.domain.achievement.{Achievement, AchievementId}
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir._
@@ -15,6 +15,7 @@ object AdminAchievementEndpoints {
 
   val adminCreateAchievement: Endpoint[String, AchievementCreateRequest, ErrorResponse, Achievement, Any] =
     endpoint.post
+      .tag(SwaggerTags.AdminAchievements)
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "achievements")
       .in(jsonBody[AchievementCreateRequest])
@@ -24,6 +25,7 @@ object AdminAchievementEndpoints {
 
   val adminUpdateAchievement: Endpoint[String, (AchievementId, AchievementUpdateRequest), ErrorResponse, Achievement, Any] =
     endpoint.patch
+      .tag(SwaggerTags.AdminAchievements)
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "achievements" / path[AchievementId]("achievementId"))
       .in(jsonBody[AchievementUpdateRequest])
@@ -32,6 +34,7 @@ object AdminAchievementEndpoints {
 
   val adminDeleteAchievement: Endpoint[String, AchievementId, ErrorResponse, Unit, Any] =
     endpoint.delete
+      .tag(SwaggerTags.AdminAchievements)
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "achievements" / path[AchievementId]("achievementId"))
       .errorOut(EndpointErrors.notFound)

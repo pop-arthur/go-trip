@@ -11,7 +11,10 @@ admin_user as (
   select gen_random_uuid(), email, crypt(password, gen_salt('bf', 12)), full_name, now(), now()
   from admin_config
   where email is not null and password is not null
-  on conflict (email) do update set email = excluded.email
+  on conflict (email) do update set
+    password_hash = excluded.password_hash,
+    full_name = excluded.full_name,
+    updated_at = now()
   returning id
 )
 insert into user_roles (user_id, role, created_at, updated_at)

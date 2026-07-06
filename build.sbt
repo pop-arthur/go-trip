@@ -22,6 +22,8 @@ lazy val root = (project in file("."))
       "org.typelevel" %% "cats-effect" % "3.7.0",
       "org.scalatest" %% "scalatest" % scalaTestVersion % Test,
       "org.scalamock" %% "scalamock" % scalaMockVersion % Test,
+      "org.typelevel" %% "munit-cats-effect" % "2.2.0" % Test,
+      "org.testcontainers" % "testcontainers-postgresql" % "2.0.5" % Test,
       
       "com.softwaremill.sttp.tapir" %% "tapir-core" % tapirVersion,
       "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % tapirVersion,

@@ -1,7 +1,7 @@
 package gotrip.http.user
 
 import gotrip.domain.user.UserId
-import gotrip.http.{EndpointErrors, HttpError}
+import gotrip.http.{EndpointErrors, HttpError, SwaggerTags}
 import gotrip.http.auth.{AuthEndpoints, PublicUser}
 import sttp.model.StatusCode
 import sttp.tapir._
@@ -15,6 +15,7 @@ object UserEndpoints:
 
   val getCurrentUser: Endpoint[String, Unit, ErrorResponse, PublicUser, Any] =
     endpoint.get
+      .tag(SwaggerTags.Users)
       .securityIn(AuthEndpoints.bearer)
       .in("users" / "me")
       .errorOut(EndpointErrors.notFound)
@@ -22,6 +23,7 @@ object UserEndpoints:
 
   val updateCurrentUser: Endpoint[String, UserUpdate, ErrorResponse, PublicUser, Any] =
     endpoint.patch
+      .tag(SwaggerTags.Users)
       .securityIn(AuthEndpoints.bearer)
       .in("users" / "me")
       .in(jsonBody[UserUpdate])

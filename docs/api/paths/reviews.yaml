@@ -54,6 +54,35 @@ paths:
           "$ref": "../gotrip-openapi.yaml#/components/responses/Conflict"
         '422':
           "$ref": "../gotrip-openapi.yaml#/components/responses/ValidationError"
+  "/reviews/rating-summary":
+    get:
+      tags:
+      - Reviews
+      summary: Get review rating summary
+      operationId: getReviewRatingSummary
+      parameters:
+      - name: targetType
+        in: query
+        required: true
+        schema:
+          "$ref": "../gotrip-openapi.yaml#/components/schemas/ReviewTargetType"
+      - name: targetId
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                "$ref": "../gotrip-openapi.yaml#/components/schemas/ReviewRatingSummary"
+        '400':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/BadRequest"
+        '401':
+          "$ref": "../gotrip-openapi.yaml#/components/responses/Unauthorized"
   "/reviews/{reviewId}":
     get:
       tags:
