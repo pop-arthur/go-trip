@@ -158,7 +158,7 @@ object PostgresReviewRepository:
     """.query(float8)
 
   val countByUserQuery: Query[UUID, Int] =
-    sql"SELECT COUNT(*) FROM reviews WHERE user_id = $uuid".query(int4)
+    sql"SELECT COUNT(*)::int FROM reviews WHERE user_id = $uuid".query(int4)
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): ReviewRepository[F] =
     new PostgresReviewRepository(sessionPool)

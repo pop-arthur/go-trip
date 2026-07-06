@@ -157,7 +157,7 @@ object PostgresTripRepository:
     """.query(uuid)
 
   val countByUserQuery: Query[UUID, Int] =
-    sql"SELECT COUNT(*) FROM trips WHERE user_id = $uuid".query(int4)
+    sql"SELECT COUNT(*)::int FROM trips WHERE user_id = $uuid".query(int4)
 
   private def updateFragment(
     userId: UserId,

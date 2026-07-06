@@ -216,7 +216,7 @@ object PostgresTripLocationRepository:
 
   val countDistinctCountriesQuery: Query[UUID, Int] =
     sql"""
-      SELECT COUNT(DISTINCT l.country)
+      SELECT COUNT(DISTINCT l.country)::int
       FROM trips t
       JOIN trip_locations tl ON tl.trip_id = t.id
       JOIN locations l ON l.id = tl.location_id

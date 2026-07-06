@@ -296,7 +296,7 @@ object PostgresOrderRepository:
 
   val totalSpendingQuery: Query[UUID, Double] =
     sql"""
-      SELECT COALESCE(SUM(price_amount), 0.0)
+      SELECT COALESCE(SUM(price_amount), 0.0)::float8
       FROM orders
       WHERE user_id = $uuid
         AND status NOT IN ('CANCELLED', 'REFUNDED')
