@@ -2,18 +2,27 @@ package gotrip.repository.review
 
 import cats.Applicative
 import cats.syntax.all._
-import gotrip.domain.user.UserId
 import gotrip.domain.review._
+import gotrip.domain.user.UserId
+import java.time.Instant
+import java.util.UUID
 import scala.collection.mutable
 
 object InMemoryReviewRepository {
   def make[F[_]: Applicative]: F[ReviewRepository[F]] = {
     val store = mutable.Map.empty[ReviewId, Review]
+    def newId(): ReviewId = ReviewId(UUID.randomUUID())
 
     new ReviewRepository[F] {
       override def create(review: Review): F[Review] = {
-        store += (review.id -> review)
-        review.pure[F]
+        val now = Instant.now()
+        val newReview = review.copy(
+          id = newId(),
+          createdAt = now,
+          updatedAt = now
+        )
+        store += (newReview.id -> newReview)
+        newReview.pure[F]
       }
 
       override def findById(id: ReviewId): F[Option[Review]] = store.get(id).pure[F]
@@ -27,7 +36,8 @@ object InMemoryReviewRepository {
       override def update(review: Review): F[Int] = {
         store.get(review.id) match {
           case Some(_) =>
-            store += (review.id -> review)
+            val updated = review.copy(updatedAt = Instant.now())
+            store += (updated.id -> updated)
             1.pure[F]
           case None => 0.pure[F]
         }
@@ -40,9 +50,12 @@ object InMemoryReviewRepository {
         val ratings = store.values.filter(r => r.targetType == targetType && r.targetId == targetId).map(_.rating.value).toList
         ratings match {
           case Nil => None.pure[F]
-          case list => Some(list.sum.toDouble / list.size).pure[F]
+          case list => Some(list.map(_.toDouble).sum / list.size).pure[F]
         }
       }
+
+      override def countByUser(userId: UserId): F[Int] =
+        store.values.count(_.userId == userId).pure[F]
     }.pure[F]
   }
 }
