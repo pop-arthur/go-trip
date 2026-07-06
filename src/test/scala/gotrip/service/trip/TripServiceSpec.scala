@@ -5,6 +5,7 @@ import cats.effect.unsafe.implicits.global
 import gotrip.domain.trip.*
 import gotrip.domain.user.*
 import gotrip.repository.trip.TripRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -12,7 +13,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.{Instant, LocalDate}
 import java.util.UUID
 
-final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "TripService" should {
     "delegate listByUser to repository and return trips" in {
@@ -44,16 +45,12 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
     "create a valid trip for a user" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
-      repository.create.expects(where { (created: Trip) =>
-        created.id.value != new UUID(0L, 0L) &&
-        created.user_id == userId &&
-        created.title == tripCreate.title &&
-        created.start_date == tripCreate.start_date &&
-        created.end_date == tripCreate.end_date &&
-        created.status == TripStatus.Planned
-      }).returning(IO.pure(trip))
+      expectGeneratedId(generatedData, tripId.value)
+      expectGeneratedNow(generatedData, trip.created_at)
+      repository.create.expects(trip).returning(IO.pure(trip))
 
       service.create(userId, tripCreate).unsafeRunSync() shouldBe Right(trip)
     }
@@ -77,18 +74,12 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
     "update an owned trip with merged fields" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.findByUser.expects(userId, tripId).returning(IO.pure(Some(trip)))
-      repository.update.expects(where { (updated: Trip) =>
-        updated.id == tripId &&
-        updated.title == TripTitle("Updated") &&
-        updated.start_date == trip.start_date &&
-        updated.end_date == TripEndDate(Some(LocalDate.parse("2026-06-25"))) &&
-        updated.status == TripStatus.Completed &&
-        updated.created_at == trip.created_at &&
-        updated.updated_at != trip.updated_at
-      }).returning(IO.pure(Some(updatedTrip)))
+      expectGeneratedNow(generatedData, updatedTrip.updated_at)
+      repository.update.expects(updatedTrip).returning(IO.pure(Some(updatedTrip)))
 
       service.update(userId, tripId, tripUpdate).unsafeRunSync() shouldBe Right(updatedTrip)
     }
@@ -124,6 +115,13 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
   private val userId = UserId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
   private val tripId = TripId(UUID.fromString("00000000-0000-0000-0000-000000000010"))
+
+  private def serviceWith(
+    repository: TripRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): TripService[IO] =
+    given GeneratedData[IO] = generatedData
+    TripService[IO](repository)
 
   private val tripCreate = TripCreate(
     title = TripTitle("Vietnam 2026"),

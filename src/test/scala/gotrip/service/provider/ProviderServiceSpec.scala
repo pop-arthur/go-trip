@@ -4,13 +4,14 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import gotrip.domain.provider.*
 import gotrip.repository.provider.ProviderRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
 
-final class ProviderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class ProviderServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "ProviderService" should {
     "delegate search to repository and return providers" in {
@@ -33,16 +34,12 @@ final class ProviderServiceSpec extends AnyWordSpec with Matchers with MockFacto
 
     "create a provider when name is available" in {
       val repository = mock[ProviderRepository[IO]]
-      val service = ProviderService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.nameExists.expects(providerCreate.name, None).returning(IO.pure(false))
-      repository.create.expects(where { (created: Provider) =>
-        created.id.value != new UUID(0L, 0L) &&
-        created.name == providerCreate.name &&
-        created.`type` == providerCreate.`type` &&
-        created.website == providerCreate.website &&
-        created.support_contact == providerCreate.support_contact
-      }).returning(IO.pure(provider))
+      expectGeneratedId(generatedData, providerId.value)
+      repository.create.expects(provider).returning(IO.pure(provider))
 
       service.create(providerCreate).unsafeRunSync() shouldBe Right(provider)
     }
@@ -123,6 +120,14 @@ final class ProviderServiceSpec extends AnyWordSpec with Matchers with MockFacto
   }
 
   private val providerId = ProviderId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+
+  private def serviceWith(
+    repository: ProviderRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): ProviderService[IO] =
+    given GeneratedData[IO] = generatedData
+    ProviderService[IO](repository)
+
   private val providerName = ProviderName("SkyWays")
   private val updatedName = ProviderName("SkyWays Premium")
 

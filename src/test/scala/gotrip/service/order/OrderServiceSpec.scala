@@ -13,6 +13,7 @@ import gotrip.domain.user.*
 import gotrip.repository.notification.NotificationRepository
 import gotrip.repository.notificationpreference.NotificationPreferenceRepository
 import gotrip.repository.order.OrderRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import gotrip.service.notification.NotificationService
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
@@ -21,7 +22,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.{Instant, OffsetDateTime}
 import java.util.UUID
 
-final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "OrderService" should {
     "list orders for an owned trip" in {
@@ -54,28 +55,16 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
     "create an order with default status" in {
       val repository = mock[OrderRepository[IO]]
-      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository, generatedData)
 
       repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
       repository.providerExists.expects(providerId).returning(IO.pure(true))
       repository.locationExists.expects(departureLocationId).returning(IO.pure(true))
       repository.locationExists.expects(arrivalLocationId).returning(IO.pure(true))
-      repository.create.expects(where { (created: Order) =>
-        created.id.value != new UUID(0L, 0L) &&
-        created.user_id == userId &&
-        created.trip_id == tripId &&
-        created.provider_id.contains(providerId) &&
-        created.service_type == orderCreate.service_type &&
-        created.external_order_id == orderCreate.external_order_id &&
-        created.title == orderCreate.title &&
-        created.status == OrderStatus.PendingVerification &&
-        created.price_amount == orderCreate.price_amount &&
-        created.price_currency == orderCreate.price_currency &&
-        created.start_datetime == orderCreate.start_datetime &&
-        created.end_datetime == orderCreate.end_datetime &&
-        created.departure_location_id.contains(departureLocationId) &&
-        created.arrival_location_id.contains(arrivalLocationId)
-      }).returning(IO.pure(order))
+      expectGeneratedId(generatedData, orderId.value)
+      expectGeneratedNow(generatedData, order.created_at)
+      repository.create.expects(order).returning(IO.pure(order))
 
       service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe Right(order)
     }
@@ -135,27 +124,14 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
 
     "update an order with merged fields" in {
       val repository = mock[OrderRepository[IO]]
-      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository, generatedData)
 
       repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
       repository.providerExists.expects(providerId).returning(IO.pure(true))
       repository.locationExists.expects(arrivalLocationId).returning(IO.pure(true))
-      repository.update.expects(where { (updated: Order) =>
-        updated.id == orderId &&
-        updated.provider_id.contains(providerId) &&
-        updated.service_type == ServiceType.Hotel &&
-        updated.external_order_id == order.external_order_id &&
-        updated.title == OrderTitle("Hotel in Bangkok") &&
-        updated.status == order.status &&
-        updated.price_amount == Some(280.0) &&
-        updated.price_currency == order.price_currency &&
-        updated.start_datetime == order.start_datetime &&
-        updated.end_datetime == Some(endDateTime.plusDays(2)) &&
-        updated.departure_location_id == order.departure_location_id &&
-        updated.arrival_location_id.contains(arrivalLocationId) &&
-        updated.created_at == order.created_at &&
-        updated.updated_at != order.updated_at
-      }).returning(IO.pure(Some(updatedOrderDetails)))
+      expectGeneratedNow(generatedData, updatedOrderDetails.updated_at)
+      repository.update.expects(updatedOrderDetails).returning(IO.pure(Some(updatedOrderDetails)))
 
       service.update(userId, orderId, orderUpdate).unsafeRunSync() shouldBe Right(updatedOrderDetails)
     }
@@ -200,19 +176,19 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
     "write a status event and notification when preferences are enabled" in {
       val repository = mock[OrderRepository[IO]]
       val notifications = new RecordingNotificationRepository
-      val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications, generatedData)
 
       repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
-      repository.updateStatus.expects(where { (updated: Order) =>
-        updated.id == orderId &&
-        updated.status == OrderStatus.Confirmed
-      }).returning(IO.pure(Some(updatedOrder)))
-      repository.insertStatusEvent.expects(where { (event: OrderStatusEvent) =>
-        event.order_id == orderId &&
-        event.old_status.contains(OrderStatus.PendingVerification) &&
-        event.new_status == OrderStatus.Confirmed &&
-        event.source == OrderStatusEventSource.UserEdit
-      }).returning(IO.pure(statusEvent))
+      inSequence {
+        expectGeneratedNow(generatedData, statusAt)
+        expectGeneratedId(generatedData, statusEventId.value)
+        expectGeneratedNow(generatedData, statusAt)
+        expectGeneratedId(generatedData, notificationId.value)
+        expectGeneratedNow(generatedData, notificationAt)
+      }
+      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(statusEvent).returning(IO.pure(statusEvent))
 
       service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created.size shouldBe 1
@@ -222,11 +198,17 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
     "skip notification when preferences are disabled" in {
       val repository = mock[OrderRepository[IO]]
       val notifications = new RecordingNotificationRepository
-      val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications, generatedData)
 
       repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
-      repository.updateStatus.expects(*).returning(IO.pure(Some(updatedOrder)))
-      repository.insertStatusEvent.expects(*).returning(IO.pure(statusEvent))
+      inSequence {
+        expectGeneratedNow(generatedData, statusAt)
+        expectGeneratedId(generatedData, statusEventId.value)
+        expectGeneratedNow(generatedData, statusAt)
+      }
+      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(statusEvent).returning(IO.pure(statusEvent))
 
       service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created shouldBe empty
@@ -255,20 +237,20 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
     "admin update status for any order and notify the owner" in {
       val repository = mock[OrderRepository[IO]]
       val notifications = new RecordingNotificationRepository
-      val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications)
+      val generatedData = generatedDataMock
+      val adminStatusEvent = statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)
+      val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications, generatedData)
 
       repository.findById.expects(orderId).returning(IO.pure(Some(order)))
-      repository.updateStatus.expects(where { (updated: Order) =>
-        updated.id == orderId &&
-        updated.user_id == userId &&
-        updated.status == OrderStatus.Confirmed
-      }).returning(IO.pure(Some(updatedOrder)))
-      repository.insertStatusEvent.expects(where { (event: OrderStatusEvent) =>
-        event.order_id == orderId &&
-        event.old_status.contains(OrderStatus.PendingVerification) &&
-        event.new_status == OrderStatus.Confirmed &&
-        event.source == OrderStatusEventSource.AdminSimulation
-      }).returning(IO.pure(statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)))
+      inSequence {
+        expectGeneratedNow(generatedData, statusAt)
+        expectGeneratedId(generatedData, statusEventId.value)
+        expectGeneratedNow(generatedData, statusAt)
+        expectGeneratedId(generatedData, notificationId.value)
+        expectGeneratedNow(generatedData, notificationAt)
+      }
+      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(adminStatusEvent).returning(IO.pure(adminStatusEvent))
 
       service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created.size shouldBe 1
@@ -299,13 +281,18 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
     "skip admin status update notification when preferences are disabled" in {
       val repository = mock[OrderRepository[IO]]
       val notifications = new RecordingNotificationRepository
-      val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications)
+      val generatedData = generatedDataMock
+      val adminStatusEvent = statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)
+      val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications, generatedData)
 
       repository.findById.expects(orderId).returning(IO.pure(Some(order)))
-      repository.updateStatus.expects(*).returning(IO.pure(Some(updatedOrder)))
-      repository.insertStatusEvent.expects(where { (event: OrderStatusEvent) =>
-        event.source == OrderStatusEventSource.AdminSimulation
-      }).returning(IO.pure(statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)))
+      inSequence {
+        expectGeneratedNow(generatedData, statusAt)
+        expectGeneratedId(generatedData, statusEventId.value)
+        expectGeneratedNow(generatedData, statusAt)
+      }
+      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
+      repository.insertStatusEvent.expects(adminStatusEvent).returning(IO.pure(adminStatusEvent))
 
       service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
       notifications.created shouldBe empty
@@ -323,12 +310,27 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
       NotificationService[IO](notifications)
     )
 
+  private def serviceWith(
+    repository: OrderRepository[IO],
+    preference: Option[NotificationPreference],
+    notifications: RecordingNotificationRepository,
+    generatedData: GeneratedData[IO]
+  ): OrderService[IO] =
+    given GeneratedData[IO] = generatedData
+    OrderService[IO](
+      repository,
+      new StaticNotificationPreferenceRepository(preference),
+      NotificationService[IO](notifications)
+    )
+
   private def uuid(suffix: String): UUID =
     UUID.fromString(s"00000000-0000-0000-0000-$suffix")
 
   private val userId = UserId(uuid("000000000001"))
   private val tripId = TripId(uuid("000000000010"))
   private val orderId = OrderId(uuid("000000000100"))
+  private val statusEventId = OrderStatusEventId(uuid("000000000200"))
+  private val notificationId = NotificationId(uuid("000000000300"))
   private val providerId = ProviderId(uuid("000000000005"))
   private val departureLocationId = LocationId(uuid("000000000020"))
   private val arrivalLocationId = LocationId(uuid("000000000021"))
@@ -390,25 +392,28 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory:
     updated_at = Instant.parse("2026-06-01T10:00:00Z")
   )
 
-  private val updatedOrder = order.copy(status = OrderStatus.Confirmed)
+  private val statusAt = Instant.parse("2026-06-01T10:05:00Z")
+  private val notificationAt = Instant.parse("2026-06-01T10:06:00Z")
+
+  private val updatedOrder = order.copy(status = OrderStatus.Confirmed, updated_at = statusAt)
   private val updatedOrderDetails = order.copy(
     service_type = ServiceType.Hotel,
     title = OrderTitle("Hotel in Bangkok"),
     price_amount = Some(280.0),
     end_datetime = Some(endDateTime.plusDays(2)),
-    updated_at = Instant.parse("2026-06-01T10:05:00Z")
+    updated_at = statusAt
   )
   private val statusUpdate = OrderStatusUpdate(status = OrderStatus.Confirmed, reason = Some("Confirmed by provider"))
   private val invalidStatusUpdate = statusUpdate.copy(new_start_datetime = Some(endDateTime.plusHours(1)))
   private val statusEvent = OrderStatusEvent(
-    id = OrderStatusEventId(uuid("000000000001")),
+    id = statusEventId,
     order_id = orderId,
     old_status = Some(OrderStatus.PendingVerification),
     new_status = OrderStatus.Confirmed,
     reason = Some("Confirmed by provider"),
     payload = None,
     source = OrderStatusEventSource.UserEdit,
-    created_at = Instant.parse("2026-06-01T10:05:00Z")
+    created_at = statusAt
   )
 
   private val enabledPreference = NotificationPreference(

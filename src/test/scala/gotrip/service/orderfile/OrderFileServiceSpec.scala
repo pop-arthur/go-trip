@@ -5,6 +5,7 @@ import cats.effect.unsafe.implicits.global
 import gotrip.domain.order.*
 import gotrip.domain.user.*
 import gotrip.repository.orderfile.OrderFileRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -12,7 +13,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import java.util.UUID
 
-final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "OrderFileService" should {
     "list files for an owned order" in {
@@ -36,17 +37,13 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
 
     "create metadata for an owned order" in {
       val repository = mock[OrderFileRepository[IO]]
-      val service = OrderFileService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
-      repository.create.expects(where { (actualUserId: UserId, created: OrderFile) =>
-        actualUserId == userId &&
-        created.id.value != new UUID(0L, 0L) &&
-        created.order_id == orderId &&
-        created.file_url == orderFileCreate.file_url &&
-        created.file_type == orderFileCreate.file_type &&
-        created.parsed_data == orderFileCreate.parsed_data
-      }).returning(IO.pure(Some(orderFile)))
+      expectGeneratedId(generatedData, fileId.value)
+      expectGeneratedNow(generatedData, orderFile.uploaded_at)
+      repository.create.expects(userId, orderFile).returning(IO.pure(Some(orderFile)))
 
       service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe Right(orderFile)
     }
@@ -72,10 +69,13 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
 
     "return order not found when create cannot persist metadata for the user order" in {
       val repository = mock[OrderFileRepository[IO]]
-      val service = OrderFileService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
-      repository.create.expects(userId, *).returning(IO.pure(None))
+      expectGeneratedId(generatedData, fileId.value)
+      expectGeneratedNow(generatedData, orderFile.uploaded_at)
+      repository.create.expects(userId, orderFile).returning(IO.pure(None))
 
       service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe
         Left(OrderFileServiceError.OrderNotFound(orderId))
@@ -106,6 +106,13 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
   private val userId = UserId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
   private val orderId = OrderId(UUID.fromString("00000000-0000-0000-0000-000000000010"))
   private val fileId = OrderFileId(UUID.fromString("00000000-0000-0000-0000-000000000100"))
+
+  private def serviceWith(
+    repository: OrderFileRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): OrderFileService[IO] =
+    given GeneratedData[IO] = generatedData
+    OrderFileService[IO](repository)
 
   private val orderFileCreate = OrderFileCreate(
     file_url = OrderFileUrl("https://cdn.gotrip.example.com/orders/10/ticket.pdf"),
