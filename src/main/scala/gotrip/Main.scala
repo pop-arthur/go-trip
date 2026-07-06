@@ -6,6 +6,7 @@ import pureconfig.ConfigSource
 import pureconfig.error.ConfigReaderException
 import gotrip.config.{AuthConfig, DatabaseConfig, ServerConfig}
 import gotrip.database.{Migration, SkunkSessionPool}
+import gotrip.integration.duffel.{DuffelConfig, DuffelOrderStatusProvider}
 import gotrip.http.auth.{AuthController, AuthSupport}
 import gotrip.http.additionalservice.AdditionalServiceController
 import gotrip.http.location.LocationController
@@ -43,7 +44,7 @@ import gotrip.service.location.LocationService
 import gotrip.service.provider.ProviderService
 import gotrip.service.trip.TripService
 import gotrip.service.triplocation.TripLocationService
-import gotrip.service.order.OrderService
+import gotrip.service.order.{OrderService, OrderStatusSyncService}
 import gotrip.service.orderfile.OrderFileService
 import gotrip.service.user.UserService
 import gotrip.service.notification.NotificationService
@@ -77,6 +78,10 @@ object Main extends IOApp.Simple {
         ConfigSource.default.at("gotrip.auth").load[AuthConfig]
           .leftMap(e => ConfigReaderException[AuthConfig](e))
       )
+      duffelConfig <- IO.fromEither(
+        ConfigSource.default.at("gotrip.duffel").load[DuffelConfig]
+          .leftMap(e => ConfigReaderException[DuffelConfig](e))
+      )
 
       _ <- IO.println("Running Flyway migrations...")
       _ <- Migration.migrate[IO](databaseConfig)
@@ -109,8 +114,14 @@ object Main extends IOApp.Simple {
         val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
         val userService = new UserService[IO](userRepository)
         val notificationService = new NotificationService[IO](notificationRepository)
+        val orderStatusProvider = DuffelOrderStatusProvider.make[IO](duffelConfig)
         val notifPrefService = new NotificationPreferenceService[IO](notifPrefRepository)
         val orderService = new OrderService[IO](orderRepository, notifPrefRepository, notificationService)
+        val orderStatusSyncService = new OrderStatusSyncService[IO](
+          orderRepository,
+          orderService,
+          orderStatusProvider
+        )
         val orderFileService = new OrderFileService[IO](orderFileRepository)
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
@@ -139,7 +150,11 @@ object Main extends IOApp.Simple {
         val providerController = new ProviderController(providerService, authSupport)
         val additionalServiceController = new AdditionalServiceController(additionalServiceService, authSupport)
         val userController = new UserController(userService, authSupport)
-        val notificationController = new NotificationController(notificationService, authSupport)
+        val notificationController = new NotificationController(
+          notificationService,
+          authSupport,
+          orderStatusSyncService
+        )
         val notifPrefController = new NotificationPreferenceController(notifPrefService, authSupport)
         val achievementController = new AchievementController(achievementService, authSupport)
         val adminAchievementController = new AdminAchievementController(achievementService, authSupport)
