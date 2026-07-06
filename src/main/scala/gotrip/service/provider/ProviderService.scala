@@ -9,7 +9,7 @@ import gotrip.domain.provider.*
 import gotrip.repository.provider.ProviderRepository
 import gotrip.service.GeneratedData
 
-final class ProviderService[F[_]: Sync](repository: ProviderRepository[F]):
+final class ProviderService[F[_]: Sync: GeneratedData](repository: ProviderRepository[F]):
 
   import ProviderServiceError.*
 
@@ -62,7 +62,7 @@ final class ProviderService[F[_]: Sync](repository: ProviderRepository[F]):
     }
 
   private def materializeProvider(create: ProviderCreate): F[Provider] =
-    GeneratedData.newId[F].map { id =>
+    GeneratedData[F].newId().map { id =>
       Provider(
         id = ProviderId(id),
         name = create.name,

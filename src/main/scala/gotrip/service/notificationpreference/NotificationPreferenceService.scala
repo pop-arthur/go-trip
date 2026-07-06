@@ -8,7 +8,7 @@ import gotrip.domain.notificationpreference.{NotificationPreference, Notificatio
 import gotrip.repository.notificationpreference.NotificationPreferenceRepository
 import gotrip.service.GeneratedData
 
-final class NotificationPreferenceService[F[_]: Sync: Clock](
+final class NotificationPreferenceService[F[_]: Sync: Clock: GeneratedData](
   repo: NotificationPreferenceRepository[F]
 ):
 
@@ -24,12 +24,12 @@ final class NotificationPreferenceService[F[_]: Sync: Clock](
   def setStatus(userId: UserId, enabled: Boolean): F[NotificationPreference] =
     for
       existing <- repo.getByUserId(userId)
-      now <- GeneratedData.now[F]
+      now <- GeneratedData[F].now()
       preference <- existing match
         case Some(current) =>
           repo.upsert(current.copy(isEnabled = enabled, updatedAt = now))
         case None =>
-          GeneratedData.newId[F].flatMap { id =>
+          GeneratedData[F].newId().flatMap { id =>
             repo.upsert(
               NotificationPreference(
                 id = NotificationPreferenceId(id),

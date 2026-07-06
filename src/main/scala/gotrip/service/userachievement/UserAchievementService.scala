@@ -9,14 +9,14 @@ import gotrip.domain.userachievement.{UserAchievement, UserAchievementId}
 import gotrip.repository.userachievement.UserAchievementRepository
 import gotrip.service.GeneratedData
 
-final class UserAchievementService[F[_]: Sync: Clock](
+final class UserAchievementService[F[_]: Sync: Clock: GeneratedData](
   repo: UserAchievementRepository[F]
 ):
 
   def unlock(userId: UserId, achievementId: AchievementId): F[UserAchievement] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
       achievement <- repo.create(
         UserAchievement(
           id = UserAchievementId(id),
