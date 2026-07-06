@@ -11,6 +11,7 @@ import org.testcontainers.containers.PostgreSQLContainer
 import skunk.Session
 
 import java.sql.{Connection, DriverManager}
+import scala.annotation.tailrec
 
 trait PostgresRepositorySpecBase extends CatsEffectSuite:
 
@@ -72,15 +73,18 @@ trait PostgresRepositorySpecBase extends CatsEffectSuite:
           finally statement.close()
       }
     }  
-
+    
   private def applicationTables(connection: Connection): List[String] =
     val resultSet = connection.getMetaData.getTables(null, "public", "%", Array("TABLE"))
-    try
-      val tables = List.newBuilder[String]
-      while resultSet.next() do
+    @tailrec
+    def helper(acc: List[String], resultSet: java.sql.ResultSet): List[String] =
+      if resultSet.next() then
         val tableName = resultSet.getString("TABLE_NAME")
-        if tableName != "flyway_schema_history" then tables += tableName
-      tables.result()
+        if tableName == "flyway_schema_history" then helper(acc, resultSet)
+        else helper(tableName :: acc, resultSet)
+      else acc.reverse
+
+    try helper(Nil, resultSet)
     finally resultSet.close()
 
   private def connectionResource(postgres: PostgreSQLContainer[?]): Resource[IO, Connection] =
