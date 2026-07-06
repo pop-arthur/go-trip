@@ -1,13 +1,13 @@
 package gotrip.http.order
 
 import gotrip.domain.additionalservice.ServiceType
-import gotrip.domain.order.*
+import gotrip.domain.order._
 import gotrip.domain.trip.TripId
 import gotrip.http.{EndpointErrors, HttpError}
 import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
-import sttp.tapir.*
-import sttp.tapir.json.circe.*
+import sttp.tapir._
+import sttp.tapir.json.circe._
 
 import java.time.LocalDate
 
@@ -67,7 +67,7 @@ object OrderEndpoints:
       .errorOut(EndpointErrors.validationOrNotFound)
       .out(jsonBody[Order])
 
-  val adminSimulateStatusChange: Endpoint[String, (OrderId, OrderStatusUpdate), ErrorResponse, Order, Any] =
+  val adminUpdateOrderStatus: Endpoint[String, (OrderId, OrderStatusUpdate), ErrorResponse, Order, Any] =
     endpoint.post
       .securityIn(AuthEndpoints.bearer)
       .in("admin" / "orders" / path[OrderId]("orderId") / "simulate-status-change")

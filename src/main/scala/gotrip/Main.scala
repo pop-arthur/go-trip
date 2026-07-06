@@ -50,7 +50,7 @@ import gotrip.service.orderfile.OrderFileService
 import gotrip.service.user.UserService
 import gotrip.service.notification.NotificationService
 import gotrip.service.notificationpreference.NotificationPreferenceService
-import gotrip.service.achievement.AchievementService
+import gotrip.service.achievement.{AchievementService, AchievementEngine}
 import gotrip.service.userachievement.UserAchievementService
 import gotrip.service.review.ReviewService
 import gotrip.service.recommendation.RecommendationService
@@ -103,22 +103,32 @@ object Main extends IOApp.Simple {
         val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
         val statisticsRepository = StatisticsRepository.make[IO](sessionPool)
 
+        // ---- Achievement Engine ----
+        val achievementEngine = new AchievementEngine[IO](
+          achievementRepository,
+          userAchievementRepository,
+          tripRepository,
+          orderRepository,
+          reviewRepository,
+          tripLocationRepository
+        )
+
         // ---- Service Layer ----
         val jwtService = new JwtService[IO](authConfig)
         val passwordHasher = PasswordHasher.bcrypt[IO](authConfig.passwordCost)
         val locationService = LocationService[IO](locationRepository)
-        val tripService = TripService[IO](tripRepository)
+        val tripService = new TripService[IO](tripRepository, achievementEngine)
         val tripLocationService = TripLocationService[IO](tripLocationRepository)
         val providerService = ProviderService[IO](providerRepository)
         val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
         val userService = new UserService[IO](userRepository)
         val notificationService = new NotificationService[IO](notificationRepository)
         val notifPrefService = new NotificationPreferenceService[IO](notifPrefRepository)
-        val orderService = new OrderService[IO](orderRepository, notifPrefRepository, notificationService)
+        val orderService = new OrderService[IO](orderRepository, notifPrefRepository, notificationService, achievementEngine)
         val orderFileService = new OrderFileService[IO](orderFileRepository)
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
-        val reviewService = new ReviewService[IO](reviewRepository)
+        val reviewService = new ReviewService[IO](reviewRepository, achievementEngine)
         val recommendationService = new RecommendationService[IO](
           orderRepository,
           tripLocationRepository,
@@ -179,7 +189,7 @@ object Main extends IOApp.Simple {
         val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
         val httpApp = Router("/" -> routes).orNotFound
 
-        // ---- CORS middleware (разрешить все источники для разработки) ----
+        // ---- CORS middleware ----
         val corsApp = CORS.policy
           .withAllowOriginAll
           .apply(httpApp)
