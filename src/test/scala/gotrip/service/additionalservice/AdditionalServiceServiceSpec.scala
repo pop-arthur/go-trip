@@ -6,13 +6,14 @@ import gotrip.domain.additionalservice.*
 import gotrip.domain.location.*
 import gotrip.domain.provider.*
 import gotrip.repository.additionalservice.AdditionalServiceRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
 
-final class AdditionalServiceServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class AdditionalServiceServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "AdditionalServiceService" should {
     "delegate search to repository and return services" in {
@@ -35,21 +36,13 @@ final class AdditionalServiceServiceSpec extends AnyWordSpec with Matchers with 
 
     "create a service with default active flag" in {
       val repository = mock[AdditionalServiceRepository[IO]]
-      val service = AdditionalServiceService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.providerExists.expects(providerId).returning(IO.pure(true))
       repository.locationExists.expects(locationId).returning(IO.pure(true))
-      repository.create.expects(where { (created: AdditionalService) =>
-        created.id.value != new UUID(0L, 0L) &&
-        created.title == additionalServiceCreate.title &&
-        created.description == additionalServiceCreate.description &&
-        created.service_type == additionalServiceCreate.service_type &&
-        created.provider_id.contains(providerId) &&
-        created.location_id.contains(locationId) &&
-        created.price_amount == additionalServiceCreate.price_amount &&
-        created.price_currency == additionalServiceCreate.price_currency &&
-        created.is_active
-      }).returning(IO.pure(additionalService))
+      expectGeneratedId(generatedData, serviceId.value)
+      repository.create.expects(additionalService).returning(IO.pure(additionalService))
 
       service.create(additionalServiceCreate).unsafeRunSync() shouldBe Right(additionalService)
     }
@@ -130,6 +123,13 @@ final class AdditionalServiceServiceSpec extends AnyWordSpec with Matchers with 
 
   private def uuid(suffix: String): UUID =
     UUID.fromString(s"00000000-0000-0000-0000-$suffix")
+
+  private def serviceWith(
+    repository: AdditionalServiceRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): AdditionalServiceService[IO] =
+    given GeneratedData[IO] = generatedData
+    AdditionalServiceService[IO](repository)
 
   private val serviceId = ServiceId(uuid("000000000001"))
   private val providerId = ProviderId(uuid("000000000002"))

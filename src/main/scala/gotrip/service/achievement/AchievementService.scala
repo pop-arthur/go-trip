@@ -7,7 +7,7 @@ import gotrip.domain.achievement.{Achievement, AchievementId, AchievementCode}
 import gotrip.repository.achievement.AchievementRepository
 import gotrip.service.GeneratedData
 
-final class AchievementService[F[_]: Sync: Clock](
+final class AchievementService[F[_]: Sync: Clock: GeneratedData](
   repo: AchievementRepository[F]
 ):
 
@@ -17,12 +17,12 @@ final class AchievementService[F[_]: Sync: Clock](
 
   def create(achievement: Achievement): F[Achievement] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
       created <- repo.create(achievement.copy(id = AchievementId(id), createdAt = now, updatedAt = now))
     yield created
 
   def update(achievement: Achievement): F[Int] =
-    GeneratedData.now[F].flatMap(now => repo.update(achievement.copy(updatedAt = now)))
+    GeneratedData[F].now().flatMap(now => repo.update(achievement.copy(updatedAt = now)))
 
   def delete(id: AchievementId): F[Int] = repo.delete(id)

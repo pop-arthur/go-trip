@@ -6,7 +6,7 @@ import gotrip.domain.location.*
 import gotrip.repository.location.LocationRepository
 import gotrip.service.GeneratedData
 
-final class LocationService[F[_]: Sync](repository: LocationRepository[F]):
+final class LocationService[F[_]: Sync: GeneratedData](repository: LocationRepository[F]):
 
   def search(params: LocationSearchParams): F[List[Location]] =
     repository.search(params)
@@ -15,7 +15,7 @@ final class LocationService[F[_]: Sync](repository: LocationRepository[F]):
     repository.findById(id)
 
   def create(location: LocationCreate): F[Location] =
-    GeneratedData.newId[F].flatMap { id =>
+    GeneratedData[F].newId().flatMap { id =>
       repository.create(
         Location(
           id = LocationId(id),

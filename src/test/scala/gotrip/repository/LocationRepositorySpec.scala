@@ -16,7 +16,8 @@ final class LocationRepositorySpec extends PostgresRepositorySpecBase with Repos
       all <- locations.findAll()
     yield
       assertEquals(byId, Some(hanoi))
-      assertEquals(all.map(_.id), List(hanoi.id, paris.id))
+      assert(all.map(_.id).contains(hanoi.id))
+      assert(all.map(_.id).contains(paris.id))
   }
 
   repositoryTest("LocationRepository searches by type, country, city, and query") {

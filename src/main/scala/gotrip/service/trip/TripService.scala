@@ -10,7 +10,7 @@ import gotrip.domain.user.UserId
 import gotrip.repository.trip.TripRepository
 import gotrip.service.GeneratedData
 
-final class TripService[F[_]: Sync: Clock](repository: TripRepository[F]):
+final class TripService[F[_]: Sync: Clock: GeneratedData](repository: TripRepository[F]):
 
   import TripServiceError.*
 
@@ -66,8 +66,8 @@ final class TripService[F[_]: Sync: Clock](repository: TripRepository[F]):
 
   private def materializeTrip(userId: UserId, create: TripCreate): F[Trip] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
     yield Trip(
       id = TripId(id),
       user_id = userId,
@@ -80,7 +80,7 @@ final class TripService[F[_]: Sync: Clock](repository: TripRepository[F]):
     )
 
   private def materializeTripUpdate(current: Trip, update: TripUpdate): F[Trip] =
-    GeneratedData.now[F].map { now =>
+    GeneratedData[F].now().map { now =>
       current.copy(
         title = update.title.getOrElse(current.title),
         start_date = update.start_date.getOrElse(current.start_date),

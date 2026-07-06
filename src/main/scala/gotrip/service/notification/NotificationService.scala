@@ -7,7 +7,7 @@ import gotrip.domain.notification._
 import gotrip.repository.notification.NotificationRepository
 import gotrip.service.GeneratedData
 
-final class NotificationService[F[_]: Sync: Clock](
+final class NotificationService[F[_]: Sync: Clock: GeneratedData](
   repo: NotificationRepository[F]
 ):
 
@@ -19,8 +19,8 @@ final class NotificationService[F[_]: Sync: Clock](
     orderId: NotificationOrderId = NotificationOrderId(None)
   ): F[UserNotification] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
       notification = UserNotification(
         id = NotificationId(id),
         userId = userId,
@@ -42,9 +42,9 @@ final class NotificationService[F[_]: Sync: Clock](
     repo.findByUserId(userId, limit, offset)
 
   def markAsRead(id: NotificationId): F[Int] =
-    GeneratedData.now[F].flatMap(now => repo.markAsRead(id, now))
+    GeneratedData[F].now().flatMap(now => repo.markAsRead(id, now))
 
   def markAllAsRead(userId: NotificationUserId): F[Int] =
-    GeneratedData.now[F].flatMap(now => repo.markAllAsRead(userId, now))
+    GeneratedData[F].now().flatMap(now => repo.markAllAsRead(userId, now))
   def delete(id: NotificationId): F[Int] = repo.delete(id)
   def deleteAllForUser(userId: NotificationUserId): F[Int] = repo.deleteAllForUser(userId)

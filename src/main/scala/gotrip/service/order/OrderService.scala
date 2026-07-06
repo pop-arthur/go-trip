@@ -19,7 +19,7 @@ import io.circe.Json
 
 import java.time.OffsetDateTime
 
-final class OrderService[F[_]: Sync: Clock](
+final class OrderService[F[_]: Sync: Clock: GeneratedData](
   repository: OrderRepository[F],
   notificationPreferenceRepository: NotificationPreferenceRepository[F],
   notificationService: NotificationService[F]
@@ -161,8 +161,8 @@ final class OrderService[F[_]: Sync: Clock](
 
   private def materializeOrder(userId: UserId, tripId: TripId, create: OrderCreate): F[Order] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
     yield Order(
       id = OrderId(id),
       user_id = userId,
@@ -183,7 +183,7 @@ final class OrderService[F[_]: Sync: Clock](
     )
 
   private def materializeOrderUpdate(current: Order, update: OrderUpdate): F[Order] =
-    GeneratedData.now[F].map { now =>
+    GeneratedData[F].now().map { now =>
       current.copy(
         provider_id = update.provider_id.orElse(current.provider_id),
         service_type = update.service_type.getOrElse(current.service_type),
@@ -201,7 +201,7 @@ final class OrderService[F[_]: Sync: Clock](
     }
 
   private def materializeStatusUpdate(current: Order, update: OrderStatusUpdate): F[Order] =
-    GeneratedData.now[F].map { now =>
+    GeneratedData[F].now().map { now =>
       current.copy(
         status = update.status,
         start_datetime = update.new_start_datetime.orElse(current.start_datetime),
@@ -215,8 +215,8 @@ final class OrderService[F[_]: Sync: Clock](
     source: OrderStatusEventSource
   ): F[OrderStatusEvent] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
     yield OrderStatusEvent(
         id = OrderStatusEventId(id),
         order_id = current.id,

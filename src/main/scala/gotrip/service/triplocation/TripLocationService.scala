@@ -11,7 +11,7 @@ import gotrip.domain.user.UserId
 import gotrip.repository.triplocation.TripLocationRepository
 import gotrip.service.GeneratedData
 
-final class TripLocationService[F[_]: Sync](repository: TripLocationRepository[F]):
+final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocationRepository[F]):
 
   import TripLocationServiceError.*
 
@@ -100,7 +100,7 @@ final class TripLocationService[F[_]: Sync](repository: TripLocationRepository[F
     create: TripLocationCreate,
     visitOrder: VisitOrder
   ): F[TripLocation] =
-    GeneratedData.newId[F].map { id =>
+    GeneratedData[F].newId().map { id =>
       TripLocation(
         id = TripLocationId(id),
         trip_id = tripId,

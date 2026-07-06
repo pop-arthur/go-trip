@@ -10,6 +10,7 @@ import gotrip.http.HttpError
 import gotrip.http.auth.{AuthenticatedUser, LoginRequest, RefreshRequest, RegisterRequest}
 import gotrip.repository.auth.AuthSessionRepository
 import gotrip.repository.user.UserRepository
+import gotrip.service.GeneratedData
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -164,7 +165,7 @@ final class AuthServiceSpec extends AnyWordSpec with Matchers:
 
   private val password = "strongPassword123"
   private val userId = UserId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
-  private val now = Instant.parse("2026-06-01T10:00:00Z")
+  private val now = Instant.parse("2026-07-06T10:00:00Z")
 
   private val authConfig = AuthConfig(
     issuer = "gotrip",
@@ -195,6 +196,7 @@ final class AuthServiceSpec extends AnyWordSpec with Matchers:
     users: RecordingUserRepository,
     sessions: RecordingAuthSessionRepository
   ): AuthService[IO] =
+    given GeneratedData[IO] = StaticGeneratedData
     AuthService[IO](
       users,
       sessions,
@@ -216,6 +218,13 @@ final class AuthServiceSpec extends AnyWordSpec with Matchers:
       createdAt = Instant.now(),
       updatedAt = Instant.now()
     )
+
+private object StaticGeneratedData extends GeneratedData[IO]:
+  override def newId(): IO[UUID] =
+    IO.pure(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+
+  override def now(): IO[Instant] =
+    IO.pure(Instant.parse("2026-07-06T10:00:00Z"))
 
 private object StaticPasswordHasher extends PasswordHasher[IO]:
   override def hash(password: String): IO[String] =

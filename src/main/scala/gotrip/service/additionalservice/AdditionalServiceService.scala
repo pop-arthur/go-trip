@@ -10,7 +10,7 @@ import gotrip.domain.provider.*
 import gotrip.repository.additionalservice.AdditionalServiceRepository
 import gotrip.service.GeneratedData
 
-final class AdditionalServiceService[F[_]: Sync](repository: AdditionalServiceRepository[F]):
+final class AdditionalServiceService[F[_]: Sync: GeneratedData](repository: AdditionalServiceRepository[F]):
 
   import AdditionalServiceServiceError.*
 
@@ -69,7 +69,7 @@ final class AdditionalServiceService[F[_]: Sync](repository: AdditionalServiceRe
     }
 
   private def materializeService(create: AdditionalServiceCreate): F[AdditionalService] =
-    GeneratedData.newId[F].map { id =>
+    GeneratedData[F].newId().map { id =>
       AdditionalService(
         id = ServiceId(id),
         title = create.title,

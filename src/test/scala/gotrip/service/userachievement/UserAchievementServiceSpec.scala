@@ -6,6 +6,7 @@ import gotrip.domain.achievement.AchievementId
 import gotrip.domain.user.UserId
 import gotrip.domain.userachievement.{UserAchievement, UserAchievementId}
 import gotrip.repository.userachievement.UserAchievementRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -13,16 +14,17 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import java.util.UUID
 
-final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with MockFactory {
+final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport {
 
   "UserAchievementService" should {
     "unlock an achievement (create)" in {
       val repo = mock[UserAchievementRepository[IO]]
-      val service = new UserAchievementService[IO](repo)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repo, generatedData)
 
-      (repo.create _).expects(where { (ua: UserAchievement) =>
-        ua.userId == userId && ua.achievementId == achievementId
-      }).returning(IO.pure(userAchievement))
+      expectGeneratedId(generatedData, userAchievementUuid)
+      expectGeneratedNow(generatedData, generatedAt)
+      repo.create.expects(userAchievement).returning(IO.pure(userAchievement))
 
       service.unlock(userId, achievementId).unsafeRunSync() shouldBe userAchievement
     }
@@ -31,7 +33,7 @@ final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with Mo
       val repo = mock[UserAchievementRepository[IO]]
       val service = new UserAchievementService[IO](repo)
 
-      (repo.findByUserId _).expects(userId).returning(IO.pure(List(userAchievement)))
+      repo.findByUserId.expects(userId).returning(IO.pure(List(userAchievement)))
 
       service.listByUser(userId).unsafeRunSync() shouldBe List(userAchievement)
     }
@@ -40,7 +42,7 @@ final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with Mo
       val repo = mock[UserAchievementRepository[IO]]
       val service = new UserAchievementService[IO](repo)
 
-      (repo.findByAchievementId _).expects(achievementId).returning(IO.pure(List(userAchievement)))
+      repo.findByAchievementId.expects(achievementId).returning(IO.pure(List(userAchievement)))
 
       service.listByAchievement(achievementId).unsafeRunSync() shouldBe List(userAchievement)
     }
@@ -49,9 +51,7 @@ final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with Mo
       val repo = mock[UserAchievementRepository[IO]]
       val service = new UserAchievementService[IO](repo)
 
-      (repo.delete _).expects(where { (uid: UserId, aid: AchievementId) =>
-        uid == userId && aid == achievementId
-      }).returning(IO.pure(1))
+      repo.delete.expects(userId, achievementId).returning(IO.pure(1))
 
       service.revoke(userId, achievementId).unsafeRunSync() shouldBe 1
     }
@@ -60,9 +60,7 @@ final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with Mo
       val repo = mock[UserAchievementRepository[IO]]
       val service = new UserAchievementService[IO](repo)
 
-      (repo.delete _).expects(where { (uid: UserId, aid: AchievementId) =>
-        uid == userId && aid == achievementId
-      }).returning(IO.pure(0))
+      repo.delete.expects(userId, achievementId).returning(IO.pure(0))
 
       service.revoke(userId, achievementId).unsafeRunSync() shouldBe 0
     }
@@ -71,14 +69,24 @@ final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with Mo
   private def uuid(suffix: String): UUID =
     UUID.fromString(s"00000000-0000-0000-0000-$suffix")
 
+  private def serviceWith(
+    repository: UserAchievementRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): UserAchievementService[IO] =
+    given GeneratedData[IO] = generatedData
+    new UserAchievementService[IO](repository)
+
   private val userId = UserId(uuid("000000000001"))
   private val achievementId = AchievementId(uuid("000000000010"))
+  private val userAchievementUuid = uuid("000000000100")
+  private val userAchievementId = UserAchievementId(userAchievementUuid)
+  private val generatedAt = Instant.parse("2026-06-01T10:00:00Z")
   private val userAchievement = UserAchievement(
-    id = UserAchievementId(uuid("000000000100")),
+    id = userAchievementId,
     userId = userId,
     achievementId = achievementId,
-    unlockedAt = Instant.now(),
-    createdAt = Instant.now(),
-    updatedAt = Instant.now()
+    unlockedAt = generatedAt,
+    createdAt = generatedAt,
+    updatedAt = generatedAt
   )
 }
