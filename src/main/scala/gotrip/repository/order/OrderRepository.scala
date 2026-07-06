@@ -10,6 +10,7 @@ import skunk.Session
 
 trait OrderRepository[F[_]]:
   def listByTrip(userId: UserId, tripId: TripId, params: OrderSearchParams): F[List[Order]]
+  def listExternalByUser(userId: UserId): F[List[Order]]
   def findById(orderId: OrderId): F[Option[Order]]
   def findByUser(userId: UserId, orderId: OrderId): F[Option[Order]]
   def create(order: Order): F[Order]
