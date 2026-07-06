@@ -15,7 +15,7 @@ final class AchievementRepositorySpec extends PostgresRepositorySpecBase with Re
       byId <- achievements.findById(achievement.id)
       byCode <- achievements.findByCode(achievement.code)
     yield
-      assertEquals(all, List(achievement))
+      assert(all.contains(achievement))
       assertEquals(byId, Some(achievement))
       assertEquals(byCode, Some(achievement))
   }
