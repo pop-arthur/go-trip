@@ -4,13 +4,14 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import gotrip.domain.location.*
 import gotrip.repository.location.LocationRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.UUID
 
-final class LocationServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class LocationServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "LocationService" should {
     "delegate search to repository and return locations" in {
@@ -48,19 +49,22 @@ final class LocationServiceSpec extends AnyWordSpec with Matchers with MockFacto
 
     "delegate create to repository and return created location" in {
       val repository = mock[LocationRepository[IO]]
-      val service = LocationService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
+      val materialized = Location(
+        id = createdLocation.id,
+        name = locationCreate.name,
+        `type` = locationCreate.`type`,
+        country = locationCreate.country,
+        city = locationCreate.city,
+        address = locationCreate.address,
+        latitude = locationCreate.latitude,
+        longitude = locationCreate.longitude
+      )
 
+      expectGeneratedId(generatedData, createdLocation.id.value)
       repository.create
-        .expects(where { (materialized: Location) =>
-          materialized.id.value != new UUID(0L, 0L) &&
-          materialized.name == locationCreate.name &&
-          materialized.`type` == locationCreate.`type` &&
-          materialized.country == locationCreate.country &&
-          materialized.city == locationCreate.city &&
-          materialized.address == locationCreate.address &&
-          materialized.latitude == locationCreate.latitude &&
-          materialized.longitude == locationCreate.longitude
-        })
+        .expects(materialized)
         .returning(IO.pure(createdLocation))
 
       service.create(locationCreate).unsafeRunSync() shouldBe createdLocation
@@ -112,6 +116,13 @@ final class LocationServiceSpec extends AnyWordSpec with Matchers with MockFacto
   }
 
   private val locationId: LocationId = LocationId(UUID.fromString("00000000-0000-0000-0000-000000000001"))
+
+  private def serviceWith(
+    repository: LocationRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): LocationService[IO] =
+    given GeneratedData[IO] = generatedData
+    LocationService[IO](repository)
 
   private val location: Location = Location(
     id = locationId,

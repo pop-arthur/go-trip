@@ -10,7 +10,7 @@ import gotrip.domain.user.UserId
 import gotrip.repository.orderfile.OrderFileRepository
 import gotrip.service.GeneratedData
 
-final class OrderFileService[F[_]: Sync: Clock](repository: OrderFileRepository[F]):
+final class OrderFileService[F[_]: Sync: Clock: GeneratedData](repository: OrderFileRepository[F]):
 
   import OrderFileServiceError.*
 
@@ -59,8 +59,8 @@ final class OrderFileService[F[_]: Sync: Clock](repository: OrderFileRepository[
 
   private def materializeFile(orderId: OrderId, create: OrderFileCreate): F[OrderFile] =
     for
-      id <- GeneratedData.newId[F]
-      now <- GeneratedData.now[F]
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
     yield OrderFile(
       id = OrderFileId(id),
       order_id = orderId,

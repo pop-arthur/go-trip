@@ -5,6 +5,7 @@ import cats.effect.unsafe.implicits.global
 import gotrip.domain.review._
 import gotrip.domain.user.UserId
 import gotrip.repository.review.ReviewRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -12,20 +13,17 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.Instant
 import java.util.UUID
 
-final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory {
+final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport {
 
   "ReviewService" should {
     "create a review" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repo, generatedData)
 
-      (repo.create _).expects(where { (r: Review) =>
-        r.userId == userId &&
-        r.targetType == targetType &&
-        r.targetId == targetId &&
-        r.rating == rating &&
-        r.text == text
-      }).returning(IO.pure(review))
+      expectGeneratedId(generatedData, reviewId.value)
+      expectGeneratedNow(generatedData, generatedAt)
+      repo.create.expects(review).returning(IO.pure(review))
 
       service.create(review).unsafeRunSync() shouldBe review
     }
@@ -34,7 +32,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
       val repo = mock[ReviewRepository[IO]]
       val service = new ReviewService[IO](repo)
 
-      (repo.findById _).expects(reviewId).returning(IO.pure(Some(review)))
+      repo.findById.expects(reviewId).returning(IO.pure(Some(review)))
 
       service.findById(reviewId).unsafeRunSync() shouldBe Some(review)
     }
@@ -43,7 +41,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
       val repo = mock[ReviewRepository[IO]]
       val service = new ReviewService[IO](repo)
 
-      (repo.findByTarget _).expects(targetType, targetId).returning(IO.pure(List(review)))
+      repo.findByTarget.expects(targetType, targetId).returning(IO.pure(List(review)))
 
       service.findByTarget(targetType, targetId).unsafeRunSync() shouldBe List(review)
     }
@@ -52,24 +50,19 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
       val repo = mock[ReviewRepository[IO]]
       val service = new ReviewService[IO](repo)
 
-      (repo.findByUserId _).expects(userId).returning(IO.pure(List(review)))
+      repo.findByUserId.expects(userId).returning(IO.pure(List(review)))
 
       service.findByUser(userId).unsafeRunSync() shouldBe List(review)
     }
 
     "update a review" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repo, generatedData)
 
       val updated = review.copy(rating = ReviewRating(4))
-      (repo.update _).expects(where { (u: Review) =>
-        u.id == reviewId &&
-        u.userId == userId &&
-        u.targetType == targetType &&
-        u.targetId == targetId &&
-        u.rating == ReviewRating(4) &&
-        u.text == text
-      }).returning(IO.pure(1))
+      expectGeneratedNow(generatedData, updatedAt)
+      repo.update.expects(updated.copy(updatedAt = updatedAt)).returning(IO.pure(1))
 
       service.update(updated).unsafeRunSync() shouldBe 1
     }
@@ -78,7 +71,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
       val repo = mock[ReviewRepository[IO]]
       val service = new ReviewService[IO](repo)
 
-      (repo.delete _).expects(reviewId).returning(IO.pure(1))
+      repo.delete.expects(reviewId).returning(IO.pure(1))
 
       service.delete(reviewId).unsafeRunSync() shouldBe 1
     }
@@ -87,7 +80,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
       val repo = mock[ReviewRepository[IO]]
       val service = new ReviewService[IO](repo)
 
-      (repo.averageRating _).expects(targetType, targetId).returning(IO.pure(Some(4.5)))
+      repo.averageRating.expects(targetType, targetId).returning(IO.pure(Some(4.5)))
 
       service.averageRating(targetType, targetId).unsafeRunSync() shouldBe Some(4.5)
     }
@@ -96,7 +89,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
       val repo = mock[ReviewRepository[IO]]
       val service = new ReviewService[IO](repo)
 
-      (repo.averageRating _).expects(targetType, targetId).returning(IO.pure(None))
+      repo.averageRating.expects(targetType, targetId).returning(IO.pure(None))
 
       service.averageRating(targetType, targetId).unsafeRunSync() shouldBe None
     }
@@ -105,8 +98,17 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
   private def uuid(suffix: String): UUID =
     UUID.fromString(s"00000000-0000-0000-0000-$suffix")
 
+  private def serviceWith(
+    repository: ReviewRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): ReviewService[IO] =
+    given GeneratedData[IO] = generatedData
+    new ReviewService[IO](repository)
+
   private val userId = UserId(uuid("000000000001"))
   private val reviewId = ReviewId(uuid("000000000100"))
+  private val generatedAt = Instant.parse("2026-06-01T10:00:00Z")
+  private val updatedAt = Instant.parse("2026-06-01T10:05:00Z")
   private val targetType = ReviewTargetType.Provider
   private val targetId = ReviewTargetId(uuid("000000000042"))
   private val rating = ReviewRating(5)
@@ -118,7 +120,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
     targetId = targetId,
     rating = rating,
     text = text,
-    createdAt = Instant.now(),
-    updatedAt = Instant.now()
+    createdAt = generatedAt,
+    updatedAt = generatedAt
   )
 }

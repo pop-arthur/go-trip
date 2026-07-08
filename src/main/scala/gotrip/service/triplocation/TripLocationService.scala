@@ -9,7 +9,7 @@ import gotrip.domain.trip._
 import gotrip.domain.user.UserId
 import gotrip.repository.triplocation.TripLocationRepository
 
-final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[F]):
+final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocationRepository[F]):
 
   import TripLocationServiceError._
 
@@ -90,6 +90,22 @@ final class TripLocationService[F[_]: Monad](repository: TripLocationRepository[
       repository.visitOrderExists(tripId, visitOrder, excludeTripLocationId).map { exists =>
         Either.cond(!exists, (), DuplicateVisitOrder(visitOrder))
       }
+    }
+
+  private def materializeTripLocation(
+    tripId: TripId,
+    create: TripLocationCreate,
+    visitOrder: VisitOrder
+  ): F[TripLocation] =
+    GeneratedData[F].newId().map { id =>
+      TripLocation(
+        id = TripLocationId(id),
+        trip_id = tripId,
+        location_id = create.location_id,
+        visit_order = visitOrder,
+        arrival_date = create.arrival_date,
+        departure_date = create.departure_date
+      )
     }
 
   private def validateDateRange(

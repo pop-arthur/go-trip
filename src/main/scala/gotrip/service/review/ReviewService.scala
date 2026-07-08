@@ -7,15 +7,16 @@ import gotrip.domain.user.UserId
 import gotrip.repository.review.ReviewRepository
 import gotrip.service.achievement.{AchievementEngine, AchievementEvent}
 
-final class ReviewService[F[_]: Monad](
-  repo: ReviewRepository[F],
-  achievementEngine: AchievementEngine[F]
+final class ReviewService[F[_]: Sync: Clock: GeneratedData](
+  repo: ReviewRepository[F]
 ):
 
   def create(review: Review): F[Review] =
-    repo.create(review).flatMap { created =>
-      achievementEngine.checkAndUnlock(created.userId, AchievementEvent.ReviewCreated(created)).map(_ => created)
-    }
+    for
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
+      created <- repo.create(review.copy(id = ReviewId(id), createdAt = now, updatedAt = now))
+    yield created
 
   def findById(id: ReviewId): F[Option[Review]] = repo.findById(id)
 
@@ -25,8 +26,8 @@ final class ReviewService[F[_]: Monad](
   def findByUser(userId: UserId): F[List[Review]] =
     repo.findByUserId(userId)
 
-  def update(review: Review): F[Int] = repo.update(review)
-
+  def update(review: Review): F[Int] =
+    GeneratedData[F].now().flatMap(now => repo.update(review.copy(updatedAt = now)))
   def delete(id: ReviewId): F[Int] = repo.delete(id)
 
   def averageRating(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[Double]] =

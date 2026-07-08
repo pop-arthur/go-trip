@@ -1,47 +1,66 @@
-# GoTrip Backend
+# GoTrip
 
-Backend-сервис GoTrip для управления поездками, локациями, пользователями, провайдерами, дополнительными услугами, достижениями, уведомлениями и отзывами.
+GoTrip - backend-сервис для travel assistant MVP с REST API, PostgreSQL-хранилищем и простым статическим web-интерфейсом. Проект покрывает базовый пользовательский сценарий планирования поездки: регистрация, авторизация, маршруты, заказы, файлы заказов, провайдеры, дополнительные услуги, рекомендации, отзывы, уведомления и достижения.
 
-## Стек технологий
+## Возможности
 
-- **Scala 3.8.4**
-- **sbt 1.12.11**
-- **Cats Effect 3.7.0**
-- **http4s 0.23.17** + **Tapir 1.13.21**
-- **Circe 0.14.15**
-- **Skunk 1.0.0** для работы с PostgreSQL
-- **Flyway 12.8.1** для миграций
-- **PostgreSQL 17** через Docker Compose
-- **PureConfig 0.17.10**
-- **ScalaTest 3.2.20** + **ScalaMock 7.5.5**
-- **Logback** / **log4cats**
+- Регистрация, вход, refresh/logout и JWT-аутентификация.
+- Роли пользователей `USER` и `ADMIN`.
+- Управление профилем текущего пользователя.
+- CRUD для поездок и точек маршрута.
+- Работа с заказами внутри поездки, статусами заказов и файлами заказов.
+- Каталоги локаций, провайдеров и дополнительных услуг.
+- Пользовательские уведомления и настройки уведомлений.
+- Отзывы, агрегированная оценка и достижения.
+- Рекомендации дополнительных услуг по поездке или заказу.
+- Admin endpoints для управления провайдерами, услугами, достижениями и симуляции смены статуса заказа.
+- Swagger UI, собранный из Tapir endpoints.
+- Seed-данные для локальной разработки и демонстрации.
+
+## Технологии
+
+- Scala `3.8.4`
+- sbt `1.12.11`
+- Cats Effect `3.7.0`
+- http4s `0.23.17`
+- Tapir `1.13.21`
+- Circe `0.14.15`
+- Skunk `1.0.0`
+- Flyway `12.8.1`
+- PostgreSQL `17`
+- PureConfig `0.17.10`
+- ScalaTest, ScalaMock, munit-cats-effect, Testcontainers
+- Logback и log4cats
+- Docker, Docker Compose
 
 ## Структура проекта
 
 ```text
 go-trip/
-├── build.sbt
-├── docker-compose.yml               # PostgreSQL + приложение
+├── build.sbt                         # зависимости, настройки sbt и Docker packaging
+├── Dockerfile                        # multi-stage образ backend-приложения
+├── docker-compose.yml                # backend, PostgreSQL и nginx для frontend
+├── .env.example                      # пример локальных переменных окружения
+├── frontend/                         # статический HTML/CSS/JS интерфейс
 ├── docs/
-│   ├── api/                         # OpenAPI-спецификация
-│   ├── database/                    # ER-диаграмма и описание БД
-│   └── requirements/                # требования и user stories
+│   ├── api/docs.yaml                 # статическая OpenAPI 3.1 спецификация
+│   ├── database/                     # ER-диаграмма и описание схемы БД
+│   └── requirements/                 # PDF со спецификацией и user stories
 └── src/
     ├── main/
     │   ├── resources/
-    │   │   ├── application.conf     # настройки сервера и БД
+    │   │   ├── application.conf      # конфигурация сервера, БД и auth
     │   │   ├── logback.xml
-    │   │   └── db/migration/        # SQL-миграции Flyway
+    │   │   └── db/migration/         # Flyway SQL-миграции и seed-данные
     │   └── scala/gotrip/
-    │       ├── Main.scala           # точка входа, миграции, HTTP-сервер
-    │       ├── config/              # загрузка конфигурации
-    │       ├── database/            # Flyway + Skunk session pool
-    │       ├── domain/              # доменные модели
-    │       ├── http/                # Tapir endpoints, controllers, codecs
-    │       ├── repository/          # PostgreSQL и in-memory репозитории
-    │       └── service/             # бизнес-логика
-    └── test/
-        └── scala/gotrip/            # ScalaTest specs
+    │       ├── Main.scala            # wiring приложения и запуск HTTP server
+    │       ├── config/               # PureConfig-модели
+    │       ├── database/             # Flyway и Skunk session pool
+    │       ├── domain/               # доменные модели
+    │       ├── http/                 # Tapir endpoints, controllers, codecs
+    │       ├── repository/           # PostgreSQL и in-memory репозитории
+    │       └── service/              # бизнес-логика
+    └── test/scala/gotrip/            # service и repository specs
 ```
 
 ## Требования
@@ -50,129 +69,231 @@ go-trip/
 - sbt
 - Docker и Docker Compose
 
-## Быстрый старт через Docker
+Docker нужен не только для запуска через Compose, но и для интеграционных тестов репозиториев: они поднимают PostgreSQL через Testcontainers.
 
-1. Создать локальный `.env`:
+## Быстрый старт
 
-   ```bash
-   cp .env.example .env
-   ```
+Создайте локальный файл окружения:
 
-2. Собрать Docker-образ приложения:
+```bash
+cp .env.example .env
+```
 
-   ```bash
-   sbt native
-   ```
+Минимально нужен `GOTRIP_DB_PASSWORD`. В `.env.example` также есть admin-настройки:
 
-   Проверить:
+```env
+GOTRIP_DB_PASSWORD=replace-me
+GOTRIP_ADMIN_EMAIL=admin@example.com
+GOTRIP_ADMIN_PASSWORD=replace-me-admin-password
+GOTRIP_ADMIN_FULL_NAME=GoTrip Admin
+```
 
-   ```bash
-   docker images | grep gotrip-backend
-   ```
+Соберите локальный Docker-образ backend-приложения:
 
-3. Поднять приложение и PostgreSQL:
+```bash
+sbt native
+```
 
-   ```bash
-   docker compose up
-   ```
+Команда `native` - alias для `Docker / publishLocal`. Она публикует локальный образ `gotrip-backend:0.1.0-SNAPSHOT`, который использует `docker-compose.yml`.
 
-4. Проверить API:
+Запустите backend, PostgreSQL и frontend:
 
-   ```text
-   http://localhost:8080/docs
-   ```
+```bash
+docker compose up
+```
 
-5. Остановить контейнеры:
+После запуска доступны:
 
-   ```bash
-   docker compose down
-   ```
+```text
+http://localhost:8080/docs   # Swagger UI
+http://localhost:8081        # web-интерфейс
+```
 
-   Чтобы также удалить volume с данными PostgreSQL:
+Остановить контейнеры:
 
-   ```bash
-   docker compose down -v
-   ```
+```bash
+docker compose down
+```
 
-При старте приложение загружает конфигурацию, выполняет Flyway-миграции, создает Skunk-пул соединений и поднимает HTTP-сервер.
+Остановить контейнеры и удалить volume PostgreSQL:
+
+```bash
+docker compose down -v
+```
+
+При старте backend загружает конфигурацию, выполняет Flyway-миграции, создает Skunk session pool, собирает Tapir routes и запускает http4s server.
+
+## Demo-данные
+
+Миграция `V4__seed_default_data.sql` создает тестовых пользователей:
+
+```text
+demo.user1@example.com / Password123
+demo.user2@example.com / Password123
+demo.user3@example.com / Password123
+demo.user4@example.com / Password123
+demo.user5@example.com / Password123
+```
+
+Если в `.env` заданы `GOTRIP_ADMIN_EMAIL` и `GOTRIP_ADMIN_PASSWORD`, миграция `V3__seed_admin_user.sql` создает или обновляет администратора с ролями `USER` и `ADMIN`.
+
+## Локальный запуск backend
+
+Можно запустить только PostgreSQL из Compose:
+
+```bash
+docker compose up -d postgres
+```
+
+Затем запустить приложение из sbt:
+
+```bash
+export GOTRIP_DB_PASSWORD=replace-me
+sbt run
+```
+
+По умолчанию backend слушает `0.0.0.0:8080` и подключается к базе `gotrip` на `localhost:5432` пользователем `gotrip_user`.
 
 ## Конфигурация
 
-Основные настройки находятся в `src/main/resources/application.conf`.
+Базовые значения находятся в `src/main/resources/application.conf`. Их можно переопределять переменными окружения:
 
-Файл содержит локальные значения по умолчанию и поддерживает переопределение через переменные окружения. Пароли и секреты дефолтных значений не имеют.
+| Variable | Description | Default |
+|---|---|---|
+| `GOTRIP_SERVER_HOST` | host HTTP-сервера | `0.0.0.0` |
+| `GOTRIP_SERVER_PORT` | port HTTP-сервера | `8080` |
+| `GOTRIP_DB_URL` | JDBC URL для Flyway | `jdbc:postgresql://localhost:5432/gotrip` |
+| `GOTRIP_DB_HOST` | host PostgreSQL для Skunk | `localhost` |
+| `GOTRIP_DB_PORT` | port PostgreSQL для Skunk | `5432` |
+| `GOTRIP_DB_NAME` | имя базы данных | `gotrip` |
+| `GOTRIP_DB_USER` | пользователь БД | `gotrip_user` |
+| `GOTRIP_DB_PASSWORD` | пароль БД | обязательна |
+| `GOTRIP_DB_POOL_MAX_SIZE` | максимальный размер пула | `10` |
+| `GOTRIP_DB_POOL_MIN_IDLE` | минимальное число idle-сессий | `2` |
+| `GOTRIP_ADMIN_EMAIL` | email admin-пользователя для seed-миграции | пусто |
+| `GOTRIP_ADMIN_PASSWORD` | пароль admin-пользователя для seed-миграции | пусто |
+| `GOTRIP_ADMIN_FULL_NAME` | имя admin-пользователя | `GoTrip Admin` |
 
-Для локального запуска вне Docker по умолчанию используется `localhost:5432`, внутри Docker Compose — сервис `postgres`.
+`GOTRIP_DB_PASSWORD` обязателен: дефолтного пароля в конфиге нет.
 
-В контейнере приложения настройки переопределяются переменными окружения:
+JWT-secret сейчас задан dev-значением в `application.conf`. Для production его нужно вынести в секреты и заменить.
 
-- `GOTRIP_DB_URL=jdbc:postgresql://postgres:5432/gotrip`
-- `GOTRIP_DB_HOST=postgres`
-- `GOTRIP_DB_PORT=5432`
-- `GOTRIP_DB_NAME=gotrip`
-- `GOTRIP_DB_USER=gotrip_user`
-- `GOTRIP_DB_PASSWORD` — пароль БД, задаётся через `.env` или окружение
-- `GOTRIP_SERVER_HOST=0.0.0.0`
-- `GOTRIP_SERVER_PORT=8080`
+## API
 
-Если после смены пароля PostgreSQL падает с `password authentication failed`, а volume уже существовал, пересоздайте локальный volume:
+Swagger UI доступен при запущенном backend:
+
+```text
+http://localhost:8080/docs
+```
+
+Статическая OpenAPI 3.1 спецификация лежит в:
+
+```text
+docs/api/docs.yaml
+```
+
+Основные группы API:
+
+- `Auth`: регистрация, вход, refresh, logout.
+- `Users`: профиль текущего пользователя.
+- `Trips`: поездки.
+- `Trip locations`: маршрут поездки.
+- `Orders`: заказы, статусы заказов и admin-симуляция смены статуса.
+- `Order files`: файлы и parsed data по заказам.
+- `Locations`: локации.
+- `Providers`: провайдеры и admin-управление провайдерами.
+- `Additional services`: дополнительные услуги и admin-управление услугами.
+- `Notifications`: уведомления пользователя.
+- `Notification preferences`: настройки уведомлений.
+- `Achievements`: каталог достижений и admin-управление.
+- `User achievements`: достижения текущего пользователя.
+- `Reviews`: отзывы и rating summary.
+- `Recommendations`: рекомендации по поездке или заказу.
+
+Для просмотра статической спецификации можно использовать любой OpenAPI/Swagger viewer, например:
+
+```bash
+npx swagger-ui-watcher docs/api/docs.yaml
+```
+
+## База данных
+
+Миграции лежат в:
+
+```text
+src/main/resources/db/migration/
+```
+
+Они применяются автоматически при запуске backend.
+
+Текущие миграции:
+
+- `V1__initial_schema.sql` - основная схема: пользователи, роли, поездки, маршруты, заказы, файлы, провайдеры, услуги, отзывы, достижения, уведомления.
+- `V2__auth_sessions.sql` - refresh-сессии для auth flow.
+- `V3__seed_admin_user.sql` - создание или обновление admin-пользователя из env.
+- `V4__seed_default_data.sql` - demo-данные для локальной разработки.
+
+Документация по схеме и ER-диаграмма:
+
+```text
+docs/database/README.md
+docs/database/er-diagram.png
+docs/database/er-diagram.drawio
+```
+
+## Тесты
+
+Запуск всех тестов:
+
+```bash
+sbt test
+```
+
+В проекте есть:
+
+- unit-тесты сервисов в `src/test/scala/gotrip/service`;
+- интеграционные тесты PostgreSQL-репозиториев в `src/test/scala/gotrip/repository`.
+
+Repository specs используют Testcontainers, поэтому перед запуском должен быть доступен Docker.
+
+## Полезные команды
+
+| Command | Description |
+|---|---|
+| `sbt run` | запустить backend локально |
+| `sbt test` | запустить тесты |
+| `sbt native` | собрать локальный Docker-образ `gotrip-backend` |
+| `docker compose up` | поднять backend, PostgreSQL и frontend |
+| `docker compose up -d postgres` | поднять только PostgreSQL |
+| `docker compose down` | остановить контейнеры |
+| `docker compose down -v` | остановить контейнеры и удалить volume БД |
+
+## Диагностика
+
+`GOTRIP_DB_PASSWORD is required`  
+Создайте `.env` из `.env.example` и задайте `GOTRIP_DB_PASSWORD`.
+
+`Connection refused` во время `Running Flyway migrations...`  
+PostgreSQL недоступен. Проверьте `docker compose ps`, порт `5432` и значения `GOTRIP_DB_*`.
+
+`password authentication failed`  
+Пароль в `.env` не совпадает с паролем в уже созданном PostgreSQL volume. Для локальной разработки проще пересоздать volume:
 
 ```bash
 docker compose down -v
 docker compose up
 ```
 
-## Миграции
+`sbt: command not found`  
+Установите sbt или добавьте его в `PATH`.
 
-SQL-миграции лежат в `src/main/resources/db/migration/` и применяются автоматически при запуске приложения.
+Testcontainers-тесты не стартуют  
+Проверьте, что Docker запущен и доступен текущему пользователю.
 
-Формат имени файла:
+## Документация
 
-```text
-V{version}__description.sql
-```
+- `docs/api/docs.yaml` - OpenAPI-спецификация.
+- `docs/database/README.md` - описание таблиц и связей.
+- `docs/database/er-diagram.png` - ER-диаграмма.
+- `docs/requirements/` - спецификация и user stories в PDF.
 
-Например:
-
-```text
-V1__initial_schema.sql
-```
-
-## Тесты
-
-Запустить все тесты:
-
-```bash
-sbt test
-```
-
-На текущий момент есть unit-тесты для `LocationService`.
-
-## OpenAPI
-
-Исходная OpenAPI-спецификация находится в `docs/api/gotrip-openapi.yaml`.
-
-Для локального просмотра статической спецификации можно использовать:
-
-```bash
-npx swagger-ui-watcher docs/api/gotrip-openapi.yaml
-```
-
-Во время работы приложения Swagger UI также доступен из Tapir по адресу:
-
-```text
-http://localhost:8080/docs
-```
-
-## Диагностика
-
-Если приложение падает на этапе `Running Flyway migrations...` с ошибкой `Connection refused`, значит PostgreSQL недоступен на `localhost:5432`.
-
-Проверьте:
-
-```bash
-docker compose ps
-docker compose up -d
-```
-
-Если команда `sbt` не найдена, установите sbt или добавьте его в `PATH`.

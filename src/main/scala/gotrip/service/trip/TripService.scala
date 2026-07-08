@@ -8,10 +8,7 @@ import gotrip.domain.user.UserId
 import gotrip.repository.trip.TripRepository
 import gotrip.service.achievement.{AchievementEngine, AchievementEvent}
 
-final class TripService[F[_]: Monad](
-  repository: TripRepository[F],
-  achievementEngine: AchievementEngine[F]
-) {
+final class TripService[F[_]: Sync: Clock: GeneratedData](repository: TripRepository[F]):
 
   import TripServiceError._
 
@@ -66,7 +63,32 @@ final class TripService[F[_]: Monad](
     update.end_date match
       case Some(endDate) => endDate.value
       case None          => current.end_date.value
-}
+
+  private def materializeTrip(userId: UserId, create: TripCreate): F[Trip] =
+    for
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
+    yield Trip(
+      id = TripId(id),
+      user_id = userId,
+      title = create.title,
+      start_date = create.start_date,
+      end_date = create.end_date,
+      status = create.status.getOrElse(TripStatus.Planned),
+      created_at = now,
+      updated_at = now
+    )
+
+  private def materializeTripUpdate(current: Trip, update: TripUpdate): F[Trip] =
+    GeneratedData[F].now().map { now =>
+      current.copy(
+        title = update.title.getOrElse(current.title),
+        start_date = update.start_date.getOrElse(current.start_date),
+        end_date = update.end_date.getOrElse(current.end_date),
+        status = update.status.getOrElse(current.status),
+        updated_at = now
+      )
+    }
 
 enum TripServiceError:
   case TripNotFound(id: TripId)

@@ -19,7 +19,7 @@ import io.circe.Json
 import java.time.{Instant, OffsetDateTime}
 import java.util.UUID
 
-final class OrderService[F[_]: Monad](
+final class OrderService[F[_]: Sync: Clock: GeneratedData](
   repository: OrderRepository[F],
   notificationPreferenceRepository: NotificationPreferenceRepository[F],
   notificationService: NotificationService[F],
@@ -138,21 +138,89 @@ final class OrderService[F[_]: Monad](
   private def nextEndDateTime(current: Order, update: OrderUpdate): Option[OffsetDateTime] =
     update.end_datetime.orElse(current.end_datetime)
 
+  private def updateStatusForCurrent(
+    orderId: OrderId,
+    current: Order,
+    update: OrderStatusUpdate,
+    source: OrderStatusEventSource
+  ): EitherT[F, OrderServiceError, Order] =
+    for {
+      _ <- validateDateTimeRange(update.new_start_datetime.orElse(current.start_datetime), current.end_datetime)
+      materialized <- EitherT.liftF(materializeStatusUpdate(current, update))
+      updated <- EitherT.fromOptionF(repository.updateStatus(materialized), OrderNotFound(orderId))
+      event <- EitherT.liftF(statusEvent(current, update, source))
+      _ <- EitherT.liftF(repository.insertStatusEvent(event))
+      _ <- EitherT.liftF(sendStatusNotificationIfEnabled(updated, update.reason))
+    } yield updated
+
+  private def materializeOrder(userId: UserId, tripId: TripId, create: OrderCreate): F[Order] =
+    for
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
+    yield Order(
+      id = OrderId(id),
+      user_id = userId,
+      trip_id = tripId,
+      provider_id = create.provider_id,
+      service_type = create.service_type,
+      external_order_id = create.external_order_id,
+      title = create.title,
+      status = create.status.getOrElse(OrderStatus.PendingVerification),
+      price_amount = create.price_amount,
+      price_currency = create.price_currency,
+      start_datetime = create.start_datetime,
+      end_datetime = create.end_datetime,
+      departure_location_id = create.departure_location_id,
+      arrival_location_id = create.arrival_location_id,
+      created_at = now,
+      updated_at = now
+    )
+
+  private def materializeOrderUpdate(current: Order, update: OrderUpdate): F[Order] =
+    GeneratedData[F].now().map { now =>
+      current.copy(
+        provider_id = update.provider_id.orElse(current.provider_id),
+        service_type = update.service_type.getOrElse(current.service_type),
+        external_order_id = update.external_order_id.orElse(current.external_order_id),
+        title = update.title.getOrElse(current.title),
+        status = update.status.getOrElse(current.status),
+        price_amount = update.price_amount.orElse(current.price_amount),
+        price_currency = update.price_currency.orElse(current.price_currency),
+        start_datetime = update.start_datetime.orElse(current.start_datetime),
+        end_datetime = update.end_datetime.orElse(current.end_datetime),
+        departure_location_id = update.departure_location_id.orElse(current.departure_location_id),
+        arrival_location_id = update.arrival_location_id.orElse(current.arrival_location_id),
+        updated_at = now
+      )
+    }
+
+  private def materializeStatusUpdate(current: Order, update: OrderStatusUpdate): F[Order] =
+    GeneratedData[F].now().map { now =>
+      current.copy(
+        status = update.status,
+        start_datetime = update.new_start_datetime.orElse(current.start_datetime),
+        updated_at = now
+      )
+    }
+
   private def statusEvent(
     current: Order,
     update: OrderStatusUpdate,
     source: OrderStatusEventSource
-  ): OrderStatusEvent =
-    OrderStatusEvent(
-      id = OrderStatusEventId(UUID.fromString("00000000-0000-0000-0000-000000000000")),
-      order_id = current.id,
-      old_status = Some(current.status),
-      new_status = update.status,
-      reason = update.reason,
-      payload = update.payload,
-      source = source,
-      created_at = Instant.now()
-    )
+  ): F[OrderStatusEvent] =
+    for
+      id <- GeneratedData[F].newId()
+      now <- GeneratedData[F].now()
+    yield OrderStatusEvent(
+        id = OrderStatusEventId(id),
+        order_id = current.id,
+        old_status = Some(current.status),
+        new_status = update.status,
+        reason = update.reason,
+        payload = update.payload,
+        source = source,
+        created_at = now
+      )
 
   private def sendStatusNotificationIfEnabled(order: Order, reason: Option[String]): F[Unit] =
     notificationPreferenceRepository.getByUserId(order.user_id).flatMap { preference =>

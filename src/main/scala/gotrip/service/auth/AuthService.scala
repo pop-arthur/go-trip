@@ -16,7 +16,7 @@ import java.time.Instant
 import java.util.UUID
 import scala.concurrent.duration._
 
-final class AuthService[F[_]: Sync: Clock](
+final class AuthService[F[_]: Sync: Clock: GeneratedData](
   userRepository: UserRepository[F],
   sessionRepository: AuthSessionRepository[F],
   passwordHasher: PasswordHasher[F],
@@ -90,7 +90,7 @@ final class AuthService[F[_]: Sync: Clock](
   private def issueAuthResponse(user: User, roles: List[Role]): F[AuthResponse] =
     for
       now <- nowInstant
-      sessionId <- Sync[F].delay(UUID.randomUUID())
+      sessionId <- GeneratedData[F].newId()
       accessToken <- jwtService.issueAccessToken(user.id, user.email, roles, sessionId, now)
       refreshToken <- jwtService.issueRefreshToken(user.id, user.email, roles, sessionId, now)
       _ <- sessionRepository.create(
@@ -127,11 +127,11 @@ final class AuthService[F[_]: Sync: Clock](
     if roles.isEmpty then List(Role.USER) else roles.distinct
 
   private def nowInstant: F[Instant] =
-    GeneratedData.now[F]
+    GeneratedData[F].now()
 
   private def newUser(email: UserEmail, passwordHash: UserPasswordHash, fullName: UserFullName): F[User] =
     for
-      id <- GeneratedData.newId[F]
+      id <- GeneratedData[F].newId()
       now <- nowInstant
     yield User(UserId(id), email, passwordHash, fullName, now, now)
 

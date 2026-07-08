@@ -6,6 +6,7 @@ import gotrip.domain.location.*
 import gotrip.domain.trip.*
 import gotrip.domain.user.*
 import gotrip.repository.triplocation.TripLocationRepository
+import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -13,7 +14,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.time.OffsetDateTime
 import java.util.UUID
 
-final class TripLocationServiceSpec extends AnyWordSpec with Matchers with MockFactory:
+final class TripLocationServiceSpec extends AnyWordSpec with Matchers with MockFactory with GeneratedDataTestSupport:
 
   "TripLocationService" should {
     "list locations for an owned trip" in {
@@ -38,35 +39,29 @@ final class TripLocationServiceSpec extends AnyWordSpec with Matchers with MockF
 
     "create a location with explicit visit order" in {
       val repository = mock[TripLocationRepository[IO]]
-      val service = TripLocationService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
       repository.locationExists.expects(locationId).returning(IO.pure(true))
       repository.visitOrderExists.expects(tripId, explicitVisitOrder, None).returning(IO.pure(false))
-      repository.create.expects(where { (created: TripLocation) =>
-        created.id.value != new UUID(0L, 0L) &&
-        created.trip_id == tripId &&
-        created.location_id == locationId &&
-        created.visit_order == explicitVisitOrder &&
-        created.arrival_date == tripLocationCreate.arrival_date &&
-        created.departure_date == tripLocationCreate.departure_date
-      }).returning(IO.pure(tripLocation))
+      expectGeneratedId(generatedData, tripLocationId.value)
+      repository.create.expects(tripLocation).returning(IO.pure(tripLocation))
 
       service.create(userId, tripId, tripLocationCreate).unsafeRunSync() shouldBe Right(tripLocation)
     }
 
     "create a location with generated next visit order" in {
       val repository = mock[TripLocationRepository[IO]]
-      val service = TripLocationService[IO](repository)
+      val generatedData = generatedDataMock
+      val service = serviceWith(repository, generatedData)
 
       repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
       repository.locationExists.expects(locationId).returning(IO.pure(true))
       repository.nextVisitOrder.expects(tripId).returning(IO.pure(generatedVisitOrder))
       repository.visitOrderExists.expects(tripId, generatedVisitOrder, None).returning(IO.pure(false))
-      repository.create.expects(where { (created: TripLocation) =>
-        created.visit_order == generatedVisitOrder &&
-        created.location_id == locationId
-      }).returning(IO.pure(generatedTripLocation))
+      expectGeneratedId(generatedData, tripLocationId.value)
+      repository.create.expects(generatedTripLocation).returning(IO.pure(generatedTripLocation))
 
       service.create(userId, tripId, tripLocationCreate.copy(visit_order = None)).unsafeRunSync() shouldBe
         Right(generatedTripLocation)
@@ -184,6 +179,13 @@ final class TripLocationServiceSpec extends AnyWordSpec with Matchers with MockF
 
   private def uuid(suffix: String): UUID =
     UUID.fromString(s"00000000-0000-0000-0000-$suffix")
+
+  private def serviceWith(
+    repository: TripLocationRepository[IO],
+    generatedData: GeneratedData[IO]
+  ): TripLocationService[IO] =
+    given GeneratedData[IO] = generatedData
+    TripLocationService[IO](repository)
 
   private val userId = UserId(uuid("000000000001"))
   private val tripId = TripId(uuid("000000000010"))
