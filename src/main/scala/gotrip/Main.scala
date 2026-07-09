@@ -60,10 +60,12 @@ import gotrip.service.statistics.StatisticsService
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import org.http4s.server.middleware.CORS
+import org.http4s.server.staticcontent.{fileService, FileService}
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 
 import scala.concurrent.ExecutionContext
+import java.nio.file.{Files, Paths}
 
 object Main extends IOApp.Simple {
 
@@ -85,6 +87,8 @@ object Main extends IOApp.Simple {
         ConfigSource.default.at("gotrip.duffel").load[DuffelConfig]
           .leftMap(e => ConfigReaderException[DuffelConfig](e))
       )
+
+      _ <- IO.blocking(Files.createDirectories(Paths.get("uploads"))).handleError(_ => ())
 
       _ <- IO.println("Running Flyway migrations...")
       _ <- Migration.migrate[IO](databaseConfig)
@@ -196,7 +200,16 @@ object Main extends IOApp.Simple {
         val swaggerEndpoints = SwaggerInterpreter()
           .fromServerEndpoints[IO](serverEndpoints, "GoTrip API", "0.1.0")
         val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
-        val httpApp = Router("/" -> routes).orNotFound
+
+        val staticRoutes = fileService[IO](FileService.Config(
+          systemPath = "uploads",
+          pathPrefix = ""
+        ))
+
+        val httpApp = Router(
+          "/" -> routes,
+          "/uploads" -> staticRoutes
+        ).orNotFound
 
         val corsApp = CORS.policy
           .withAllowOriginAll
