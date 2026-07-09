@@ -8,7 +8,7 @@ import skunk._
 import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.util.UUID
 
 final class PostgresReviewRepository[F[_]: Concurrent](
@@ -18,16 +18,16 @@ final class PostgresReviewRepository[F[_]: Concurrent](
   override def create(review: Review): F[Review] =
     sessionPool.use { session =>
       session.prepare(PostgresReviewRepository.insertQuery).flatMap { cmd =>
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
         cmd.unique(
           (
+            review.id.value,
             review.userId.value,
             ReviewTargetType.toString(review.targetType),
             review.targetId.value,
             review.rating.value,
             review.text.value,
-            now,
-            now
+            PostgresReviewRepository.toOffset(review.createdAt),
+            PostgresReviewRepository.toOffset(review.updatedAt)
           )
         )
       }
@@ -97,6 +97,9 @@ object PostgresReviewRepository:
     case _                        => 0
   }
 
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
+
   private val decoder: Decoder[Review] =
     (uuid ~ uuid ~ text ~ uuid ~ int4 ~ text.opt ~ timestamptz ~ timestamptz).map {
       case id ~ uid ~ ttype ~ tid ~ rating ~ text ~ created ~ updated =>
@@ -112,10 +115,10 @@ object PostgresReviewRepository:
         )
     }
 
-  val insertQuery: Query[(UUID, String, UUID, Int, Option[String], OffsetDateTime, OffsetDateTime), Review] =
+  val insertQuery: Query[(UUID, UUID, String, UUID, Int, Option[String], OffsetDateTime, OffsetDateTime), Review] =
     sql"""
-      INSERT INTO reviews (user_id, target_type, target_id, rating, text, created_at, updated_at)
-      VALUES ($uuid, $text, $uuid, $int4, ${text.opt}, $timestamptz, $timestamptz)
+      INSERT INTO reviews (id, user_id, target_type, target_id, rating, text, created_at, updated_at)
+      VALUES ($uuid, $uuid, $text, $uuid, $int4, ${text.opt}, $timestamptz, $timestamptz)
       RETURNING id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
     """.query(decoder)
 

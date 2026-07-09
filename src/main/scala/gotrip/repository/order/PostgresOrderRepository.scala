@@ -37,6 +37,8 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       }
     }
 
+  // УДАЛЁН МЕТОД findById
+
   override def create(userId: UserId, tripId: TripId, order: OrderCreate): F[Order] =
     sessionPool.use { session =>
       session.prepare(PostgresOrderRepository.createQuery).flatMap { query =>
@@ -102,6 +104,7 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       session.prepare(PostgresOrderRepository.insertStatusEventQuery).flatMap { query =>
         query.unique(
           (
+            event.id.value,
             event.order_id.value,
             event.old_status.map(SkunkCodecs.encodeOrderStatus),
             SkunkCodecs.encodeOrderStatus(event.new_status),
@@ -233,8 +236,7 @@ object PostgresOrderRepository:
         and id = $uuid
     """.query(orderDecoder)
 
-  val createQuery
-      : Query[(UUID, UUID, UUID, Option[UUID], ServiceType, Option[String], String, String, Option[Double], Option[String], Option[OffsetDateTime], Option[OffsetDateTime], Option[UUID], Option[UUID]), Order] =
+  val createQuery: Query[(UUID, UUID, UUID, Option[UUID], ServiceType, Option[String], String, String, Option[Double], Option[String], Option[OffsetDateTime], Option[OffsetDateTime], Option[UUID], Option[UUID]), Order] =
     sql"""
       insert into orders (
         id, user_id, trip_id, provider_id, service_type, external_order_id, title, status,
@@ -270,11 +272,12 @@ object PostgresOrderRepository:
                 departure_location_id, arrival_location_id, created_at, updated_at
     """.query(orderDecoder)
 
-  val insertStatusEventQuery: Query[(UUID, Option[String], String, Option[String], Option[String], String), OrderStatusEvent] =
+  // ИСПРАВЛЕНО: добавлен id
+  val insertStatusEventQuery: Query[(UUID, UUID, Option[String], String, Option[String], Option[String], String), OrderStatusEvent] =
     sql"""
-      insert into order_status_events (order_id, old_status, new_status, reason, payload, source)
-      values ($uuid, ${text.opt}, $text, ${text.opt}, ${text.opt}::jsonb, $text)
-      returning id, order_id, old_status, new_status, reason, payload::text, source, created_at
+      INSERT INTO order_status_events (id, order_id, old_status, new_status, reason, payload, source)
+      VALUES ($uuid, $uuid, ${text.opt}, $text, ${text.opt}, ${text.opt}::jsonb, $text)
+      RETURNING id, order_id, old_status, new_status, reason, payload::text, source, created_at
     """.query(statusEventDecoder)
 
   val tripExistsForUserQuery: Query[(UUID, UUID), UUID] =

@@ -38,10 +38,20 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     visitOrder: VisitOrder
   ): F[TripLocation] =
     sessionPool.use { session =>
-      PostgresTripLocationRepository.uniqueTripLocation(
-        session,
-        PostgresTripLocationRepository.createFragment(tripId, location, visitOrder)
-      )
+      // Генерируем новый ID
+      val newId = UUID.randomUUID()
+      session.prepare(PostgresTripLocationRepository.insertQuery).flatMap { cmd =>
+        cmd.unique(
+          (
+            newId,
+            tripId.value,
+            location.location_id.value,
+            visitOrder.value,
+            location.arrival_date.value,
+            location.departure_date.value
+          )
+        )
+      }
     }
 
   override def update(
@@ -150,6 +160,14 @@ object PostgresTripLocationRepository:
             departure_date = TripLocationDepartureDate(departureDate)
           )
       }
+
+  // ИСПРАВЛЕНО: добавлен id в INSERT (теперь 6 параметров)
+  val insertQuery: Query[(UUID, UUID, UUID, Int, Option[OffsetDateTime], Option[OffsetDateTime]), TripLocation] =
+    sql"""
+      INSERT INTO trip_locations (id, trip_id, location_id, visit_order, arrival_date, departure_date)
+      VALUES ($uuid, $uuid, $uuid, $int4, ${timestamptz.opt}, ${timestamptz.opt})
+      RETURNING id, trip_id, location_id, visit_order, arrival_date, departure_date
+    """.query(tripLocationDecoder)
 
   val listByTripQuery: Query[UUID, TripLocation] =
     sql"""
