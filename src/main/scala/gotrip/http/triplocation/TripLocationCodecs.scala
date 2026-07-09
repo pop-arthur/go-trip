@@ -14,7 +14,6 @@ import java.time.format.DateTimeFormatter
 import scala.util.Try
 
 object TripLocationCodecs:
-  // API errors
   given Encoder[ApiError] =
     deriveEncoder
 
@@ -24,7 +23,6 @@ object TripLocationCodecs:
   given Schema[ApiError] =
     derived
 
-  // Date-time values
   given Encoder[OffsetDateTime] =
     Encoder.encodeString.contramap(_.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
 
@@ -38,7 +36,6 @@ object TripLocationCodecs:
       _.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
     )
 
-  // LocationId
   given Encoder[LocationId] =
     uuidEncoder(_.value)
 
@@ -48,7 +45,6 @@ object TripLocationCodecs:
   given Schema[LocationId] =
     uuidSchema(LocationId.apply, _.value)
 
-  // TripId
   given Encoder[TripId] =
     uuidEncoder(_.value)
 
@@ -61,7 +57,6 @@ object TripLocationCodecs:
   given Codec[String, TripId, CodecFormat.TextPlain] =
     uuidTextCodec(TripId.apply, _.value)
 
-  // TripLocationId
   given Encoder[TripLocationId] =
     uuidEncoder(_.value)
 
@@ -74,7 +69,6 @@ object TripLocationCodecs:
   given Codec[String, TripLocationId, CodecFormat.TextPlain] =
     uuidTextCodec(TripLocationId.apply, _.value)
 
-  // VisitOrder
   given Encoder[VisitOrder] =
     Encoder.encodeInt.contramap(_.value)
 
@@ -86,7 +80,6 @@ object TripLocationCodecs:
       .map(value => Some(VisitOrder(value)))(_.value)
       .validate(Validator.positive[Int].contramap[VisitOrder](_.value))
 
-  // Optional date-time wrappers
   given Encoder[TripLocationArrivalDate] =
     Encoder.encodeOption[OffsetDateTime].contramap(_.value)
 
@@ -105,7 +98,6 @@ object TripLocationCodecs:
   given Schema[TripLocationDepartureDate] =
     Schema.schemaForOption[OffsetDateTime].map(value => Some(TripLocationDepartureDate(value)))(_.value)
 
-  // Trip location models
   given Encoder[TripLocation] =
     deriveEncoder
 

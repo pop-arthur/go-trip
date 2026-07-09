@@ -86,7 +86,6 @@ object Main extends IOApp.Simple {
 
       _ <- IO.println("Initializing Skunk session pool...")
       _ <- SkunkSessionPool[IO](databaseConfig).use { sessionPool =>
-        // ---- Repository Layer ----
         val locationRepository = LocationRepository.makePostgres[IO](sessionPool)
         val tripRepository = TripRepository.makePostgres[IO](sessionPool)
         val tripLocationRepository = TripLocationRepository.makePostgres[IO](sessionPool)
@@ -103,7 +102,6 @@ object Main extends IOApp.Simple {
         val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
         val statisticsRepository = StatisticsRepository.make[IO](sessionPool)
 
-        // ---- Achievement Engine ----
         val achievementEngine = new AchievementEngine[IO](
           achievementRepository,
           userAchievementRepository,
@@ -113,7 +111,6 @@ object Main extends IOApp.Simple {
           tripLocationRepository
         )
 
-        // ---- Service Layer ----
         val jwtService = new JwtService[IO](authConfig)
         val passwordHasher = PasswordHasher.bcrypt[IO](authConfig.passwordCost)
         val locationService = LocationService[IO](locationRepository)
@@ -143,7 +140,6 @@ object Main extends IOApp.Simple {
           authConfig.refreshTokenTtl
         )
 
-        // ---- Controller Layer ----
         val authSupport = new AuthSupport(jwtService)
         val authController = new AuthController(authService, authSupport)
         val locationController = new LocationController(locationService, authSupport)
@@ -163,7 +159,6 @@ object Main extends IOApp.Simple {
         val recommendationController = new RecommendationController(recommendationService, authSupport)
         val statisticsController = new StatisticsController(statisticsService, authSupport)
 
-        // ---- Сборка всех эндпоинтов ----
         val serverEndpoints =
           authController.all ++
           locationController.all ++
@@ -183,13 +178,11 @@ object Main extends IOApp.Simple {
           recommendationController.all ++
           statisticsController.all
 
-        // ---- Swagger ----
         val swaggerEndpoints = SwaggerInterpreter()
           .fromServerEndpoints[IO](serverEndpoints, "GoTrip API", "0.1.0")
         val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
         val httpApp = Router("/" -> routes).orNotFound
 
-        // ---- CORS middleware ----
         val corsApp = CORS.policy
           .withAllowOriginAll
           .apply(httpApp)

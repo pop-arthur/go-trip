@@ -11,7 +11,6 @@ import sttp.tapir.Schema.derived
 import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 
 object AdditionalServiceCodecs:
-  // API errors
   given Encoder[ApiError] =
     deriveEncoder
 
@@ -21,7 +20,6 @@ object AdditionalServiceCodecs:
   given Schema[ApiError] =
     derived
 
-  // ServiceId
   given Encoder[ServiceId] =
     uuidEncoder(_.value)
 
@@ -34,7 +32,6 @@ object AdditionalServiceCodecs:
   given Codec[String, ServiceId, CodecFormat.TextPlain] =
     uuidTextCodec(ServiceId.apply, _.value)
 
-  // ServiceTitle
   given Encoder[ServiceTitle] =
     Encoder.encodeString.contramap(_.value)
 
@@ -44,7 +41,6 @@ object AdditionalServiceCodecs:
   given Schema[ServiceTitle] =
     Schema.schemaForString.map(value => Some(ServiceTitle(value)))(_.value)
 
-  // ProviderId
   given Encoder[ProviderId] =
     uuidEncoder(_.value)
 
@@ -57,7 +53,6 @@ object AdditionalServiceCodecs:
   given Codec[String, ProviderId, CodecFormat.TextPlain] =
     uuidTextCodec(ProviderId.apply, _.value)
 
-  // LocationId
   given Encoder[LocationId] =
     uuidEncoder(_.value)
 
@@ -70,7 +65,6 @@ object AdditionalServiceCodecs:
   given Codec[String, LocationId, CodecFormat.TextPlain] =
     uuidTextCodec(LocationId.apply, _.value)
 
-  // ServiceType
   given Encoder[ServiceType] =
     Encoder.encodeString.contramap(encodeServiceType)
 
@@ -91,7 +85,6 @@ object AdditionalServiceCodecs:
           sttp.tapir.DecodeResult.Error(value, new Exception(error.message))
     }(encodeServiceType)
 
-  // Additional service models
   given Encoder[AdditionalService] =
     deriveEncoder
 

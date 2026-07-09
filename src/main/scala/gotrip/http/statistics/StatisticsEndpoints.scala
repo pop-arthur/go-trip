@@ -13,7 +13,6 @@ object StatisticsEndpoints {
 
   type ErrorResponse = HttpError
 
-  // GET /statistics/countries
   val getCountriesStatistics: Endpoint[String, (Option[String], Option[LocalDate], Option[LocalDate]), ErrorResponse, CountriesStatisticsResponse, Any] =
     endpoint.get
       .securityIn(AuthEndpoints.bearer)
@@ -24,7 +23,6 @@ object StatisticsEndpoints {
       .errorOut(EndpointErrors.internalOnly)
       .out(jsonBody[CountriesStatisticsResponse])
 
-  // GET /statistics/spending
   val getSpendingStatistics: Endpoint[String, (Option[LocalDate], Option[LocalDate], Option[String]), ErrorResponse, SpendingStatisticsResponse, Any] =
     endpoint.get
       .securityIn(AuthEndpoints.bearer)
@@ -35,7 +33,6 @@ object StatisticsEndpoints {
       .errorOut(EndpointErrors.internalOnly)
       .out(jsonBody[SpendingStatisticsResponse])
 
-  // GET /statistics/upcoming-trips
   val getUpcomingTripsStatistics: Endpoint[String, Unit, ErrorResponse, UpcomingTripsResponse, Any] =
     endpoint.get
       .securityIn(AuthEndpoints.bearer)
@@ -43,7 +40,6 @@ object StatisticsEndpoints {
       .errorOut(EndpointErrors.internalOnly)
       .out(jsonBody[UpcomingTripsResponse])
 
-  // GET /statistics/trip-durations
   val getTripDurationsStatistics: Endpoint[String, (Option[LocalDate], Option[LocalDate]), ErrorResponse, TripDurationsResponse, Any] =
     endpoint.get
       .securityIn(AuthEndpoints.bearer)

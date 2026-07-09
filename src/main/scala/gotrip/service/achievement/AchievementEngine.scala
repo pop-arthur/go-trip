@@ -44,7 +44,6 @@ class AchievementEngine[F[_]: Monad](
               createdAt = Instant.now(),
               updatedAt = Instant.now()
             )
-            // Вставка вернёт Some, если успешно, и None при конфликте — игнорируем
             userAchievementRepo.create(ua).map(_ => ())
           case false => Monad[F].unit
         }

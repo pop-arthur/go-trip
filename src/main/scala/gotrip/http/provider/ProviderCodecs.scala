@@ -9,7 +9,6 @@ import sttp.tapir.Schema.derived
 import sttp.tapir.{Codec, CodecFormat, Schema}
 
 object ProviderCodecs:
-  // API errors
   given Encoder[ApiError] =
     deriveEncoder
 
@@ -19,7 +18,6 @@ object ProviderCodecs:
   given Schema[ApiError] =
     derived
 
-  // ProviderId
   given Encoder[ProviderId] =
     uuidEncoder(_.value)
 
@@ -32,7 +30,6 @@ object ProviderCodecs:
   given Codec[String, ProviderId, CodecFormat.TextPlain] =
     uuidTextCodec(ProviderId.apply, _.value)
 
-  // ProviderName
   given Encoder[ProviderName] =
     Encoder.encodeString.contramap(_.value)
 
@@ -42,7 +39,6 @@ object ProviderCodecs:
   given Schema[ProviderName] =
     Schema.schemaForString.map(value => Some(ProviderName(value)))(_.value)
 
-  // ProviderType
   given Encoder[ProviderType] =
     Encoder.encodeString.contramap(encodeProviderType)
 
@@ -63,7 +59,6 @@ object ProviderCodecs:
           sttp.tapir.DecodeResult.Error(value, new Exception(error.message))
     }(encodeProviderType)
 
-  // Provider models
   given Encoder[Provider] =
     deriveEncoder
 
