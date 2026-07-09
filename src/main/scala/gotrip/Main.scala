@@ -51,7 +51,7 @@ import gotrip.service.orderfile.OrderFileService
 import gotrip.service.user.UserService
 import gotrip.service.notification.NotificationService
 import gotrip.service.notificationpreference.NotificationPreferenceService
-import gotrip.service.achievement.AchievementService
+import gotrip.service.achievement.{AchievementService, AchievementEngine}
 import gotrip.service.userachievement.UserAchievementService
 import gotrip.service.review.ReviewService
 import gotrip.service.recommendation.RecommendationService
@@ -91,7 +91,6 @@ object Main extends IOApp.Simple {
 
       _ <- IO.println("Initializing Skunk session pool...")
       _ <- SkunkSessionPool[IO](databaseConfig).use { sessionPool =>
-        // ---- Repository Layer ----
         val locationRepository = LocationRepository.makePostgres[IO](sessionPool)
         val tripRepository = TripRepository.makePostgres[IO](sessionPool)
         val tripLocationRepository = TripLocationRepository.makePostgres[IO](sessionPool)
@@ -108,11 +107,19 @@ object Main extends IOApp.Simple {
         val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
         val statisticsRepository = StatisticsRepository.make[IO](sessionPool)
 
-        // ---- Service Layer ----
+        val achievementEngine = new AchievementEngine[IO](
+          achievementRepository,
+          userAchievementRepository,
+          tripRepository,
+          orderRepository,
+          reviewRepository,
+          tripLocationRepository
+        )
+
         val jwtService = new JwtService[IO](authConfig)
         val passwordHasher = PasswordHasher.bcrypt[IO](authConfig.passwordCost)
         val locationService = LocationService[IO](locationRepository)
-        val tripService = TripService[IO](tripRepository)
+        val tripService = new TripService[IO](tripRepository, achievementEngine)
         val tripLocationService = TripLocationService[IO](tripLocationRepository)
         val providerService = ProviderService[IO](providerRepository)
         val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
@@ -129,7 +136,7 @@ object Main extends IOApp.Simple {
         val orderFileService = new OrderFileService[IO](orderFileRepository)
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
-        val reviewService = new ReviewService[IO](reviewRepository)
+        val reviewService = new ReviewService[IO](reviewRepository, achievementEngine)
         val recommendationService = new RecommendationService[IO](
           orderRepository,
           tripLocationRepository,
@@ -144,7 +151,6 @@ object Main extends IOApp.Simple {
           authConfig.refreshTokenTtl
         )
 
-        // ---- Controller Layer ----
         val authSupport = new AuthSupport(jwtService)
         val authController = new AuthController(authService, authSupport)
         val locationController = new LocationController(locationService, authSupport)
@@ -168,7 +174,6 @@ object Main extends IOApp.Simple {
         val recommendationController = new RecommendationController(recommendationService, authSupport)
         val statisticsController = new StatisticsController(statisticsService, authSupport)
 
-        // ---- Сборка всех эндпоинтов ----
         val serverEndpoints =
           authController.all ++
           locationController.all ++
@@ -188,13 +193,11 @@ object Main extends IOApp.Simple {
           recommendationController.all ++
           statisticsController.all
 
-        // ---- Swagger ----
         val swaggerEndpoints = SwaggerInterpreter()
           .fromServerEndpoints[IO](serverEndpoints, "GoTrip API", "0.1.0")
         val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
         val httpApp = Router("/" -> routes).orNotFound
 
-        // ---- CORS middleware (разрешить все источники для разработки) ----
         val corsApp = CORS.policy
           .withAllowOriginAll
           .apply(httpApp)

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GoTrip — управление поездками</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:,">
+    <!-- Подключение округлого шрифта Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -49,15 +52,17 @@
             <div class="roles" id="sidebar-roles">USER</div>
         </div>
         <nav id="main-nav">
-            <a data-section="profile" class="active"><span class="icon">👤</span> Профиль</a>
-            <a data-section="notifications"><span class="icon">🔔</span> Уведомления</a>
-            <a data-section="achievements"><span class="icon">🏆</span> Достижения</a>
-            <a data-section="reviews"><span class="icon">⭐</span> Отзывы</a>
-            <a data-section="locations"><span class="icon">📍</span> Локации</a>
-            <a data-section="providers"><span class="icon">🏢</span> Провайдеры</a>
-            <a data-section="services"><span class="icon">🛠️</span> Доп. услуги</a>
-            <a data-section="trips"><span class="icon">✈️</span> Поездки</a>
-            <a data-section="admin" class="hidden" id="nav-admin"><span class="icon">⚙️</span> Админ-панель</a>
+            <a data-section="profile" class="active">Профиль</a>
+            <a data-section="notifications">Уведомления</a>
+            <a data-section="achievements">Достижения</a>
+            <a data-section="reviews">Отзывы</a>
+            <a data-section="locations">Локации</a>
+            <a data-section="providers">Провайдеры</a>
+            <a data-section="services">Доп. услуги</a>
+            <a data-section="trips">Поездки</a>
+            <a data-section="statistics">Статистика</a>
+            <a data-section="recommendations">Рекомендации</a>
+            <a data-section="admin" class="hidden" id="nav-admin">Админ-панель</a>
         </nav>
         <button class="logout-btn" id="logout-btn">Выйти</button>
     </aside>

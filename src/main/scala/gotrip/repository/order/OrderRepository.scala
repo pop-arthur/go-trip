@@ -10,17 +10,18 @@ import skunk.Session
 
 trait OrderRepository[F[_]]:
   def listByTrip(userId: UserId, tripId: TripId, params: OrderSearchParams): F[List[Order]]
-  def listExternalByUser(userId: UserId): F[List[Order]]
-  def findById(orderId: OrderId): F[Option[Order]]
   def findByUser(userId: UserId, orderId: OrderId): F[Option[Order]]
-  def create(order: Order): F[Order]
-  def update(order: Order): F[Option[Order]]
+  def create(userId: UserId, tripId: TripId, order: OrderCreate): F[Order]
+  def update(userId: UserId, orderId: OrderId, order: OrderUpdate): F[Option[Order]]
   def delete(userId: UserId, orderId: OrderId): F[Boolean]
-  def updateStatus(order: Order): F[Option[Order]]
+  def updateStatus(userId: UserId, orderId: OrderId, update: OrderStatusUpdate): F[Option[Order]]
   def insertStatusEvent(event: OrderStatusEvent): F[OrderStatusEvent]
   def tripExistsForUser(userId: UserId, tripId: TripId): F[Boolean]
   def providerExists(providerId: ProviderId): F[Boolean]
   def locationExists(locationId: LocationId): F[Boolean]
+  
+  def countByUser(userId: UserId): F[Int]
+  def getTotalSpending(userId: UserId): F[Double]
 
 object OrderRepository:
 

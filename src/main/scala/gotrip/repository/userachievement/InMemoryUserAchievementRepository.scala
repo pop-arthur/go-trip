@@ -12,9 +12,14 @@ object InMemoryUserAchievementRepository {
     val store = mutable.ListBuffer[UserAchievement]()
 
     new UserAchievementRepository[F] {
-      override def create(userAchievement: UserAchievement): F[UserAchievement] = {
-        store += userAchievement
-        userAchievement.pure[F]
+      override def create(userAchievement: UserAchievement): F[Option[UserAchievement]] = {
+        val exists = store.exists(ua => ua.userId == userAchievement.userId && ua.achievementId == userAchievement.achievementId)
+        if (exists) {
+          none[UserAchievement].pure[F]
+        } else {
+          store += userAchievement
+          userAchievement.some.pure[F]
+        }
       }
 
       override def findByUserId(userId: UserId): F[List[UserAchievement]] =
