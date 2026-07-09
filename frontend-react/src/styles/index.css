@@ -319,3 +319,30 @@ h2 {
 .gap-8 { gap: 8px; }
 .mt-16 { margin-top: 16px; }
 .mb-16 { margin-bottom: 16px; }
+
+/* Отступы для форм внутри карточек */
+.card form .input,
+.card form .select {
+  margin-bottom: 16px;
+}
+
+.card form .btn {
+  margin-top: 8px;
+}
+
+.card form .form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.card form .form-row .input,
+.card form .form-row .select {
+  margin-bottom: 0;
+}
+
+/* Общие отступы для списков */
+.list-item .actions {
+  gap: 12px;
+}

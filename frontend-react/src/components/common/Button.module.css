@@ -1,12 +1,16 @@
 .button {
   padding: 10px 20px;
   border: none;
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-sm);
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
   font-size: 14px;
+}
+
+.button-form {
+  margin-top: 8px;
 }
 
 .primary {

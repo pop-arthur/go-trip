@@ -111,32 +111,44 @@ const Admin = () => {
 
   const handleEditAchievement = async (id) => {
     const ach = achievements.find(a => a.id === id);
-    if (!ach) return;
+    if (!ach) {
+      showToast('Достижение не найдено', 'error');
+      return;
+    }
+
     const code = window.prompt('Код:', ach.code);
     if (code === null) return;
     const title = window.prompt('Название:', ach.title);
     if (title === null) return;
     const desc = window.prompt('Описание:', ach.description || '');
-    const condType = window.prompt('Тип условия:', ach.conditionType);
+    const condType = window.prompt('Тип условия (TRIPS_COUNT / COUNTRIES_COUNT / ORDERS_COUNT / REVIEWS_COUNT / SPENDING_AMOUNT):', ach.conditionType);
+    if (condType === null) return;
     const condValue = window.prompt('Значение:', ach.conditionValue);
     if (condValue === null) return;
+
     try {
       const resp = await apiFetch(`/admin/achievements/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({
-          code,
-          title,
-          description: desc || null,
-          conditionType: condType,
-          conditionValue: parseInt(condValue),
+          code: code.trim(),
+          title: title.trim(),
+          description: desc.trim() || null,
+          conditionType: condType.trim().toUpperCase(),
+          conditionValue: parseInt(condValue, 10),
         }),
       });
+
       if (resp.ok) {
         showToast('Достижение обновлено');
-        loadAchievements();
+        loadAchievements(); // обновляем список
+      } else {
+        const err = await resp.json();
+        showToast(`Ошибка: ${err.message || 'Неизвестная ошибка'}`, 'error');
+        console.error('Edit achievement error:', err);
       }
     } catch (e) {
-      showToast('Ошибка обновления', 'error');
+      showToast('Ошибка обновления: ' + e.message, 'error');
+      console.error(e);
     }
   };
 
