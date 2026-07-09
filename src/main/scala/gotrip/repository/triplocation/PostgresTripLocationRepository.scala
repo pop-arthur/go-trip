@@ -38,7 +38,6 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
     visitOrder: VisitOrder
   ): F[TripLocation] =
     sessionPool.use { session =>
-      // Генерируем новый ID
       val newId = UUID.randomUUID()
       session.prepare(PostgresTripLocationRepository.insertQuery).flatMap { cmd =>
         cmd.unique(
@@ -161,7 +160,6 @@ object PostgresTripLocationRepository:
           )
       }
 
-  // ИСПРАВЛЕНО: добавлен id в INSERT (теперь 6 параметров)
   val insertQuery: Query[(UUID, UUID, UUID, Int, Option[OffsetDateTime], Option[OffsetDateTime]), TripLocation] =
     sql"""
       INSERT INTO trip_locations (id, trip_id, location_id, visit_order, arrival_date, departure_date)

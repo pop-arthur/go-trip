@@ -37,8 +37,6 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       }
     }
 
-  // УДАЛЁН МЕТОД findById
-
   override def create(userId: UserId, tripId: TripId, order: OrderCreate): F[Order] =
     sessionPool.use { session =>
       session.prepare(PostgresOrderRepository.createQuery).flatMap { query =>
@@ -272,7 +270,6 @@ object PostgresOrderRepository:
                 departure_location_id, arrival_location_id, created_at, updated_at
     """.query(orderDecoder)
 
-  // ИСПРАВЛЕНО: добавлен id
   val insertStatusEventQuery: Query[(UUID, UUID, Option[String], String, Option[String], Option[String], String), OrderStatusEvent] =
     sql"""
       INSERT INTO order_status_events (id, order_id, old_status, new_status, reason, payload, source)
