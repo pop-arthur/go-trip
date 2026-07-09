@@ -1,9 +1,16 @@
 package gotrip.repository.statistics
 
 import cats.effect.{Concurrent, Resource}
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 import gotrip.domain.statistics._
-import gotrip.domain.user.UserId
-import skunk.Session
+import gotrip.domain.trip._
+import gotrip.domain.user._
+import gotrip.repository.SkunkCodecs.tripStatus
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
+import java.time.LocalDate
 
 trait StatisticsRepository[F[_]] {
   def getCountriesStatistics(userId: UserId, params: CountriesStatisticsParams): F[CountriesStatisticsResponse]

@@ -30,6 +30,13 @@ final class PostgresOrderRepository[F[_]: Concurrent](
       }
     }
 
+  override def listExternalByUser(userId: UserId): F[List[Order]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresOrderRepository.listExternalByUserQuery).flatMap { query =>
+        query.stream(userId.value, 64).compile.toList
+      }
+    }
+
   override def findByUser(userId: UserId, orderId: OrderId): F[Option[Order]] =
     sessionPool.use { session =>
       session.prepare(PostgresOrderRepository.findByUserQuery).flatMap { query =>
@@ -222,6 +229,17 @@ object PostgresOrderRepository:
         and ($bool or start_datetime::date >= $date)
         and ($bool or end_datetime::date <= $date)
       order by coalesce(start_datetime, timestamptz '9999-12-31 00:00:00+00'), id
+    """.query(orderDecoder)
+
+  val listExternalByUserQuery: Query[UUID, Order] =
+    sql"""
+      select id, user_id, trip_id, provider_id, service_type, external_order_id::text, title::text, status,
+             price_amount::float8, price_currency::text, start_datetime, end_datetime,
+             departure_location_id, arrival_location_id, created_at, updated_at
+      from orders
+      where user_id = $uuid
+        and external_order_id is not null
+      order by updated_at desc, id
     """.query(orderDecoder)
 
   val findByUserQuery: Query[(UUID, UUID), Order] =
