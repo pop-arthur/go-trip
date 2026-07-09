@@ -30,8 +30,14 @@ object InMemoryReviewRepository {
       override def findByTarget(targetType: ReviewTargetType, targetId: ReviewTargetId): F[List[Review]] =
         store.values.filter(r => r.targetType == targetType && r.targetId == targetId).toList.pure[F]
 
+      override def findByTargetType(targetType: ReviewTargetType): F[List[Review]] =
+        store.values.filter(_.targetType == targetType).toList.pure[F]
+
       override def findByUserId(userId: UserId): F[List[Review]] =
         store.values.filter(_.userId == userId).toList.pure[F]
+
+      override def findAll(): F[List[Review]] =
+        store.values.toList.pure[F]
 
       override def update(review: Review): F[Int] = {
         store.get(review.id) match {
@@ -56,6 +62,16 @@ object InMemoryReviewRepository {
 
       override def countByUser(userId: UserId): F[Int] =
         store.values.count(_.userId == userId).pure[F]
+
+      override def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]] = {
+        val targetReviews = store.values.filter(r => r.targetType == targetType && r.targetId == targetId).toList
+        if (targetReviews.isEmpty) {
+          Some(ReviewRatingSummary(targetType, targetId, None, 0)).pure[F]
+        } else {
+          val avg = targetReviews.map(_.rating.value).map(_.toDouble).sum / targetReviews.size
+          Some(ReviewRatingSummary(targetType, targetId, Some(avg), targetReviews.size)).pure[F]
+        }
+      }
     }.pure[F]
   }
 }

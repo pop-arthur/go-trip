@@ -47,10 +47,24 @@ final class PostgresReviewRepository[F[_]: Concurrent](
       }
     }
 
+  override def findByTargetType(targetType: ReviewTargetType): F[List[Review]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.selectByTargetType).flatMap { query =>
+        query.stream(ReviewTargetType.toString(targetType), 64).compile.toList
+      }
+    }
+
   override def findByUserId(userId: UserId): F[List[Review]] =
     sessionPool.use { session =>
       session.prepare(PostgresReviewRepository.selectByUserId).flatMap { query =>
         query.stream(userId.value, 64).compile.toList
+      }
+    }
+
+  override def findAll(): F[List[Review]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.selectAll).flatMap { query =>
+        query.stream(Void, 64).compile.toList
       }
     }
 
@@ -85,6 +99,16 @@ final class PostgresReviewRepository[F[_]: Concurrent](
     sessionPool.use { session =>
       session.prepare(PostgresReviewRepository.countByUserQuery).flatMap { q =>
         q.unique(userId.value)
+      }
+    }
+
+  override def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.ratingSummaryQuery).flatMap { query =>
+        query.option((ReviewTargetType.toString(targetType), targetId.value)).map {
+          case Some((avg, count)) => Some(ReviewRatingSummary(targetType, targetId, Some(avg), count))
+          case None => Some(ReviewRatingSummary(targetType, targetId, None, 0))
+        }
       }
     }
 
@@ -136,10 +160,25 @@ object PostgresReviewRepository:
       ORDER BY created_at DESC
     """.query(decoder)
 
+  val selectByTargetType: Query[String, Review] =
+    sql"""
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
+      FROM reviews
+      WHERE target_type = $text
+      ORDER BY created_at DESC
+    """.query(decoder)
+
   val selectByUserId: Query[UUID, Review] =
     sql"""
       SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
       FROM reviews WHERE user_id = $uuid
+      ORDER BY created_at DESC
+    """.query(decoder)
+
+  val selectAll: Query[Void, Review] =
+    sql"""
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
+      FROM reviews
       ORDER BY created_at DESC
     """.query(decoder)
 
@@ -162,6 +201,15 @@ object PostgresReviewRepository:
 
   val countByUserQuery: Query[UUID, Int] =
     sql"SELECT COUNT(*)::int FROM reviews WHERE user_id = $uuid".query(int4)
+
+  val ratingSummaryQuery: Query[(String, UUID), (Double, Int)] =
+    sql"""
+      SELECT
+        COALESCE(AVG(rating), 0.0)::double precision,
+        COUNT(*)::int
+      FROM reviews
+      WHERE target_type = $text AND target_id = $uuid
+    """.query(float8 ~ int4)
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): ReviewRepository[F] =
     new PostgresReviewRepository(sessionPool)

@@ -37,14 +37,35 @@ services:
       timeout: 5s
       retries: 10
 
+  # СТАРЫЙ ФРОНТЕНД (nginx, на порту 8081)
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: nginx:alpine
+    volumes:
+      - ./frontend:/usr/share/nginx/html
     ports:
       - "8081:80"
     depends_on:
       - app
+
+  # НОВЫЙ ФРОНТЕНД (React, на порту 3000)
+  frontend-react:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend-dev
+    environment:
+      - HOST=0.0.0.0
+      # - REACT_APP_API_URL=http://app:8080
+      - DISABLE_ESLINT_PLUGIN=true
+      - CI=true  
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend-react:/app
+      - /app/node_modules
+    depends_on:
+      - app
+    stdin_open: true
+    tty: true
 
 volumes:
   postgres-data:
