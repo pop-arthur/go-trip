@@ -1,0 +1,31 @@
+.toast {
+  padding: 14px 24px;
+  border-radius: 12px;
+  color: #f0eef7;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  max-width: 400px;
+  margin-bottom: 8px;
+  font-family: var(--font-family);
+  font-size: 15px;
+  animation: fadeIn 0.2s ease;
+}
+
+.success {
+  background: #2a4a5a;
+  border: 1px solid #4a6a7a;
+}
+
+.error {
+  background: #5a2a3a;
+  border: 1px solid #8a5a6a;
+}
+
+.info {
+  background: #3a4a5a;
+  border: 1px solid #4a6a7a;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
