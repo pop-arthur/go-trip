@@ -75,6 +75,17 @@ final class ReviewController(
         }
       }
 
+  val getRatingSummary: ServerEndpoint[Any, IO] =
+    ReviewEndpoints.getRatingSummary
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (targetType: ReviewTargetType, targetId: ReviewTargetId) =>
+        service.getRatingSummary(targetType, targetId).attempt.map {
+          case Right(Some(summary)) => Right(summary)
+          case Right(None)          => Left(HttpError.NotFound(s"No reviews found for target"))
+          case Left(error)          => Left(HttpError.Internal(error.getMessage))
+        }
+      }}
+
   val getReview: ServerEndpoint[Any, IO] =
     ReviewEndpoints.getReview.serverLogic { id =>
       service.findById(id).attempt.map {
@@ -119,5 +130,5 @@ final class ReviewController(
       }
 
   val all: List[ServerEndpoint[Any, IO]] =
-    List(listReviews, createReview, getReview, updateReview, deleteReview)
+    List(listReviews, createReview, getRatingSummary, getReview, updateReview, deleteReview)
 }

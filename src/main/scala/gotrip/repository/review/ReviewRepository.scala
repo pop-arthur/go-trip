@@ -4,8 +4,9 @@ import cats.effect.{Concurrent, Resource}
 import gotrip.domain.review.{Review, ReviewId, ReviewTargetType, ReviewTargetId}
 import gotrip.domain.user.UserId
 import skunk.Session
+import gotrip.domain.review.ReviewRatingSummary
 
-trait ReviewRepository[F[_]]:
+trait ReviewRepository[F[_]] {
   def create(review: Review): F[Review]
   def findById(id: ReviewId): F[Option[Review]]
   def findByTarget(targetType: ReviewTargetType, targetId: ReviewTargetId): F[List[Review]]
@@ -15,8 +16,9 @@ trait ReviewRepository[F[_]]:
   def update(review: Review): F[Int]
   def delete(id: ReviewId): F[Int]
   def averageRating(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[Double]]
-  
   def countByUser(userId: UserId): F[Int]
+  def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]]
+}
 
 object ReviewRepository:
 

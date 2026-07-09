@@ -49,4 +49,13 @@ object ReviewEndpoints {
       .in("reviews" / path[ReviewId]("reviewId"))
       .errorOut(EndpointErrors.notFound)
       .out(statusCode(StatusCode.NoContent))
+
+  val getRatingSummary: Endpoint[String, (ReviewTargetType, ReviewTargetId), ErrorResponse, ReviewRatingSummary, Any] =
+    endpoint.get
+      .securityIn(AuthEndpoints.bearer)
+      .in("reviews" / "rating-summary")
+      .in(query[ReviewTargetType]("targetType"))
+      .in(query[ReviewTargetId]("targetId"))
+      .errorOut(EndpointErrors.notFound)
+      .out(jsonBody[ReviewRatingSummary])
 }

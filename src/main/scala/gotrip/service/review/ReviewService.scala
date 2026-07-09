@@ -2,7 +2,7 @@ package gotrip.service.review
 
 import cats.effect.{Clock, Sync}
 import cats.syntax.all._
-import gotrip.domain.review.{Review, ReviewId, ReviewTargetType, ReviewTargetId}
+import gotrip.domain.review.{Review, ReviewId, ReviewRatingSummary, ReviewTargetType, ReviewTargetId}
 import gotrip.domain.user.UserId
 import gotrip.repository.review.ReviewRepository
 import gotrip.service.GeneratedData
@@ -42,4 +42,7 @@ final class ReviewService[F[_]: Sync: Clock: GeneratedData](
 
   def averageRating(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[Double]] =
     repo.averageRating(targetType, targetId)
+
+  def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]] =
+    repo.getRatingSummary(targetType, targetId)
 }

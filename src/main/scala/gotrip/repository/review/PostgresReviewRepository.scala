@@ -102,6 +102,16 @@ final class PostgresReviewRepository[F[_]: Concurrent](
       }
     }
 
+  override def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.ratingSummaryQuery).flatMap { query =>
+        query.option((ReviewTargetType.toString(targetType), targetId.value)).map {
+          case Some((avg, count)) => Some(ReviewRatingSummary(targetType, targetId, Some(avg), count))
+          case None => Some(ReviewRatingSummary(targetType, targetId, None, 0))
+        }
+      }
+    }
+
 object PostgresReviewRepository:
 
   private def rowsAffected(c: Completion): Int = c match {
@@ -191,6 +201,15 @@ object PostgresReviewRepository:
 
   val countByUserQuery: Query[UUID, Int] =
     sql"SELECT COUNT(*)::int FROM reviews WHERE user_id = $uuid".query(int4)
+
+  val ratingSummaryQuery: Query[(String, UUID), (Double, Int)] =
+    sql"""
+      SELECT
+        COALESCE(AVG(rating), 0.0)::double precision,
+        COUNT(*)::int
+      FROM reviews
+      WHERE target_type = $text AND target_id = $uuid
+    """.query(float8 ~ int4)
 
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): ReviewRepository[F] =
     new PostgresReviewRepository(sessionPool)
