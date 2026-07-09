@@ -1,5 +1,8 @@
 services:
   app:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: gotrip-backend:0.1.0-SNAPSHOT
     env_file:
       - .env
@@ -35,9 +38,9 @@ services:
       retries: 10
 
   frontend:
-    image: nginx:alpine
-    volumes:
-      - ./frontend:/usr/share/nginx/html
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     ports:
       - "8081:80"
     depends_on:
