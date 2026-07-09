@@ -505,7 +505,68 @@ function renderAchievements(container) {
 // ============================================================
 //  REVIEWS
 // ============================================================
+let providersMap = {};
+let locationsMap = {};
+let servicesMap = {};
+
+async function loadReviewMaps() {
+    try {
+        const [provResp, locResp, servResp] = await Promise.all([
+            apiFetch('/providers'),
+            apiFetch('/locations'),
+            apiFetch('/additional-services')
+        ]);
+        if (provResp.ok) {
+            const data = await provResp.json();
+            providersMap = {};
+            data.forEach(item => providersMap[item.id] = item.name);
+        }
+        if (locResp.ok) {
+            const data = await locResp.json();
+            locationsMap = {};
+            data.forEach(item => locationsMap[item.id] = item.name);
+        }
+        if (servResp.ok) {
+            const data = await servResp.json();
+            servicesMap = {};
+            data.forEach(item => servicesMap[item.id] = item.title);
+        }
+    } catch (e) {
+        console.error('Ошибка загрузки справочников для отзывов', e);
+    }
+}
+
+function getTargetName(targetType, targetId) {
+    if (!targetType || !targetId) return 'неизвестно';
+    const type = targetType.toUpperCase();
+    switch (type) {
+        case 'PROVIDER':
+            return providersMap[targetId] || `Провайдер #${targetId.slice(0, 8)}`;
+        case 'LOCATION':
+            return locationsMap[targetId] || `Локация #${targetId.slice(0, 8)}`;
+        case 'ADDITIONAL_SERVICE':
+        case 'ADDITIONALSERVICE':
+            return servicesMap[targetId] || `Услуга #${targetId.slice(0, 8)}`;
+        case 'ORDER':
+            return `Заказ #${targetId.slice(0, 8)}`;
+        default:
+            return targetId.slice(0, 8);
+    }
+}
+
+function getUserLabel(userId, currentUserId) {
+    if (!userId) return 'неизвестно';
+    if (userId === currentUserId) return 'Вы';
+    return `#${userId.slice(0, 8)}`;
+}
+
 function renderReviews(container) {
+    if (Object.keys(providersMap).length === 0) {
+        loadReviewMaps();
+    }
+
+    let viewMode = 'all';
+
     container.innerHTML = `
         <div class="section active">
             <h2>Отзывы</h2>
@@ -541,15 +602,22 @@ function renderReviews(container) {
             </div>
             <div class="card">
                 <h3>Список отзывов</h3>
+                <!-- Вкладки -->
+                <div class="form-row" style="margin-bottom: 12px;">
+                    <button class="btn btn-sm btn-outline review-tab" data-view="all" style="background: var(--color-primary);">Все</button>
+                    <button class="btn btn-sm btn-outline review-tab" data-view="mine">Мои</button>
+                </div>
                 <div class="form-row">
                     <label>Тип цели <select id="review-filter-type">
                         <option value="">Все</option>
-                        <option value="PROVIDER">Провайдер</option>
-                        <option value="LOCATION">Локация</option>
-                        <option value="ORDER">Заказ</option>
-                        <option value="ADDITIONAL_SERVICE">Доп. услуга</option>
+                        <option value="PROVIDER">Провайдеры</option>
+                        <option value="LOCATION">Локации</option>
+                        <option value="ORDER">Заказы</option>
+                        <option value="ADDITIONAL_SERVICE">Доп. услуги</option>
                     </select></label>
-                    <label>ID цели <input type="text" id="review-filter-id" placeholder="Введите ID" /></label>
+                    <label>Цель <select id="review-filter-target">
+                        <option value="">-- Все --</option>
+                    </select></label>
                     <button class="btn" id="review-filter-btn">Поиск</button>
                 </div>
                 <div id="review-list"></div>
@@ -561,6 +629,14 @@ function renderReviews(container) {
     const targetIdSelect = document.getElementById('review-target-id');
     const tripSelectWrapper = document.getElementById('order-trip-select-wrapper');
     const tripSelect = document.getElementById('review-trip-select');
+    const filterTypeSelect = document.getElementById('review-filter-type');
+    const filterTargetSelect = document.getElementById('review-filter-target');
+    const filterBtn = document.getElementById('review-filter-btn');
+    const createBtn = document.getElementById('review-create-btn');
+
+    let filterType = '';
+    let filterTargetId = '';
+    let filterTargetOptions = [];
 
     function loadTargets(targetType) {
         const select = targetIdSelect;
@@ -695,6 +771,107 @@ function renderReviews(container) {
             });
     }
 
+    function loadFilterTargets(targetType) {
+        const select = filterTargetSelect;
+        select.innerHTML = '<option value="">Загрузка...</option>';
+        select.disabled = true;
+        filterTargetId = '';
+        filterTargetOptions = [];
+
+        let url = '';
+        let labelField = 'name';
+        let idField = 'id';
+
+        switch (targetType) {
+            case 'PROVIDER':
+                url = '/providers';
+                labelField = 'name';
+                break;
+            case 'LOCATION':
+                url = '/locations';
+                labelField = 'name';
+                break;
+            case 'ADDITIONAL_SERVICE':
+                url = '/additional-services';
+                labelField = 'title';
+                break;
+            case 'ORDER':
+                select.innerHTML = '<option value="">Введите ID заказа</option>';
+                select.disabled = false;
+                const inputId = document.createElement('input');
+                inputId.type = 'text';
+                inputId.placeholder = 'ID заказа';
+                inputId.id = 'review-filter-order-id';
+                inputId.style.marginLeft = '8px';
+                select.parentNode.insertBefore(inputId, select.nextSibling);
+                select.style.display = 'none';
+                inputId.addEventListener('input', function() {
+                    filterTargetId = this.value;
+                });
+                return;
+            default:
+                select.innerHTML = '<option value="">-- Все --</option>';
+                select.disabled = false;
+                return;
+        }
+
+        apiFetch(url)
+            .then(resp => {
+                if (!resp.ok) throw new Error(`Ошибка загрузки: ${resp.status}`);
+                return resp.json();
+            })
+            .then(list => {
+                if (!list || list.length === 0) {
+                    select.innerHTML = '<option value="">Нет доступных объектов</option>';
+                    select.disabled = true;
+                    return;
+                }
+                const allOption = document.createElement('option');
+                allOption.value = '';
+                allOption.textContent = `Все ${targetType.toLowerCase()}`;
+                select.innerHTML = '';
+                select.appendChild(allOption);
+                list.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = String(item[idField]);
+                    option.textContent = item[labelField] || item[idField];
+                    select.appendChild(option);
+                });
+                filterTargetOptions = list.map(item => ({ value: item[idField], label: item[labelField] || item[idField] }));
+                select.disabled = false;
+                const inputOrder = document.getElementById('review-filter-order-id');
+                if (inputOrder) inputOrder.remove();
+                select.style.display = '';
+            })
+            .catch(err => {
+                select.innerHTML = `<option value="">Ошибка: ${err.message}</option>`;
+                select.disabled = true;
+                showToast('Не удалось загрузить цели для фильтра', 'error');
+            });
+    }
+
+    filterTypeSelect.addEventListener('change', function() {
+        const type = this.value;
+        filterType = type;
+        const oldInput = document.getElementById('review-filter-order-id');
+        if (oldInput) oldInput.remove();
+        const select = filterTargetSelect;
+        select.style.display = '';
+        if (type) {
+            loadFilterTargets(type);
+        } else {
+            select.innerHTML = '<option value="">-- Все --</option>';
+            select.disabled = false;
+            filterTargetId = '';
+        }
+        loadReviews();
+    });
+
+    filterTargetSelect.addEventListener('change', function() {
+        filterTargetId = this.value;
+        loadReviews();
+    });
+
     targetTypeSelect.addEventListener('change', () => {
         const type = targetTypeSelect.value;
         if (type) {
@@ -706,9 +883,74 @@ function renderReviews(container) {
         }
     });
 
-    loadTargets(targetTypeSelect.value);
+    let currentView = 'all';
+    const tabs = container.querySelectorAll('.review-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.style.background = '');
+            this.style.background = 'var(--color-primary)';
+            currentView = this.dataset.view;
+            loadReviews();
+        });
+    });
+    tabs[0].style.background = 'var(--color-primary)';
 
-    const createBtn = document.getElementById('review-create-btn');
+    async function loadReviews() {
+        const listEl = document.getElementById('review-list');
+        if (!listEl) return;
+        listEl.innerHTML = '<p>Загрузка...</p>';
+
+        try {
+            const params = new URLSearchParams();
+            if (filterType) {
+                params.append('targetType', filterType);
+                if (filterTargetId) {
+                    params.append('targetId', filterTargetId);
+                }
+            }
+            const resp = await apiFetch(`/reviews?${params.toString()}`);
+            if (!resp.ok) {
+                listEl.innerHTML = '<div class="error-state">Ошибка загрузки отзывов</div>';
+                return;
+            }
+            let data = await resp.json();
+            if (currentView === 'mine') {
+                data = data.filter(r => r.userId === state.user?.id);
+            }
+            if (!data || data.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">Нет отзывов</div>';
+                return;
+            }
+            let html = '';
+            data.forEach(r => {
+                const targetName = getTargetName(r.targetType, r.targetId);
+                const userLabel = getUserLabel(r.userId, state.user?.id);
+                const text = r.text || '(без текста)';
+                html += `
+                    <div class="list-item">
+                        <div class="info">
+                            <div class="title">
+                                <span style="color: #f5b342;">⭐</span> ${r.rating}/5 — ${targetName}
+                            </div>
+                            <div class="sub">${text}</div>
+                            <div class="sub" style="font-size:12px;color:var(--color-text-secondary);">
+                                От пользователя: ${userLabel}
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-outline" onclick="editReview('${r.id}')">✎</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteReview('${r.id}')">✕</button>
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        } catch (e) {
+            listEl.innerHTML = '<div class="error-state">Ошибка загрузки отзывов</div>';
+            showToast('Ошибка загрузки отзывов', 'error');
+        }
+    }
+
     if (createBtn) {
         createBtn.addEventListener('click', async () => {
             const targetType = targetTypeSelect.value;
@@ -737,17 +979,13 @@ function renderReviews(container) {
                 });
                 if (resp.ok) {
                     showToast('Отзыв создан');
-                    renderReviews(container);
+                    document.getElementById('review-rating').value = '';
+                    document.getElementById('review-text').value = '';
+                    targetIdSelect.value = '';
+                    loadReviews();
                 } else {
-                    const textBody = await resp.text();
-                    let errMsg = 'Ошибка создания отзыва';
-                    try {
-                        const json = JSON.parse(textBody);
-                        errMsg = json.message || errMsg;
-                    } catch (_) {
-                        errMsg = textBody || errMsg;
-                    }
-                    showToast('Ошибка: ' + errMsg, 'error');
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + (err.message || ''), 'error');
                 }
             } catch (e) {
                 showToast('Ошибка: ' + e.message, 'error');
@@ -755,46 +993,15 @@ function renderReviews(container) {
         });
     }
 
-    const filterBtn = document.getElementById('review-filter-btn');
     if (filterBtn) {
         filterBtn.addEventListener('click', loadReviews);
     }
-    loadReviews();
 
-    async function loadReviews() {
-        const targetType = document.getElementById('review-filter-type').value;
-        const targetId = document.getElementById('review-filter-id').value;
-        let url = '/reviews';
-        const params = new URLSearchParams();
-        if (targetType) params.append('targetType', targetType);
-        if (targetId) params.append('targetId', targetId);
-        if (params.toString()) url += '?' + params.toString();
-        try {
-            const resp = await apiFetch(url);
-            if (resp.ok) {
-                const list = await resp.json();
-                const el = document.getElementById('review-list');
-                if (!list || list.length === 0) {
-                    el.innerHTML = '<div class="empty-state">Нет отзывов</div>';
-                    return;
-                }
-                el.innerHTML = list.map(r => `
-                    <div class="list-item">
-                        <div class="info">
-                            <div class="title">${r.rating}/5 — ${r.target_type} #${r.target_id}</div>
-                            <div class="sub">${r.text || '(без текста)'}</div>
-                        </div>
-                        <div class="actions">
-                            <button class="btn btn-sm btn-outline" onclick="editReview('${r.id}')">Редактировать</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteReview('${r.id}')">Удалить</button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        } catch (e) {
-            showToast('Ошибка загрузки отзывов', 'error');
-        }
-    }
+    loadTargets(targetTypeSelect.value);
+    filterTypeSelect.value = '';
+    filterTargetSelect.innerHTML = '<option value="">-- Все --</option>';
+    filterTargetSelect.disabled = false;
+    loadReviews();
 
     window.editReview = (id) => {
         apiFetch(`/reviews/${id}`).then(resp => resp.json()).then(review => {
