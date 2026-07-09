@@ -363,9 +363,10 @@ const TripDetail = () => {
   };
 
   const handleViewFile = (fileUrl) => {
-    window.open(fileUrl, '_blank');
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+    window.open(`${baseUrl}/${fileUrl}`, '_blank');
   };
-
+  
   if (loading) return <div className="loading-state">Загрузка данных поездки...</div>;
   if (!trip) return <div className="error-state">Поездка не найдена</div>;
 
