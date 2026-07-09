@@ -8,6 +8,6 @@ VALUES
   (gen_random_uuid(), 'ORGANIZER', 'Organizer', 'Add 5 orders', 'ORDERS_COUNT', 5, 'https://example.com/icons/organizer.svg', now(), now()),
   (gen_random_uuid(), 'REVIEWER', 'Reviewer', 'Leave your first review', 'REVIEWS_COUNT', 1, 'https://example.com/icons/reviewer.svg', now(), now()),
   (gen_random_uuid(), 'CRITIC', 'Critic', 'Leave 5 reviews', 'REVIEWS_COUNT', 5, 'https://example.com/icons/critic.svg', now(), now()),
-  (gen_random_uuid(), 'BIG_SPENDER', 'Big Spender', 'Spend over $1000', 'SPENDING_AMOUNT', 1000, 'https://example.com/icons/big-spender.svg', now(), now()),
-  (gen_random_uuid(), 'MEGA_SPENDER', 'Mega Spender', 'Spend over $5000', 'SPENDING_AMOUNT', 5000, 'https://example.com/icons/mega-spender.svg', now(), now())
+  (gen_random_uuid(), 'BIG_SPENDER', 'Big Spender', 'Spend over 10000 rubles', 'SPENDING_AMOUNT', 10000, 'https://example.com/icons/big-spender.svg', now(), now()),
+  (gen_random_uuid(), 'MEGA_SPENDER', 'Mega Spender', 'Spend over 50000 rubles', 'SPENDING_AMOUNT', 50000, 'https://example.com/icons/mega-spender.svg', now(), now())
 ON CONFLICT (code) DO NOTHING;

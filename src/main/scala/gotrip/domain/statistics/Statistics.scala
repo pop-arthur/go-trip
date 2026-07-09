@@ -15,7 +15,7 @@ case class SpendingStatisticsResponse(
 )
 
 case class SpendingItem(
-  trip_id: Long,
+  trip_id: String,
   trip_title: String,
   amount: Double
 )
@@ -34,7 +34,7 @@ case class TripDurationsResponse(
 )
 
 case class TripDuration(
-  trip_id: Long,
+  trip_id: String,
   trip_title: String,
   duration_days: Int,
   duration_hours: Int
