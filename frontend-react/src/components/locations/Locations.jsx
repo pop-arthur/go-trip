@@ -107,6 +107,9 @@ const Locations = () => {
       if (resp.ok) {
         showToast('Локация удалена');
         loadLocations();
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        showToast(err.message || 'Ошибка удаления', 'error');
       }
     } catch (e) {
       showToast('Ошибка удаления', 'error');
