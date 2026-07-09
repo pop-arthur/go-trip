@@ -26,8 +26,14 @@ final class ReviewService[F[_]: Sync: Clock: GeneratedData](
   def findByTarget(targetType: ReviewTargetType, targetId: ReviewTargetId): F[List[Review]] =
     repo.findByTarget(targetType, targetId)
 
+  def findByTargetType(targetType: ReviewTargetType): F[List[Review]] =
+    repo.findByTargetType(targetType)
+
   def findByUser(userId: UserId): F[List[Review]] =
     repo.findByUserId(userId)
+
+  def findAll(): F[List[Review]] =
+    repo.findAll()
 
   def update(review: Review): F[Int] =
     GeneratedData[F].now().flatMap(now => repo.update(review.copy(updatedAt = now)))

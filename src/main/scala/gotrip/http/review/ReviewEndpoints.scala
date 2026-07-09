@@ -6,14 +6,15 @@ import gotrip.http.auth.AuthEndpoints
 import sttp.model.StatusCode
 import sttp.tapir._
 import sttp.tapir.json.circe._
-import ReviewCodecs.{ReviewCreateRequest, ReviewUpdateRequest, given}
 
+import ReviewCodecs.{ReviewCreateRequest, ReviewUpdateRequest, given}
 
 object ReviewEndpoints {
   type ErrorResponse = HttpError
 
-  val listReviews: PublicEndpoint[(Option[ReviewTargetType], Option[String]), ErrorResponse, List[Review], Any] =
+  val listReviews: Endpoint[String, (Option[ReviewTargetType], Option[String]), ErrorResponse, List[Review], Any] =
     endpoint.get
+      .securityIn(AuthEndpoints.bearer)
       .in("reviews")
       .in(query[Option[ReviewTargetType]]("targetType"))
       .in(query[Option[String]]("targetId"))

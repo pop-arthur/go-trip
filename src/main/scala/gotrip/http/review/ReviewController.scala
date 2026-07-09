@@ -15,23 +15,33 @@ final class ReviewController(
 ) {
 
   val listReviews: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.listReviews.serverLogic { case (targetType, targetId) =>
-      (targetType, targetId) match {
-        case (Some(tt), Some(tid)) =>
-          try {
-            val tidUuid = UUID.fromString(tid)
-            service.findByTarget(tt, ReviewTargetId(tidUuid)).attempt.map {
+    ReviewEndpoints.listReviews
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (targetType, targetId) =>
+        (targetType, targetId) match {
+          case (Some(tt), Some(tid)) =>
+            try {
+              val tidUuid = UUID.fromString(tid)
+              service.findByTarget(tt, ReviewTargetId(tidUuid)).attempt.map {
+                case Right(list) => Right(list)
+                case Left(error) => Left(HttpError.Internal(error.getMessage))
+              }
+            } catch {
+              case _: IllegalArgumentException =>
+                IO.pure(Left(HttpError.Validation("Invalid targetId format")))
+            }
+          case (Some(tt), None) =>
+            service.findByTargetType(tt).attempt.map {
               case Right(list) => Right(list)
               case Left(error) => Left(HttpError.Internal(error.getMessage))
             }
-          } catch {
-            case _: IllegalArgumentException =>
-              IO.pure(Left(HttpError.Validation("Invalid targetId format")))
-          }
-        case _ =>
-          IO.pure(Right(Nil))
-      }
-    }
+          case _ =>
+            service.findAll().attempt.map {
+              case Right(list) => Right(list)
+              case Left(error) => Left(HttpError.Internal(error.getMessage))
+            }
+        }
+      } }
 
   val createReview: ServerEndpoint[Any, IO] =
     ReviewEndpoints.createReview

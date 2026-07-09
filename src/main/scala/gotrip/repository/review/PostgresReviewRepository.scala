@@ -47,10 +47,24 @@ final class PostgresReviewRepository[F[_]: Concurrent](
       }
     }
 
+  override def findByTargetType(targetType: ReviewTargetType): F[List[Review]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.selectByTargetType).flatMap { query =>
+        query.stream(ReviewTargetType.toString(targetType), 64).compile.toList
+      }
+    }
+
   override def findByUserId(userId: UserId): F[List[Review]] =
     sessionPool.use { session =>
       session.prepare(PostgresReviewRepository.selectByUserId).flatMap { query =>
         query.stream(userId.value, 64).compile.toList
+      }
+    }
+
+  override def findAll(): F[List[Review]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.selectAll).flatMap { query =>
+        query.stream(Void, 64).compile.toList
       }
     }
 
@@ -136,10 +150,25 @@ object PostgresReviewRepository:
       ORDER BY created_at DESC
     """.query(decoder)
 
+  val selectByTargetType: Query[String, Review] =
+    sql"""
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
+      FROM reviews
+      WHERE target_type = $text
+      ORDER BY created_at DESC
+    """.query(decoder)
+
   val selectByUserId: Query[UUID, Review] =
     sql"""
       SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
       FROM reviews WHERE user_id = $uuid
+      ORDER BY created_at DESC
+    """.query(decoder)
+
+  val selectAll: Query[Void, Review] =
+    sql"""
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
+      FROM reviews
       ORDER BY created_at DESC
     """.query(decoder)
 
