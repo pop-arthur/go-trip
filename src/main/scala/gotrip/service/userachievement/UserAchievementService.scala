@@ -1,8 +1,8 @@
 package gotrip.service.userachievement
 
 import cats.effect.{Clock, Sync}
-import cats.syntax.flatMap.*
-import cats.syntax.functor.*
+import cats.syntax.flatMap._
+import cats.syntax.functor._
 import gotrip.domain.user.UserId
 import gotrip.domain.achievement.AchievementId
 import gotrip.domain.userachievement.{UserAchievement, UserAchievementId}
@@ -13,8 +13,8 @@ final class UserAchievementService[F[_]: Sync: Clock: GeneratedData](
   repo: UserAchievementRepository[F]
 ):
 
-  def unlock(userId: UserId, achievementId: AchievementId): F[UserAchievement] =
-    for
+  def unlock(userId: UserId, achievementId: AchievementId): F[Option[UserAchievement]] =
+    for {
       id <- GeneratedData[F].newId()
       now <- GeneratedData[F].now()
       achievement <- repo.create(
@@ -27,7 +27,7 @@ final class UserAchievementService[F[_]: Sync: Clock: GeneratedData](
           updatedAt = now
         )
       )
-    yield achievement
+    } yield achievement
 
   def listByUser(userId: UserId): F[List[UserAchievement]] =
     repo.findByUserId(userId)

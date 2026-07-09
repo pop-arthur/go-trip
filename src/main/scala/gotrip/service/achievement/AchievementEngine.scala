@@ -37,14 +37,15 @@ class AchievementEngine[F[_]: Monad](
         checkCondition(userId, ach).flatMap {
           case true =>
             val ua = UserAchievement(
-              id = UserAchievementId(UUID.fromString("00000000-0000-0000-0000-000000000000")),
+              id = UserAchievementId(UUID.randomUUID()),
               userId = userId,
               achievementId = ach.id,
               unlockedAt = Instant.now(),
               createdAt = Instant.now(),
               updatedAt = Instant.now()
             )
-            userAchievementRepo.create(ua).void
+            // Вставка вернёт Some, если успешно, и None при конфликте — игнорируем
+            userAchievementRepo.create(ua).map(_ => ())
           case false => Monad[F].unit
         }
       }
