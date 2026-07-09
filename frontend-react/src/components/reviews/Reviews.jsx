@@ -7,7 +7,6 @@ import Button from '../common/Button';
 import Input from '../common/Input';
 import Select from '../common/Select';
 
-// Маппинг типов целей на русские названия для подписей фильтра
 const typeLabels = {
   PROVIDER: 'провайдеров',
   LOCATION: 'локаций',
@@ -22,7 +21,6 @@ const Reviews = () => {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Вкладка: 'all' или 'mine'
   const [viewMode, setViewMode] = useState('all');
 
   const [filterType, setFilterType] = useState('');
@@ -41,10 +39,13 @@ const Reviews = () => {
   const [orders, setOrders] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState('');
 
-  // Кэши для названий целей
   const [providersMap, setProvidersMap] = useState({});
   const [locationsMap, setLocationsMap] = useState({});
   const [servicesMap, setServicesMap] = useState({});
+
+  const [showTargetModal, setShowTargetModal] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState(null);
+  const [targetRating, setTargetRating] = useState(null);
 
   // Загрузка справочников
   useEffect(() => {
@@ -78,7 +79,7 @@ const Reviews = () => {
       }
     };
     loadMaps();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, []);
 
   // Загрузка отзывов
@@ -95,7 +96,6 @@ const Reviews = () => {
       const resp = await apiFetch(`/reviews?${params.toString()}`);
       if (resp.ok) {
         let data = await resp.json();
-        // Если вкладка "Мои" – фильтруем по userId
         if (viewMode === 'mine') {
           data = data.filter(r => r.userId === user?.id);
         }
@@ -124,7 +124,7 @@ const Reviews = () => {
       }
     };
     loadTrips();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, []);
 
   // Загрузка заказов при выборе поездки
@@ -145,7 +145,7 @@ const Reviews = () => {
     } else {
       setOrders([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, [selectedTripId]);
 
   // Загрузка целей для формы создания
@@ -190,7 +190,7 @@ const Reviews = () => {
       }
     };
     loadTargets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, [createTargetType]);
 
   // Загрузка целей для фильтра
@@ -234,16 +234,15 @@ const Reviews = () => {
       }
     };
     loadFilterTargets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, [filterType]);
 
   // Перезагрузка при изменении вкладки или фильтров
   useEffect(() => {
     loadReviews();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line
   }, [viewMode, filterType, filterTargetId]);
 
-  // Создание отзыва
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!createTargetId || !createRating) {
@@ -269,7 +268,6 @@ const Reviews = () => {
           setSelectedTripId('');
           setOrders([]);
         }
-        // Сброс фильтров для обновления списка
         setFilterType('');
         setFilterTargetId('');
         setFilterTargetOptions([]);
@@ -283,14 +281,11 @@ const Reviews = () => {
     }
   };
 
-  // Редактирование отзыва
   const handleEdit = async (id) => {
     const review = reviews.find((r) => r.id === id);
     if (!review) return;
-    // eslint-disable-next-line no-restricted-globals
     const newRating = window.prompt('Новая оценка (1-5):', review.rating);
     if (newRating === null) return;
-    // eslint-disable-next-line no-restricted-globals
     const newText = window.prompt('Новый текст:', review.text || '');
     if (newText === null) return;
     try {
@@ -310,10 +305,8 @@ const Reviews = () => {
     }
   };
 
-  // Удаление отзыва
   const handleDelete = async (id) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!window.confirm('Удалить отзыв?')) return;
+    if (!window.confirm('Удалить этот отзыв?')) return;
     try {
       const resp = await apiFetch(`/reviews/${id}`, { method: 'DELETE' });
       if (resp.ok) {
@@ -325,7 +318,6 @@ const Reviews = () => {
     }
   };
 
-  // Получение названия цели (с поддержкой AdditionalService)
   const getTargetName = (targetType, targetId) => {
     if (!targetType || !targetId) return 'неизвестно';
     const type = targetType.toUpperCase();
@@ -344,28 +336,62 @@ const Reviews = () => {
     }
   };
 
-  // Русская подпись для второго селекта
   const getFilterLabel = (filterType) => {
     if (!filterType) return 'Все';
     const label = typeLabels[filterType.toUpperCase()];
     return label ? `Все ${label}` : 'Все';
   };
 
-  // Отображение пользователя: "Вы" для своих, иначе сокращённый ID
   const getUserLabel = (userId) => {
     if (!userId) return 'неизвестно';
     if (userId === user?.id) return 'Вы';
     return `#${userId.slice(0, 8)}`;
   };
 
+    const handleViewTarget = (targetType, targetId) => {
+      if (!targetType || !targetId) return;
+      const name = getTargetName(targetType, targetId);
+      setSelectedTarget({ targetType, targetId, name });
+      apiFetch(`/reviews/rating-summary?targetType=${targetType.toUpperCase()}&targetId=${targetId}`)
+        .then(resp => {
+          if (!resp.ok) {
+            if (resp.status === 400) {
+              showToast('Неверный формат типа цели', 'error');
+            }
+            return resp.json().catch(() => ({}));
+          }
+          return resp.json();
+        })
+        .then(data => {
+          setTargetRating(data);
+          setShowTargetModal(true);
+        })
+        .catch(() => {
+          setTargetRating(null);
+          setShowTargetModal(true);
+        });
+  };
+
+  const closeTargetModal = () => {
+    setShowTargetModal(false);
+    setSelectedTarget(null);
+    setTargetRating(null);
+  };
+
+  const clearFilters = () => {
+    setFilterType('');
+    setFilterTargetId('');
+    setFilterTargetOptions([]);
+  };
+
   return (
     <div>
-      <h2>
-        <i className="fas fa-star" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>
-        Отзывы
-      </h2>
+      <h2><i className="fas fa-star" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>Отзывы</h2>
 
       <Card title="Создать отзыв" icon="fa-pen">
+        <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+          Оставьте отзыв о провайдере, локации, заказе или дополнительной услуге.
+        </p>
         <form onSubmit={handleCreate}>
           <div className="flex-row">
             <Select
@@ -416,7 +442,7 @@ const Reviews = () => {
               type="number"
               min="1"
               max="5"
-              placeholder="Оценка (1-5)"
+              placeholder="Оценка *"
               value={createRating}
               onChange={(e) => setCreateRating(e.target.value)}
               required
@@ -429,9 +455,7 @@ const Reviews = () => {
               style={{ flex: 1 }}
             />
           </div>
-          <Button type="submit">
-            <i className="fas fa-plus"></i> Оставить отзыв
-          </Button>
+          <Button type="submit"><i className="fas fa-plus"></i> Оставить отзыв</Button>
         </form>
       </Card>
 
@@ -473,7 +497,7 @@ const Reviews = () => {
               setFilterTargetId('');
             }}
             options={[
-              { value: '', label: 'Все' },
+              { value: '', label: 'Все типы' },
               { value: 'PROVIDER', label: 'Провайдеры' },
               { value: 'LOCATION', label: 'Локации' },
               { value: 'ORDER', label: 'Заказы' },
@@ -501,16 +525,19 @@ const Reviews = () => {
             />
           )}
           <Button variant="secondary" onClick={loadReviews}>
-            <i className="fas fa-search"></i> Поиск
+            <i className="fas fa-search"></i> Найти
+          </Button>
+          <Button variant="secondary" onClick={clearFilters}>
+            <i className="fas fa-undo"></i> Сбросить
           </Button>
         </div>
 
         {loading ? (
-          <p>Загрузка...</p>
+          <div className="loading-state">Загрузка отзывов...</div>
         ) : reviews.length === 0 ? (
           <div className="empty-state">
             <i className="fas fa-star"></i>
-            <p>Нет отзывов</p>
+            <p>Нет отзывов. Оставьте первый!</p>
           </div>
         ) : (
           reviews.map((r) => (
@@ -519,6 +546,15 @@ const Reviews = () => {
                 <div className="title">
                   <i className="fas fa-star" style={{ color: '#f5b342', marginRight: 8 }}></i>
                   {r.rating}/5 — {getTargetName(r.targetType, r.targetId)}
+                  <Button
+                    variant="secondary"
+                    className="btn-sm"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => handleViewTarget(r.targetType, r.targetId)}
+                    title="Посмотреть рейтинг и детали"
+                  >
+                    <i className="fas fa-info-circle"></i>
+                  </Button>
                 </div>
                 <div className="sub">{r.text || '(без текста)'}</div>
                 <div className="sub" style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
@@ -545,6 +581,50 @@ const Reviews = () => {
           ))
         )}
       </Card>
+
+      {showTargetModal && selectedTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+          }}
+          onClick={closeTargetModal}
+        >
+          <div
+            style={{
+              background: 'white',
+              borderRadius: 'var(--border-radius)',
+              padding: '32px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>{selectedTarget.name}</h3>
+            <div style={{ marginTop: 16 }}>
+              <p><strong>Тип:</strong> {selectedTarget.targetType}</p>
+              <p><strong>ID:</strong> {selectedTarget.targetId}</p>
+              {targetRating && (
+                <div style={{ marginTop: 12, padding: 12, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
+                  <p><strong>⭐ Средняя оценка:</strong> {targetRating.averageRating ? targetRating.averageRating.toFixed(1) : 'нет оценок'}</p>
+                  <p><strong>📝 Количество отзывов:</strong> {targetRating.reviewCount || 0}</p>
+                </div>
+              )}
+            </div>
+            <Button onClick={closeTargetModal} style={{ marginTop: 16 }}>Закрыть</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

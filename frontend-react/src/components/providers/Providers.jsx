@@ -20,6 +20,11 @@ const Providers = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Модалка для просмотра
+  const [selectedProvider, setSelectedProvider] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState(null);
+
   const loadProviders = async () => {
     setLoading(true);
     try {
@@ -40,6 +45,7 @@ const Providers = () => {
 
   useEffect(() => {
     loadProviders();
+    // eslint-disable-next-line
   }, [filterType, filterQuery]);
 
   const handleCreate = async (e) => {
@@ -66,7 +72,8 @@ const Providers = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Удалить провайдера?')) return;
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm('Удалить провайдера?')) return;
     try {
       const resp = await apiFetch(`/providers/${id}`, { method: 'DELETE' });
       if (resp.ok) {
@@ -78,13 +85,45 @@ const Providers = () => {
     }
   };
 
+  const handleViewDetails = async (id) => {
+    try {
+      const resp = await apiFetch(`/providers/${id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setSelectedProvider(data);
+        try {
+          const ratingResp = await apiFetch(`/reviews/rating-summary?targetType=PROVIDER&targetId=${id}`);
+          if (ratingResp.ok) {
+            const ratingData = await ratingResp.json();
+            setRatingSummary(ratingData);
+          } else {
+            setRatingSummary(null);
+          }
+        } catch (e) {
+          setRatingSummary(null);
+        }
+        setShowModal(true);
+      } else {
+        showToast('Ошибка загрузки данных', 'error');
+      }
+    } catch (e) {
+      showToast('Ошибка загрузки данных', 'error');
+    }
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedProvider(null);
+    setRatingSummary(null);
+  };
+
   return (
     <div>
-      <h2>Провайдеры</h2>
+      <h2><i className="fas fa-building" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>Провайдеры</h2>
 
-      <Card title="Создать провайдера">
+      <Card title="Создать провайдера" icon="fa-plus-circle">
         <form onSubmit={handleCreate}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <div className="flex-row">
             <Input
               placeholder="Название"
               value={createData.name}
@@ -119,12 +158,12 @@ const Providers = () => {
               style={{ flex: 1 }}
             />
           </div>
-          <Button type="submit" disabled={submitting}>Создать</Button>
+          <Button type="submit" disabled={submitting}><i className="fas fa-save"></i> Создать</Button>
         </form>
       </Card>
 
-      <Card title="Список провайдеров">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+      <Card title="Список провайдеров" icon="fa-list">
+        <div className="flex-row" style={{ marginBottom: 16 }}>
           <Select
             value={filterType}
             onChange={e => setFilterType(e.target.value)}
@@ -144,27 +183,77 @@ const Providers = () => {
             placeholder="Запрос"
             value={filterQuery}
             onChange={e => setFilterQuery(e.target.value)}
-            style={{ flex: 2 }}
+            style={{ flex: 1 }}
           />
-          <Button variant="secondary" onClick={loadProviders}>Поиск</Button>
+          <Button variant="secondary" onClick={loadProviders}><i className="fas fa-search"></i> Поиск</Button>
         </div>
 
         {loading ? (
           <p>Загрузка...</p>
         ) : providers.length === 0 ? (
-          <p>Нет провайдеров</p>
+          <div className="empty-state">
+            <i className="fas fa-building"></i>
+            <p>Нет провайдеров</p>
+          </div>
         ) : (
           providers.map(p => (
-            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{p.name} ({p.type})</div>
-                <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>{p.website || ''} {p.support_contact || ''}</div>
+            <div key={p.id} className="list-item">
+              <div className="info">
+                <div className="title">{p.name} ({p.type})</div>
+                <div className="sub">{p.website || ''} {p.support_contact || ''}</div>
               </div>
-              <Button variant="secondary" onClick={() => handleDelete(p.id)} style={{ background: 'var(--color-secondary)' }}>Удалить</Button>
+              <div className="actions">
+                <Button variant="secondary" className="btn-sm" onClick={() => handleViewDetails(p.id)}>
+                  <i className="fas fa-eye"></i>
+                </Button>
+                <Button variant="danger" className="btn-sm" onClick={() => handleDelete(p.id)}>
+                  <i className="fas fa-trash"></i>
+                </Button>
+              </div>
             </div>
           ))
         )}
       </Card>
+
+      {showModal && selectedProvider && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }} onClick={closeModal}>
+          <div style={{
+            background: 'white',
+            borderRadius: 'var(--border-radius)',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+          }} onClick={e => e.stopPropagation()}>
+            <h3>{selectedProvider.name}</h3>
+            <div style={{ marginTop: 16 }}>
+              <p><strong>ID:</strong> {selectedProvider.id}</p>
+              <p><strong>Тип:</strong> {selectedProvider.type}</p>
+              <p><strong>Сайт:</strong> {selectedProvider.website || '—'}</p>
+              <p><strong>Контакты:</strong> {selectedProvider.support_contact || '—'}</p>
+              {ratingSummary && (
+                <div style={{ marginTop: 12, padding: 12, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
+                  <p><strong>⭐ Средняя оценка:</strong> {ratingSummary.averageRating ? ratingSummary.averageRating.toFixed(1) : 'нет оценок'}</p>
+                  <p><strong>📝 Количество отзывов:</strong> {ratingSummary.reviewCount || 0}</p>
+                </div>
+              )}
+            </div>
+            <Button onClick={closeModal} style={{ marginTop: 16 }}>Закрыть</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

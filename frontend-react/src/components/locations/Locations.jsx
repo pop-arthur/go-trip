@@ -25,6 +25,11 @@ const Locations = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Модалка для просмотра деталей локации
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState(null);
+
   const loadLocations = async () => {
     setLoading(true);
     try {
@@ -47,6 +52,7 @@ const Locations = () => {
 
   useEffect(() => {
     loadLocations();
+    // eslint-disable-next-line
   }, [filterType, filterCountry, filterCity, filterQuery]);
 
   const handleCreate = async (e) => {
@@ -80,12 +86,12 @@ const Locations = () => {
   const handleEdit = async (id) => {
     const loc = locations.find(l => l.id === id);
     if (!loc) return;
-    const name = prompt('Название:', loc.name);
+    const name = window.prompt('Название:', loc.name);
     if (name === null) return;
-    const type = prompt('Тип:', loc.type);
+    const type = window.prompt('Тип:', loc.type);
     if (type === null) return;
-    const country = prompt('Страна:', loc.country || '');
-    const city = prompt('Город:', loc.city || '');
+    const country = window.prompt('Страна:', loc.country || '');
+    const city = window.prompt('Город:', loc.city || '');
     try {
       const resp = await apiFetch(`/locations/${id}`, {
         method: 'PATCH',
@@ -101,28 +107,60 @@ const Locations = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Удалить локацию?')) return;
+    // eslint-disable-next-line no-restricted-globals
+    if (!window.confirm('Удалить локацию?')) return;
     try {
       const resp = await apiFetch(`/locations/${id}`, { method: 'DELETE' });
       if (resp.ok) {
         showToast('Локация удалена');
         loadLocations();
-      } else {
-        const err = await resp.json().catch(() => ({}));
-        showToast(err.message || 'Ошибка удаления', 'error');
       }
     } catch (e) {
       showToast('Ошибка удаления', 'error');
     }
   };
 
+  const handleViewDetails = async (id) => {
+    try {
+      // Загружаем детали локации
+      const resp = await apiFetch(`/locations/${id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setSelectedLocation(data);
+        // Загружаем рейтинг-суммари
+        try {
+          const ratingResp = await apiFetch(`/reviews/rating-summary?targetType=LOCATION&targetId=${id}`);
+          if (ratingResp.ok) {
+            const ratingData = await ratingResp.json();
+            setRatingSummary(ratingData);
+          } else {
+            setRatingSummary(null);
+          }
+        } catch (e) {
+          setRatingSummary(null);
+        }
+        setShowModal(true);
+      } else {
+        showToast('Ошибка загрузки данных', 'error');
+      }
+    } catch (e) {
+      showToast('Ошибка загрузки данных', 'error');
+    }
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedLocation(null);
+    setRatingSummary(null);
+  };
+
   return (
     <div>
-      <h2>Локации</h2>
+      <h2><i className="fas fa-location-dot" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>Локации</h2>
 
-      <Card title="Создать локацию">
+      <Card title="Создать локацию" icon="fa-plus-circle">
         <form onSubmit={handleCreate}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <div className="flex-row">
             <Input
               placeholder="Название"
               value={createData.name}
@@ -182,12 +220,12 @@ const Locations = () => {
               style={{ flex: 1 }}
             />
           </div>
-          <Button type="submit" disabled={submitting}>Создать</Button>
+          <Button type="submit" disabled={submitting}><i className="fas fa-save"></i> Создать</Button>
         </form>
       </Card>
 
-      <Card title="Поиск локаций">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+      <Card title="Поиск локаций" icon="fa-search">
+        <div className="flex-row" style={{ marginBottom: 16 }}>
           <Select
             value={filterType}
             onChange={e => setFilterType(e.target.value)}
@@ -229,22 +267,76 @@ const Locations = () => {
         {loading ? (
           <p>Загрузка...</p>
         ) : locations.length === 0 ? (
-          <p>Нет локаций</p>
+          <div className="empty-state">
+            <i className="fas fa-globe"></i>
+            <p>Нет локаций</p>
+          </div>
         ) : (
           locations.map(l => (
-            <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{l.name} ({l.type})</div>
-                <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>{l.country || ''} {l.city || ''} {l.address || ''}</div>
+            <div key={l.id} className="list-item">
+              <div className="info">
+                <div className="title">{l.name} ({l.type})</div>
+                <div className="sub">{l.country || ''} {l.city || ''} {l.address || ''}</div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <Button variant="secondary" onClick={() => handleEdit(l.id)}>Редактировать</Button>
-                <Button variant="secondary" onClick={() => handleDelete(l.id)} style={{ background: 'var(--color-secondary)' }}>Удалить</Button>
+              <div className="actions">
+                <Button variant="secondary" className="btn-sm" onClick={() => handleViewDetails(l.id)}>
+                  <i className="fas fa-eye"></i>
+                </Button>
+                <Button variant="secondary" className="btn-sm" onClick={() => handleEdit(l.id)}>
+                  <i className="fas fa-edit"></i>
+                </Button>
+                <Button variant="danger" className="btn-sm" onClick={() => handleDelete(l.id)}>
+                  <i className="fas fa-trash"></i>
+                </Button>
               </div>
             </div>
           ))
         )}
       </Card>
+
+      {/* Модалка просмотра */}
+      {showModal && selectedLocation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }} onClick={closeModal}>
+          <div style={{
+            background: 'white',
+            borderRadius: 'var(--border-radius)',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+          }} onClick={e => e.stopPropagation()}>
+            <h3>{selectedLocation.name}</h3>
+            <div style={{ marginTop: 16 }}>
+              <p><strong>ID:</strong> {selectedLocation.id}</p>
+              <p><strong>Тип:</strong> {selectedLocation.type}</p>
+              <p><strong>Страна:</strong> {selectedLocation.country || '—'}</p>
+              <p><strong>Город:</strong> {selectedLocation.city || '—'}</p>
+              <p><strong>Адрес:</strong> {selectedLocation.address || '—'}</p>
+              <p><strong>Широта:</strong> {selectedLocation.latitude || '—'}</p>
+              <p><strong>Долгота:</strong> {selectedLocation.longitude || '—'}</p>
+              {ratingSummary && (
+                <div style={{ marginTop: 12, padding: 12, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
+                  <p><strong>⭐ Средняя оценка:</strong> {ratingSummary.averageRating ? ratingSummary.averageRating.toFixed(1) : 'нет оценок'}</p>
+                  <p><strong>📝 Количество отзывов:</strong> {ratingSummary.reviewCount || 0}</p>
+                </div>
+              )}
+            </div>
+            <Button onClick={closeModal} style={{ marginTop: 16 }}>Закрыть</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -32,13 +32,27 @@ const statusColors = {
   REFUNDED: '#e0d4d4',
 };
 
+const statusLabels = {
+  PENDING_VERIFICATION: 'Ожидает проверки',
+  CONFIRMED: 'Подтверждён',
+  DELAYED: 'Задержан',
+  CANCELLED: 'Отменён',
+  COMPLETED: 'Завершён',
+  REFUND_PENDING: 'Возврат средств',
+  REFUNDED: 'Возвращён',
+};
+
 const TripDetail = () => {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+
   const [trip, setTrip] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [tripLocations, setTripLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('route');
+
   const [orderFormVisible, setOrderFormVisible] = useState(false);
   const [orderData, setOrderData] = useState({
     service_type: 'FLIGHT',
@@ -55,6 +69,15 @@ const TripDetail = () => {
   });
   const [providers, setProviders] = useState([]);
   const [locations, setLocations] = useState([]);
+
+  const [locationFormVisible, setLocationFormVisible] = useState(false);
+  const [locationData, setLocationData] = useState({
+    location_id: '',
+    visit_order: '',
+    arrival_date: '',
+    departure_date: '',
+  });
+
   const [files, setFiles] = useState([]);
   const [fileFormVisible, setFileFormVisible] = useState(false);
   const [fileData, setFileData] = useState({ file_url: '', file_type: 'PDF' });
@@ -75,6 +98,18 @@ const TripDetail = () => {
       if (resp.ok) setOrders(await resp.json());
     } catch (e) {
       showToast('Ошибка загрузки заказов', 'error');
+    }
+  };
+
+  const loadTripLocations = async () => {
+    try {
+      const resp = await apiFetch(`/trips/${tripId}/locations`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setTripLocations(data);
+      }
+    } catch (e) {
+      showToast('Ошибка загрузки локаций маршрута', 'error');
     }
   };
 
@@ -104,6 +139,7 @@ const TripDetail = () => {
     const init = async () => {
       await loadTrip();
       await loadOrders();
+      await loadTripLocations();
       await loadSelectData();
       setLoading(false);
     };
@@ -111,8 +147,13 @@ const TripDetail = () => {
     // eslint-disable-next-line
   }, [tripId]);
 
+  // --- Заказы ---
   const handleCreateOrder = async (e) => {
     e.preventDefault();
+    if (!orderData.title) {
+      showToast('Название заказа обязательно', 'error');
+      return;
+    }
     try {
       const body = {
         ...orderData,
@@ -156,12 +197,12 @@ const TripDetail = () => {
   const handleEditOrder = async (orderId) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return;
-    const newTitle = prompt('Название:', order.title);
+    const newTitle = window.prompt('Название:', order.title);
     if (newTitle === null) return;
-    const newStatus = prompt('Статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):', order.status);
+    const newStatus = window.prompt('Статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):', order.status);
     if (!newStatus) return;
-    const newPrice = prompt('Цена:', order.price_amount || '');
-    const newCurrency = prompt('Валюта:', order.price_currency || '');
+    const newPrice = window.prompt('Цена:', order.price_amount || '');
+    const newCurrency = window.prompt('Валюта:', order.price_currency || '');
     try {
       const resp = await apiFetch(`/orders/${orderId}`, {
         method: 'PATCH',
@@ -182,9 +223,9 @@ const TripDetail = () => {
   };
 
   const handleChangeStatus = async (orderId) => {
-    const newStatus = prompt('Новый статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):');
+    const newStatus = window.prompt('Новый статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):');
     if (!newStatus) return;
-    const reason = prompt('Причина (опционально):');
+    const reason = window.prompt('Причина (опционально):');
     try {
       const resp = await apiFetch(`/orders/${orderId}/status`, {
         method: 'PATCH',
@@ -200,8 +241,7 @@ const TripDetail = () => {
   };
 
   const handleDeleteOrder = async (orderId) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Удалить заказ?')) return;
+    if (!window.confirm('Удалить заказ? Это действие нельзя отменить.')) return;
     try {
       const resp = await apiFetch(`/orders/${orderId}`, { method: 'DELETE' });
       if (resp.ok) {
@@ -213,8 +253,83 @@ const TripDetail = () => {
     }
   };
 
+  // --- Локации маршрута ---
+  const handleCreateLocation = async (e) => {
+    e.preventDefault();
+    if (!locationData.location_id) {
+      showToast('Выберите локацию', 'error');
+      return;
+    }
+    try {
+      const body = {
+        location_id: locationData.location_id,
+        visit_order: locationData.visit_order ? parseInt(locationData.visit_order) : undefined,
+        arrival_date: locationData.arrival_date ? new Date(locationData.arrival_date).toISOString() : null,
+        departure_date: locationData.departure_date ? new Date(locationData.departure_date).toISOString() : null,
+      };
+      const resp = await apiFetch(`/trips/${tripId}/locations`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        showToast('Локация добавлена в маршрут');
+        setLocationFormVisible(false);
+        setLocationData({ location_id: '', visit_order: '', arrival_date: '', departure_date: '' });
+        loadTripLocations();
+      } else {
+        const err = await resp.json();
+        showToast(err.message || 'Ошибка добавления локации', 'error');
+      }
+    } catch (e) {
+      showToast('Ошибка добавления локации', 'error');
+    }
+  };
+
+  const handleEditLocation = async (locationId) => {
+    const loc = tripLocations.find(l => l.id === locationId);
+    if (!loc) return;
+    const visitOrder = window.prompt('Новый порядок посещения:', loc.visit_order);
+    if (visitOrder === null) return;
+    const arrivalDate = window.prompt('Дата прибытия (ISO):', loc.arrival_date || '');
+    const departureDate = window.prompt('Дата отбытия (ISO):', loc.departure_date || '');
+    try {
+      const resp = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          visit_order: parseInt(visitOrder),
+          arrival_date: arrivalDate || null,
+          departure_date: departureDate || null,
+        }),
+      });
+      if (resp.ok) {
+        showToast('Локация обновлена');
+        loadTripLocations();
+      }
+    } catch (e) {
+      showToast('Ошибка обновления', 'error');
+    }
+  };
+
+  const handleDeleteLocation = async (locationId) => {
+    if (!window.confirm('Удалить эту локацию из маршрута?')) return;
+    try {
+      const resp = await apiFetch(`/trips/${tripId}/locations/${locationId}`, { method: 'DELETE' });
+      if (resp.ok) {
+        showToast('Локация удалена из маршрута');
+        loadTripLocations();
+      }
+    } catch (e) {
+      showToast('Ошибка удаления', 'error');
+    }
+  };
+
+  // --- Файлы ---
   const handleAddFile = async (e) => {
     e.preventDefault();
+    if (!fileData.file_url) {
+      showToast('URL файла обязателен', 'error');
+      return;
+    }
     try {
       const resp = await apiFetch(`/orders/${selectedOrderId}/files`, {
         method: 'POST',
@@ -235,8 +350,7 @@ const TripDetail = () => {
   };
 
   const handleDeleteFile = async (fileId) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Удалить файл?')) return;
+    if (!window.confirm('Удалить файл?')) return;
     try {
       const resp = await apiFetch(`/orders/${selectedOrderId}/files/${fileId}`, { method: 'DELETE' });
       if (resp.ok) {
@@ -248,204 +362,305 @@ const TripDetail = () => {
     }
   };
 
-  if (loading) return <div>Загрузка...</div>;
-  if (!trip) return <div>Поездка не найдена</div>;
-
-  const statusLabel = {
-    PLANNED: 'Запланирована',
-    ACTIVE: 'Активна',
-    COMPLETED: 'Завершена',
-    CANCELLED: 'Отменена',
+  const handleViewFile = (fileUrl) => {
+    window.open(fileUrl, '_blank');
   };
+
+  if (loading) return <div className="loading-state">Загрузка данных поездки...</div>;
+  if (!trip) return <div className="error-state">Поездка не найдена</div>;
 
   return (
     <div>
       <button onClick={() => navigate('/trips')} style={{ background: 'none', border: 'none', color: 'var(--color-primary-dark)', cursor: 'pointer', marginBottom: 16, fontSize: 16 }}>
         <i className="fas fa-arrow-left"></i> Назад к списку
       </button>
+
       <h2><i className="fas fa-route" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>{trip.title}</h2>
 
       <Card>
         <div className="flex-row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <span className="status-badge" style={{ background: statusColors[trip.status] || 'var(--color-primary)', color: '#2d2a2a' }}>
-            {statusLabel[trip.status] || trip.status}
+            {trip.status === 'PLANNED' ? 'Запланирована' :
+             trip.status === 'ACTIVE' ? 'Активна' :
+             trip.status === 'COMPLETED' ? 'Завершена' : 'Отменена'}
           </span>
           <span><i className="fas fa-calendar-alt"></i> {trip.start_date || '—'} — {trip.end_date || '—'}</span>
-          <span><i className="fas fa-id-card"></i> {trip.id}</span>
+          <span><i className="fas fa-id-card"></i> ID: {trip.id.slice(0, 8)}</span>
         </div>
       </Card>
 
-      <Card title="Заказы" icon="fa-ticket">
-        {/* Улучшенная кнопка добавления заказа */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <span style={{ color: 'var(--color-text-secondary)' }}>
-            <i className="fas fa-info-circle"></i> Добавьте заказы к поездке
-          </span>
-          <Button 
-            onClick={() => setOrderFormVisible(true)} 
-            style={{ 
-              padding: '12px 24px', 
-              fontSize: '16px', 
-              borderRadius: 'var(--border-radius)',
-              boxShadow: '0 4px 12px rgba(184, 212, 227, 0.4)'
-            }}
-          >
-            <i className="fas fa-plus-circle"></i> Создать заказ
+      {/* Табы */}
+      <div className="flex-row" style={{ marginBottom: 16, borderBottom: '1px solid var(--color-border)' }}>
+        <button
+          onClick={() => setActiveTab('route')}
+          style={{
+            padding: '10px 20px',
+            borderBottom: activeTab === 'route' ? '2px solid var(--color-primary-dark)' : 'none',
+            background: 'none',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'route' ? 700 : 400,
+          }}
+        >
+          <i className="fas fa-map-pin"></i> Маршрут
+        </button>
+        <button
+          onClick={() => setActiveTab('orders')}
+          style={{
+            padding: '10px 20px',
+            borderBottom: activeTab === 'orders' ? '2px solid var(--color-primary-dark)' : 'none',
+            background: 'none',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'orders' ? 700 : 400,
+          }}
+        >
+          <i className="fas fa-ticket"></i> Заказы ({orders.length})
+        </button>
+      </div>
+
+      {/* Содержимое вкладок */}
+      {activeTab === 'route' && (
+        <Card title="Маршрут" icon="fa-route">
+          <Button onClick={() => setLocationFormVisible(true)} style={{ marginBottom: 16 }}>
+            <i className="fas fa-plus"></i> Добавить локацию
           </Button>
-        </div>
 
-        {orderFormVisible && (
-          <div style={{ marginBottom: 20, padding: 20, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
-            <h4 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <i className="fas fa-pen"></i> Новый заказ
-            </h4>
-            <form onSubmit={handleCreateOrder}>
-              <div className="flex-row">
-                <Select
-                  value={orderData.service_type}
-                  onChange={e => setOrderData({ ...orderData, service_type: e.target.value })}
-                  options={[
-                    { value: 'FLIGHT', label: 'Авиа' },
-                    { value: 'TRAIN', label: 'Поезд' },
-                    { value: 'BUS', label: 'Автобус' },
-                    { value: 'HOTEL', label: 'Отель' },
-                    { value: 'TOUR', label: 'Тур' },
-                    { value: 'CAR_RENTAL', label: 'Аренда авто' },
-                    { value: 'INSURANCE', label: 'Страховка' },
-                    { value: 'TAXI', label: 'Такси' },
-                    { value: 'ESIM', label: 'eSIM' },
-                    { value: 'LOUNGE', label: 'Лаунж' },
-                    { value: 'EXTRA_BAGGAGE', label: 'Доп. багаж' },
-                    { value: 'OTHER', label: 'Другое' },
-                  ]}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  placeholder="Название"
-                  value={orderData.title}
-                  onChange={e => setOrderData({ ...orderData, title: e.target.value })}
-                  required
-                  style={{ flex: 1 }}
-                />
-                <Select
-                  value={orderData.status}
-                  onChange={e => setOrderData({ ...orderData, status: e.target.value })}
-                  options={[
-                    { value: 'PENDING_VERIFICATION', label: 'Ожидает проверки' },
-                    { value: 'CONFIRMED', label: 'Подтверждён' },
-                    { value: 'DELAYED', label: 'Задержан' },
-                    { value: 'CANCELLED', label: 'Отменён' },
-                    { value: 'COMPLETED', label: 'Завершён' },
-                    { value: 'REFUND_PENDING', label: 'Возврат средств' },
-                    { value: 'REFUNDED', label: 'Возвращён' },
-                  ]}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  type="number"
-                  step="any"
-                  placeholder="Цена"
-                  value={orderData.price_amount}
-                  onChange={e => setOrderData({ ...orderData, price_amount: e.target.value })}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  placeholder="Валюта"
-                  value={orderData.price_currency}
-                  onChange={e => setOrderData({ ...orderData, price_currency: e.target.value })}
-                  style={{ flex: 1 }}
-                />
-                <Select
-                  value={orderData.provider_id}
-                  onChange={e => setOrderData({ ...orderData, provider_id: e.target.value })}
-                  options={[{ value: '', label: 'Выберите провайдера' }, ...providers.map(p => ({ value: p.id, label: p.name }))]}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  placeholder="Внешний ID"
-                  value={orderData.external_order_id}
-                  onChange={e => setOrderData({ ...orderData, external_order_id: e.target.value })}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  type="datetime-local"
-                  placeholder="Начало"
-                  value={orderData.start_datetime}
-                  onChange={e => setOrderData({ ...orderData, start_datetime: e.target.value })}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  type="datetime-local"
-                  placeholder="Конец"
-                  value={orderData.end_datetime}
-                  onChange={e => setOrderData({ ...orderData, end_datetime: e.target.value })}
-                  style={{ flex: 1 }}
-                />
-                <Select
-                  value={orderData.departure_location_id}
-                  onChange={e => setOrderData({ ...orderData, departure_location_id: e.target.value })}
-                  options={[{ value: '', label: 'Локация отправления' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
-                  style={{ flex: 1 }}
-                />
-                <Select
-                  value={orderData.arrival_location_id}
-                  onChange={e => setOrderData({ ...orderData, arrival_location_id: e.target.value })}
-                  options={[{ value: '', label: 'Локация прибытия' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
-                  style={{ flex: 1 }}
-                />
-              </div>
-              <div className="flex-row" style={{ marginTop: 12 }}>
-                <Button type="submit"><i className="fas fa-save"></i> Сохранить</Button>
-                <Button variant="secondary" onClick={() => setOrderFormVisible(false)}><i className="fas fa-times"></i> Отмена</Button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {orders.length === 0 ? (
-          <div className="empty-state">
-            <i className="fas fa-box-open"></i>
-            <p>Нет заказов</p>
-          </div>
-        ) : (
-          orders.map(o => (
-            <div key={o.id} className="list-item">
-              <div className="info">
-                <div className="title">
-                  <i className={`fas ${serviceIcons[o.service_type] || 'fa-tag'}`} style={{ marginRight: 8 }}></i>
-                  {o.title} ({o.service_type})
+          {locationFormVisible && (
+            <div style={{ marginBottom: 20, padding: 16, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
+              <h4><i className="fas fa-pen"></i> Добавить локацию</h4>
+              <form onSubmit={handleCreateLocation}>
+                <div className="flex-row">
+                  <Select
+                    value={locationData.location_id}
+                    onChange={e => setLocationData({ ...locationData, location_id: e.target.value })}
+                    options={[
+                      { value: '', label: 'Выберите локацию' },
+                      ...locations.map(l => ({ value: l.id, label: l.name })),
+                    ]}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Порядок (опционально)"
+                    value={locationData.visit_order}
+                    onChange={e => setLocationData({ ...locationData, visit_order: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    type="datetime-local"
+                    placeholder="Прибытие (опционально)"
+                    value={locationData.arrival_date}
+                    onChange={e => setLocationData({ ...locationData, arrival_date: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    type="datetime-local"
+                    placeholder="Отбытие (опционально)"
+                    value={locationData.departure_date}
+                    onChange={e => setLocationData({ ...locationData, departure_date: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
                 </div>
-                <div className="sub">
-                  <span className="status-badge" style={{ background: statusColors[o.status] || '#e8e0d8' }}>
-                    {o.status}
-                  </span>
-                  {o.price_amount && `${o.price_amount} ${o.price_currency}`}
+                <div className="flex-row" style={{ marginTop: 12 }}>
+                  <Button type="submit"><i className="fas fa-save"></i> Добавить</Button>
+                  <Button variant="secondary" onClick={() => setLocationFormVisible(false)}><i className="fas fa-times"></i> Отмена</Button>
                 </div>
-              </div>
-              <div className="actions">
-                <Button variant="secondary" className="btn-sm" onClick={() => { setSelectedOrderId(o.id); setFileFormVisible(true); loadFiles(o.id); }}>
-                  <i className="fas fa-file"></i>
-                </Button>
-                <Button variant="secondary" className="btn-sm" onClick={() => handleEditOrder(o.id)}>
-                  <i className="fas fa-edit"></i>
-                </Button>
-                <Button variant="secondary" className="btn-sm" onClick={() => handleChangeStatus(o.id)}>
-                  <i className="fas fa-sync"></i>
-                </Button>
-                <Button variant="danger" className="btn-sm" onClick={() => handleDeleteOrder(o.id)}>
-                  <i className="fas fa-trash"></i>
-                </Button>
-              </div>
+              </form>
             </div>
-          ))
-        )}
-      </Card>
+          )}
+
+          {tripLocations.length === 0 ? (
+            <div className="empty-state">
+              <i className="fas fa-map-marker-alt"></i>
+              <p>В маршруте пока нет локаций. Добавьте места, которые вы хотите посетить.</p>
+            </div>
+          ) : (
+            tripLocations.map(l => {
+              const locName = locations.find(loc => loc.id === l.location_id)?.name || l.location_id.slice(0, 8);
+              return (
+                <div key={l.id} className="list-item">
+                  <div className="info">
+                    <div className="title">
+                      <i className="fas fa-map-marker-alt" style={{ marginRight: 8 }}></i>
+                      {locName} <span style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginLeft: 8 }}>— порядок {l.visit_order}</span>
+                    </div>
+                    <div className="sub">
+                      Прибытие: {l.arrival_date ? new Date(l.arrival_date).toLocaleString() : '—'} 
+                      &nbsp;| Отбытие: {l.departure_date ? new Date(l.departure_date).toLocaleString() : '—'}
+                    </div>
+                  </div>
+                  <div className="actions">
+                    <Button variant="secondary" className="btn-sm" onClick={() => handleEditLocation(l.id)}>
+                      <i className="fas fa-edit"></i>
+                    </Button>
+                    <Button variant="danger" className="btn-sm" onClick={() => handleDeleteLocation(l.id)}>
+                      <i className="fas fa-trash"></i>
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </Card>
+      )}
+
+      {activeTab === 'orders' && (
+        <Card title="Заказы" icon="fa-ticket">
+          <Button onClick={() => setOrderFormVisible(true)} style={{ marginBottom: 16 }}>
+            <i className="fas fa-plus"></i> Добавить заказ
+          </Button>
+
+          {orderFormVisible && (
+            <div style={{ marginBottom: 20, padding: 16, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
+              <h4><i className="fas fa-pen"></i> Новый заказ</h4>
+              <form onSubmit={handleCreateOrder}>
+                <div className="flex-row">
+                  <Select
+                    value={orderData.service_type}
+                    onChange={e => setOrderData({ ...orderData, service_type: e.target.value })}
+                    options={[
+                      { value: 'FLIGHT', label: 'Авиа' },
+                      { value: 'TRAIN', label: 'Поезд' },
+                      { value: 'BUS', label: 'Автобус' },
+                      { value: 'HOTEL', label: 'Отель' },
+                      { value: 'TOUR', label: 'Тур' },
+                      { value: 'CAR_RENTAL', label: 'Аренда авто' },
+                      { value: 'INSURANCE', label: 'Страховка' },
+                      { value: 'TAXI', label: 'Такси' },
+                      { value: 'ESIM', label: 'eSIM' },
+                      { value: 'LOUNGE', label: 'Лаунж' },
+                      { value: 'EXTRA_BAGGAGE', label: 'Доп. багаж' },
+                      { value: 'OTHER', label: 'Другое' },
+                    ]}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    placeholder="Название *"
+                    value={orderData.title}
+                    onChange={e => setOrderData({ ...orderData, title: e.target.value })}
+                    required
+                    style={{ flex: 1 }}
+                  />
+                  <Select
+                    value={orderData.status}
+                    onChange={e => setOrderData({ ...orderData, status: e.target.value })}
+                    options={[
+                      { value: 'PENDING_VERIFICATION', label: 'Ожидает проверки' },
+                      { value: 'CONFIRMED', label: 'Подтверждён' },
+                      { value: 'DELAYED', label: 'Задержан' },
+                      { value: 'CANCELLED', label: 'Отменён' },
+                      { value: 'COMPLETED', label: 'Завершён' },
+                      { value: 'REFUND_PENDING', label: 'Возврат средств' },
+                      { value: 'REFUNDED', label: 'Возвращён' },
+                    ]}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    type="number"
+                    step="any"
+                    placeholder="Цена"
+                    value={orderData.price_amount}
+                    onChange={e => setOrderData({ ...orderData, price_amount: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    placeholder="Валюта"
+                    value={orderData.price_currency}
+                    onChange={e => setOrderData({ ...orderData, price_currency: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Select
+                    value={orderData.provider_id}
+                    onChange={e => setOrderData({ ...orderData, provider_id: e.target.value })}
+                    options={[{ value: '', label: 'Провайдер (опционально)' }, ...providers.map(p => ({ value: p.id, label: p.name }))]}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    placeholder="Внешний ID (опционально)"
+                    value={orderData.external_order_id}
+                    onChange={e => setOrderData({ ...orderData, external_order_id: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    type="datetime-local"
+                    placeholder="Начало (опционально)"
+                    value={orderData.start_datetime}
+                    onChange={e => setOrderData({ ...orderData, start_datetime: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Input
+                    type="datetime-local"
+                    placeholder="Конец (опционально)"
+                    value={orderData.end_datetime}
+                    onChange={e => setOrderData({ ...orderData, end_datetime: e.target.value })}
+                    style={{ flex: 1 }}
+                  />
+                  <Select
+                    value={orderData.departure_location_id}
+                    onChange={e => setOrderData({ ...orderData, departure_location_id: e.target.value })}
+                    options={[{ value: '', label: 'Отправление (опционально)' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
+                    style={{ flex: 1 }}
+                  />
+                  <Select
+                    value={orderData.arrival_location_id}
+                    onChange={e => setOrderData({ ...orderData, arrival_location_id: e.target.value })}
+                    options={[{ value: '', label: 'Прибытие (опционально)' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
+                    style={{ flex: 1 }}
+                  />
+                </div>
+                <div className="flex-row" style={{ marginTop: 12 }}>
+                  <Button type="submit"><i className="fas fa-save"></i> Сохранить</Button>
+                  <Button variant="secondary" onClick={() => setOrderFormVisible(false)}><i className="fas fa-times"></i> Отмена</Button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {orders.length === 0 ? (
+            <div className="empty-state">
+              <i className="fas fa-box-open"></i>
+              <p>Нет заказов. Добавьте первый заказ, чтобы начать планирование.</p>
+            </div>
+          ) : (
+            orders.map(o => (
+              <div key={o.id} className="list-item">
+                <div className="info">
+                  <div className="title">
+                    <i className={`fas ${serviceIcons[o.service_type] || 'fa-tag'}`} style={{ marginRight: 8 }}></i>
+                    {o.title} 
+                    <span style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginLeft: 8 }}>({o.service_type})</span>
+                  </div>
+                  <div className="sub">
+                    <span className="status-badge" style={{ background: statusColors[o.status] || '#e8e0d8' }}>
+                      {statusLabels[o.status] || o.status}
+                    </span>
+                    {o.price_amount && ` — ${o.price_amount} ${o.price_currency}`}
+                  </div>
+                </div>
+                <div className="actions">
+                  <Button variant="secondary" className="btn-sm" onClick={() => { setSelectedOrderId(o.id); setFileFormVisible(true); loadFiles(o.id); }}>
+                    <i className="fas fa-file"></i>
+                  </Button>
+                  <Button variant="secondary" className="btn-sm" onClick={() => handleEditOrder(o.id)}>
+                    <i className="fas fa-edit"></i>
+                  </Button>
+                  <Button variant="secondary" className="btn-sm" onClick={() => handleChangeStatus(o.id)}>
+                    <i className="fas fa-sync"></i>
+                  </Button>
+                  <Button variant="danger" className="btn-sm" onClick={() => handleDeleteOrder(o.id)}>
+                    <i className="fas fa-trash"></i>
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </Card>
+      )}
 
       {fileFormVisible && selectedOrderId && (
         <Card title="Файлы заказа" icon="fa-paperclip">
           <form onSubmit={handleAddFile} className="flex-row">
             <Input
-              placeholder="URL файла"
+              placeholder="URL файла *"
               value={fileData.file_url}
               onChange={e => setFileData({ ...fileData, file_url: e.target.value })}
               required
@@ -475,9 +690,14 @@ const TripDetail = () => {
                   <div className="title">{f.file_url}</div>
                   <div className="sub">{f.file_type} — {new Date(f.uploaded_at).toLocaleString()}</div>
                 </div>
-                <Button variant="danger" className="btn-sm" onClick={() => handleDeleteFile(f.id)}>
-                  <i className="fas fa-trash"></i>
-                </Button>
+                <div className="actions">
+                  <Button variant="secondary" className="btn-sm" onClick={() => handleViewFile(f.file_url)}>
+                    <i className="fas fa-eye"></i>
+                  </Button>
+                  <Button variant="danger" className="btn-sm" onClick={() => handleDeleteFile(f.id)}>
+                    <i className="fas fa-trash"></i>
+                  </Button>
+                </div>
               </div>
             ))
           )}

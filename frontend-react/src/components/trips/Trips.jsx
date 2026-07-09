@@ -63,6 +63,10 @@ const Trips = () => {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (!createData.title) {
+      showToast('Название обязательно', 'error');
+      return;
+    }
     setSubmitting(true);
     try {
       const resp = await apiFetch('/trips', {
@@ -85,8 +89,7 @@ const Trips = () => {
   };
 
   const deleteTrip = async (id) => {
-    // eslint-disable-next-line no-restricted-globals
-    if (!confirm('Удалить поездку?')) return;
+    if (!window.confirm('Вы уверены, что хотите удалить эту поездку? Все связанные заказы и локации будут удалены.')) return;
     try {
       const resp = await apiFetch(`/trips/${id}`, { method: 'DELETE' });
       if (resp.ok) {
@@ -99,11 +102,11 @@ const Trips = () => {
   };
 
   const editTrip = async (id) => {
-    const newTitle = prompt('Новое название:');
+    const newTitle = window.prompt('Новое название поездки:');
     if (newTitle === null) return;
-    const newStart = prompt('Дата начала (YYYY-MM-DD):') || null;
-    const newEnd = prompt('Дата окончания (YYYY-MM-DD):') || null;
-    const newStatus = prompt('Статус (PLANNED/ACTIVE/COMPLETED/CANCELLED):');
+    const newStart = window.prompt('Дата начала (YYYY-MM-DD):', '') || null;
+    const newEnd = window.prompt('Дата окончания (YYYY-MM-DD):', '') || null;
+    const newStatus = window.prompt('Статус (PLANNED/ACTIVE/COMPLETED/CANCELLED):', 'PLANNED');
     if (!newStatus) return;
     try {
       const resp = await apiFetch(`/trips/${id}`, {
@@ -124,15 +127,21 @@ const Trips = () => {
     }
   };
 
+  const clearFilters = () => {
+    setFilterStatus('');
+    setFilterFrom('');
+    setFilterTo('');
+  };
+
   return (
     <div>
-      <h2><i className="fas fa-plane" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>Поездки</h2>
+      <h2><i className="fas fa-plane" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>Мои поездки</h2>
 
-      <Card title="Создать поездку" icon="fa-plus-circle">
+      <Card title="Создать новую поездку" icon="fa-plus-circle">
         <form onSubmit={handleCreate}>
           <div className="flex-row">
             <Input
-              placeholder="Название"
+              placeholder="Название поездки *"
               value={createData.title}
               onChange={e => setCreateData({ ...createData, title: e.target.value })}
               required
@@ -140,14 +149,14 @@ const Trips = () => {
             />
             <Input
               type="date"
-              placeholder="Дата начала"
+              placeholder="Начало"
               value={createData.start_date}
               onChange={e => setCreateData({ ...createData, start_date: e.target.value })}
               style={{ flex: 1 }}
             />
             <Input
               type="date"
-              placeholder="Дата окончания"
+              placeholder="Окончание"
               value={createData.end_date}
               onChange={e => setCreateData({ ...createData, end_date: e.target.value })}
               style={{ flex: 1 }}
@@ -163,48 +172,55 @@ const Trips = () => {
               ]}
               style={{ flex: 1 }}
             />
-            <Button type="submit" disabled={submitting}><i className="fas fa-save"></i> Создать</Button>
+            <Button type="submit" disabled={submitting}>
+              <i className="fas fa-save"></i> Создать
+            </Button>
           </div>
         </form>
       </Card>
 
-      <Card title="Мои поездки" icon="fa-list">
+      <Card title="Список поездок" icon="fa-list">
         <div className="flex-row" style={{ marginBottom: 16 }}>
           <Select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
             options={[
-              { value: '', label: 'Все' },
-              { value: 'PLANNED', label: 'Запланирована' },
-              { value: 'ACTIVE', label: 'Активна' },
-              { value: 'COMPLETED', label: 'Завершена' },
-              { value: 'CANCELLED', label: 'Отменена' },
+              { value: '', label: 'Все статусы' },
+              { value: 'PLANNED', label: 'Запланированы' },
+              { value: 'ACTIVE', label: 'Активны' },
+              { value: 'COMPLETED', label: 'Завершены' },
+              { value: 'CANCELLED', label: 'Отменены' },
             ]}
             style={{ flex: 1 }}
           />
           <Input
             type="date"
-            placeholder="С"
+            placeholder="Начало периода"
             value={filterFrom}
             onChange={e => setFilterFrom(e.target.value)}
             style={{ flex: 1 }}
           />
           <Input
             type="date"
-            placeholder="По"
+            placeholder="Конец периода"
             value={filterTo}
             onChange={e => setFilterTo(e.target.value)}
             style={{ flex: 1 }}
           />
-          <Button variant="secondary" onClick={loadTrips}><i className="fas fa-search"></i> Поиск</Button>
+          <Button variant="secondary" onClick={loadTrips}>
+            <i className="fas fa-search"></i> Найти
+          </Button>
+          <Button variant="secondary" onClick={clearFilters}>
+            <i className="fas fa-undo"></i> Сбросить
+          </Button>
         </div>
 
         {loading ? (
-          <p>Загрузка...</p>
+          <div className="loading-state">Загрузка поездок...</div>
         ) : trips.length === 0 ? (
           <div className="empty-state">
             <i className="fas fa-suitcase"></i>
-            <p>Нет поездок. Создайте первую!</p>
+            <p>У вас пока нет поездок. Создайте первую!</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

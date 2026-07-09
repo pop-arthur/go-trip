@@ -14,6 +14,11 @@ const Services = () => {
   const [filterLocation, setFilterLocation] = useState('');
   const [filterProvider, setFilterProvider] = useState('');
 
+  // Модалка
+  const [selectedService, setSelectedService] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState(null);
+
   const loadServices = async () => {
     setLoading(true);
     try {
@@ -35,14 +40,47 @@ const Services = () => {
 
   useEffect(() => {
     loadServices();
+    // eslint-disable-next-line
   }, [filterType, filterLocation, filterProvider]);
+
+  const handleViewDetails = async (id) => {
+    try {
+      const resp = await apiFetch(`/additional-services/${id}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setSelectedService(data);
+        try {
+          const ratingResp = await apiFetch(`/reviews/rating-summary?targetType=ADDITIONAL_SERVICE&targetId=${id}`);
+          if (ratingResp.ok) {
+            const ratingData = await ratingResp.json();
+            setRatingSummary(ratingData);
+          } else {
+            setRatingSummary(null);
+          }
+        } catch (e) {
+          setRatingSummary(null);
+        }
+        setShowModal(true);
+      } else {
+        showToast('Ошибка загрузки данных', 'error');
+      }
+    } catch (e) {
+      showToast('Ошибка загрузки данных', 'error');
+    }
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedService(null);
+    setRatingSummary(null);
+  };
 
   return (
     <div>
-      <h2>Дополнительные услуги</h2>
+      <h2><i className="fas fa-concierge-bell" style={{ marginRight: 12, color: 'var(--color-primary-dark)' }}></i>Дополнительные услуги</h2>
 
-      <Card title="Список услуг">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+      <Card title="Список услуг" icon="fa-list">
+        <div className="flex-row" style={{ marginBottom: 16 }}>
           <Select
             value={filterType}
             onChange={e => setFilterType(e.target.value)}
@@ -75,24 +113,75 @@ const Services = () => {
             onChange={e => setFilterProvider(e.target.value)}
             style={{ flex: 1 }}
           />
-          <Button variant="secondary" onClick={loadServices}>Поиск</Button>
+          <Button variant="secondary" onClick={loadServices}><i className="fas fa-search"></i> Поиск</Button>
         </div>
 
         {loading ? (
           <p>Загрузка...</p>
         ) : services.length === 0 ? (
-          <p>Нет услуг</p>
+          <div className="empty-state">
+            <i className="fas fa-box"></i>
+            <p>Нет услуг</p>
+          </div>
         ) : (
           services.map(s => (
-            <div key={s.id} style={{ borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-              <div style={{ fontWeight: 600 }}>{s.title} ({s.service_type})</div>
-              <div style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>
-                {s.description || ''} {s.price_amount ? s.price_amount + ' ' + s.price_currency : ''}
+            <div key={s.id} className="list-item">
+              <div className="info">
+                <div className="title">{s.title} ({s.service_type})</div>
+                <div className="sub">{s.description || ''} {s.price_amount ? s.price_amount + ' ' + s.price_currency : ''}</div>
+              </div>
+              <div className="actions">
+                <Button variant="secondary" className="btn-sm" onClick={() => handleViewDetails(s.id)}>
+                  <i className="fas fa-eye"></i>
+                </Button>
               </div>
             </div>
           ))
         )}
       </Card>
+
+      {showModal && selectedService && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+        }} onClick={closeModal}>
+          <div style={{
+            background: 'white',
+            borderRadius: 'var(--border-radius)',
+            padding: '32px',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+          }} onClick={e => e.stopPropagation()}>
+            <h3>{selectedService.title}</h3>
+            <div style={{ marginTop: 16 }}>
+              <p><strong>ID:</strong> {selectedService.id}</p>
+              <p><strong>Тип:</strong> {selectedService.service_type}</p>
+              <p><strong>Описание:</strong> {selectedService.description || '—'}</p>
+              <p><strong>Цена:</strong> {selectedService.price_amount ? `${selectedService.price_amount} ${selectedService.price_currency}` : '—'}</p>
+              <p><strong>Активна:</strong> {selectedService.is_active ? '✅ Да' : '❌ Нет'}</p>
+              <p><strong>Провайдер:</strong> {selectedService.provider_id || '—'}</p>
+              <p><strong>Локация:</strong> {selectedService.location_id || '—'}</p>
+              {ratingSummary && (
+                <div style={{ marginTop: 12, padding: 12, background: 'var(--color-bg)', borderRadius: 'var(--border-radius-sm)' }}>
+                  <p><strong>⭐ Средняя оценка:</strong> {ratingSummary.averageRating ? ratingSummary.averageRating.toFixed(1) : 'нет оценок'}</p>
+                  <p><strong>📝 Количество отзывов:</strong> {ratingSummary.reviewCount || 0}</p>
+                </div>
+              )}
+            </div>
+            <Button onClick={closeModal} style={{ marginTop: 16 }}>Закрыть</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
