@@ -131,7 +131,12 @@ object Main extends IOApp.Simple {
         val notificationService = new NotificationService[IO](notificationRepository)
         val orderStatusProvider = DuffelOrderStatusProvider.make[IO](duffelConfig)
         val notifPrefService = new NotificationPreferenceService[IO](notifPrefRepository)
-        val orderService = new OrderService[IO](orderRepository, notifPrefRepository, notificationService)
+        val orderService = new OrderService[IO](
+          orderRepository,
+          notifPrefRepository,
+          notificationService,
+          achievementEngine
+        )
         val orderStatusSyncService = new OrderStatusSyncService[IO](
           orderRepository,
           orderService,
