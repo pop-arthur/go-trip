@@ -76,11 +76,11 @@ final class OrderFileRepositorySpec extends PostgresRepositorySpecBase with Repo
 
     for
       user <- users.create(sampleUser(start))
-      trip <- trips.create(sampleTrip(start + 2, user.id))
+      trip <- trips.create(sampleTrip(start + 2, user.id).user_id, tripCreate(sampleTrip(start + 2, user.id)))
       provider <- providers.create(sampleProvider(start + 3, "Rail Europe", ProviderType.TransportCompany))
       departure <- locations.create(sampleLocation(start + 4, "Paris Gare de Lyon", LocationType.TrainStation, country = Some("France"), city = Some("Paris")))
       arrival <- locations.create(sampleLocation(start + 5, "Milano Centrale", LocationType.TrainStation, country = Some("Italy"), city = Some("Milan")))
-      order <- orders.create(sampleOrder(start + 6, user.id, trip.id, provider.id, departure.id, arrival.id))
+      order <- orders.create(sampleOrder(start + 6, user.id, trip.id, provider.id, departure.id, arrival.id).user_id, sampleOrder(start + 6, user.id, trip.id, provider.id, departure.id, arrival.id).trip_id, orderCreate(sampleOrder(start + 6, user.id, trip.id, provider.id, departure.id, arrival.id)))
     yield OrderFileData(user, trip, order)
 
   private final case class OrderFileData(user: User, trip: Trip, order: Order)

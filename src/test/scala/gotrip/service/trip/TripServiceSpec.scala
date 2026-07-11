@@ -6,6 +6,7 @@ import gotrip.domain.trip.*
 import gotrip.domain.user.*
 import gotrip.repository.trip.TripRepository
 import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
+import gotrip.service.achievement.AchievementEngine
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -18,7 +19,7 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
   "TripService" should {
     "delegate listByUser to repository and return trips" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.listByUser.expects(userId, searchParams).returning(IO.pure(List(trip)))
 
@@ -27,7 +28,7 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
 
     "find an owned trip" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.findByUser.expects(userId, tripId).returning(IO.pure(Some(trip)))
 
@@ -36,7 +37,7 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
 
     "return not found when finding an inaccessible trip" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.findByUser.expects(userId, tripId).returning(IO.pure(None))
 
@@ -48,23 +49,21 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
       val generatedData = generatedDataMock
       val service = serviceWith(repository, generatedData)
 
-      expectGeneratedId(generatedData, tripId.value)
-      expectGeneratedNow(generatedData, trip.created_at)
-      repository.create.expects(trip).returning(IO.pure(trip))
+      repository.create.expects(userId, tripCreate).returning(IO.pure(trip))
 
       service.create(userId, tripCreate).unsafeRunSync() shouldBe Right(trip)
     }
 
     "reject create when start date is after end date" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       service.create(userId, invalidTripCreate).unsafeRunSync() shouldBe Left(TripServiceError.InvalidDateRange)
     }
 
     "return not found when updating a trip that is not owned by the user" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.findByUser.expects(userId, tripId).returning(IO.pure(None))
 
@@ -78,15 +77,14 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
       val service = serviceWith(repository, generatedData)
 
       repository.findByUser.expects(userId, tripId).returning(IO.pure(Some(trip)))
-      expectGeneratedNow(generatedData, updatedTrip.updated_at)
-      repository.update.expects(updatedTrip).returning(IO.pure(Some(updatedTrip)))
+      repository.update.expects(userId, tripId, tripUpdate).returning(IO.pure(Some(updatedTrip)))
 
       service.update(userId, tripId, tripUpdate).unsafeRunSync() shouldBe Right(updatedTrip)
     }
 
     "reject update when merged start date is after end date" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.findByUser.expects(userId, tripId).returning(IO.pure(Some(trip)))
 
@@ -96,7 +94,7 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
 
     "delete an owned trip" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.delete.expects(userId, tripId).returning(IO.pure(true))
 
@@ -105,7 +103,7 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
 
     "return not found when deleting an inaccessible trip" in {
       val repository = mock[TripRepository[IO]]
-      val service = TripService[IO](repository)
+      val service = serviceWithDefault(repository)
 
       repository.delete.expects(userId, tripId).returning(IO.pure(false))
 
@@ -121,7 +119,12 @@ final class TripServiceSpec extends AnyWordSpec with Matchers with MockFactory w
     generatedData: GeneratedData[IO]
   ): TripService[IO] =
     given GeneratedData[IO] = generatedData
-    TripService[IO](repository)
+    serviceWithDefault(repository)
+
+  private def serviceWithDefault(repository: TripRepository[IO]): TripService[IO] =
+    val achievementEngine = mock[AchievementEngine[IO]]
+    achievementEngine.checkAndUnlock.expects(*, *).returning(IO.unit).anyNumberOfTimes()
+    TripService[IO](repository, achievementEngine)
 
   private val tripCreate = TripCreate(
     title = TripTitle("Vietnam 2026"),

@@ -96,6 +96,9 @@ trait RepositoryFixtures:
       t(value)
     )
 
+  protected def tripCreate(trip: Trip): TripCreate =
+    TripCreate(trip.title, trip.start_date, trip.end_date, Some(trip.status))
+
   protected def sampleTripLocation(value: Int, tripId: TripId, locationId: LocationId, visitOrder: Int): TripLocation =
     TripLocation(
       TripLocationId(id(value)),
@@ -104,6 +107,14 @@ trait RepositoryFixtures:
       VisitOrder(visitOrder),
       TripLocationArrivalDate(Some(odt(value))),
       TripLocationDepartureDate(Some(odt(value + 1)))
+    )
+
+  protected def tripLocationCreate(location: TripLocation): TripLocationCreate =
+    TripLocationCreate(
+      location.location_id,
+      Some(location.visit_order),
+      location.arrival_date,
+      location.departure_date
     )
 
   protected def sampleOrder(
@@ -131,6 +142,21 @@ trait RepositoryFixtures:
       Some(arrivalId),
       t(value),
       t(value)
+    )
+
+  protected def orderCreate(order: Order): OrderCreate =
+    OrderCreate(
+      order.provider_id,
+      order.service_type,
+      order.external_order_id,
+      order.title,
+      Some(order.status),
+      order.price_amount,
+      order.price_currency,
+      order.start_datetime,
+      order.end_datetime,
+      order.departure_location_id,
+      order.arrival_location_id
     )
 
   protected def sampleOrderStatusEvent(value: Int, orderId: OrderId): OrderStatusEvent =
