@@ -12,6 +12,7 @@
 .scala-build/
 target/
 project/target/
+node_modules/
 
 # Local services
 pgdata/
