@@ -3,6 +3,17 @@
 # ============================================
 target/
 project/target/
+<<<<<<< HEAD
+node_modules/
+
+# Local services
+pgdata/
+.env
+
+# Metals generated sbt files
+project/metals.sbt
+=======
+>>>>>>> origin/main
 project/project/
 .bsp/
 .bloop/
