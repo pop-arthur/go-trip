@@ -407,7 +407,7 @@ const TripDetail = () => {
     const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
     window.open(`${baseUrl}/${fileUrl}`, '_blank');
   };
-  
+
   if (loading) return <div className="loading-state">Загрузка данных поездки...</div>;
   if (!trip) return <div className="error-state">Поездка не найдена</div>;
 
@@ -676,6 +676,9 @@ const TripDetail = () => {
                       {statusLabels[o.status] || o.status}
                     </span>
                     {o.price_amount && ` — ${o.price_amount} ${o.price_currency}`}
+                  </div>
+                  <div className="sub" style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                    ID: {o.id}
                   </div>
                 </div>
                 <div className="actions">
