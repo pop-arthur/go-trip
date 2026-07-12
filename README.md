@@ -39,9 +39,10 @@ GoTrip - backend-сервис для travel assistant MVP с REST API, PostgreSQ
 go-trip/
 ├── build.sbt                         # зависимости, настройки sbt и Docker packaging
 ├── Dockerfile                        # multi-stage образ backend-приложения
-├── docker-compose.yml                # backend, PostgreSQL и nginx для frontend
+├── docker-compose.yml                # backend, PostgreSQL и frontend-сервисы
 ├── .env.example                      # пример локальных переменных окружения
 ├── frontend/                         # статический HTML/CSS/JS интерфейс
+├── frontend-react/                   # основной React-интерфейс
 ├── docs/
 │   ├── api/docs.yaml                 # статическая OpenAPI 3.1 спецификация
 │   ├── database/                     # ER-диаграмма и описание схемы БД
@@ -88,25 +89,18 @@ GOTRIP_ADMIN_PASSWORD=replace-me-admin-password
 GOTRIP_ADMIN_FULL_NAME=GoTrip Admin
 ```
 
-Соберите локальный Docker-образ backend-приложения:
+Соберите и запустите backend, PostgreSQL и оба frontend-интерфейса:
 
 ```bash
-sbt native
-```
-
-Команда `native` - alias для `Docker / publishLocal`. Она публикует локальный образ `gotrip-backend:0.1.0-SNAPSHOT`, который использует `docker-compose.yml`.
-
-Запустите backend, PostgreSQL и frontend:
-
-```bash
-docker compose up
+docker compose up --build
 ```
 
 После запуска доступны:
 
 ```text
 http://localhost:8080/docs   # Swagger UI
-http://localhost:8081        # web-интерфейс
+http://localhost:3000        # React-интерфейс
+http://localhost:8081        # статический web-интерфейс
 ```
 
 Остановить контейнеры:
@@ -122,6 +116,42 @@ docker compose down -v
 ```
 
 При старте backend загружает конфигурацию, выполняет Flyway-миграции, создает Skunk session pool, собирает Tapir routes и запускает http4s server.
+
+## Frontend
+
+В репозитории есть два frontend-интерфейса:
+
+- `frontend-react/` — основной React 18 интерфейс. В Docker Compose он работает в dev-режиме на `http://localhost:3000`, а API-запросы проксируются на backend-контейнер `app:8080`.
+- `frontend/` — простой статический HTML/CSS/JS интерфейс. Nginx отдает его на `http://localhost:8081`; интерфейс обращается к API на `http://localhost:8080`.
+
+Запустить только React-интерфейс вместе с backend и базой:
+
+```bash
+docker compose up --build postgres app frontend-react
+```
+
+Запустить только статический интерфейс вместе с backend и базой:
+
+```bash
+docker compose up --build postgres app frontend
+```
+
+Для локальной разработки React без frontend-контейнера сначала запустите PostgreSQL и backend, затем dev-сервер:
+
+```bash
+docker compose up -d postgres app
+cd frontend-react
+npm ci
+REACT_APP_API_URL=http://localhost:8080 npm start
+```
+
+Для production-сборки React:
+
+```bash
+cd frontend-react
+npm ci
+npm run build
+```
 
 ## Demo-данные
 
@@ -262,8 +292,8 @@ Repository specs используют Testcontainers, поэтому перед 
 |---|---|
 | `sbt run` | запустить backend локально |
 | `sbt test` | запустить тесты |
-| `sbt native` | собрать локальный Docker-образ `gotrip-backend` |
-| `docker compose up` | поднять backend, PostgreSQL и frontend |
+| `sbt native` | собрать локальный Docker-образ `gotrip-backend` через sbt-native-packager |
+| `docker compose up --build` | собрать и поднять backend, PostgreSQL и оба frontend-интерфейса |
 | `docker compose up -d postgres` | поднять только PostgreSQL |
 | `docker compose down` | остановить контейнеры |
 | `docker compose down -v` | остановить контейнеры и удалить volume БД |
@@ -296,4 +326,3 @@ Testcontainers-тесты не стартуют
 - `docs/database/README.md` - описание таблиц и связей.
 - `docs/database/er-diagram.png` - ER-диаграмма.
 - `docs/requirements/` - спецификация и user stories в PDF.
-

@@ -287,26 +287,67 @@ const TripDetail = () => {
 
   const handleEditLocation = async (locationId) => {
     const loc = tripLocations.find(l => l.id === locationId);
-    if (!loc) return;
-    const visitOrder = window.prompt('Новый порядок посещения:', loc.visit_order);
-    if (visitOrder === null) return;
-    const arrivalDate = window.prompt('Дата прибытия (ISO):', loc.arrival_date || '');
-    const departureDate = window.prompt('Дата отбытия (ISO):', loc.departure_date || '');
+    if (!loc) {
+      showToast('Локация не найдена', 'error');
+      return;
+    }
+
+    const visitOrderInput = window.prompt('Новый порядок посещения (число > 0):', loc.visit_order);
+    if (visitOrderInput === null) return;
+
+    const newOrder = parseInt(visitOrderInput, 10);
+    if (isNaN(newOrder) || newOrder < 1) {
+      showToast('Порядок должен быть положительным числом', 'error');
+      return;
+    }
+
+    if (newOrder === loc.visit_order) {
+      showToast('Порядок не изменился', 'info');
+      return;
+    }
+
+    const conflictingLoc = tripLocations.find(l => l.id !== locationId && l.visit_order === newOrder);
+
     try {
-      const resp = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          visit_order: parseInt(visitOrder),
-          arrival_date: arrivalDate || null,
-          departure_date: departureDate || null,
-        }),
-      });
-      if (resp.ok) {
+      if (conflictingLoc) {
+        const maxOrder = tripLocations.reduce((max, l) => Math.max(max, l.visit_order), 0);
+        const tempOrder = maxOrder + 1;
+
+        const resp1 = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ visit_order: tempOrder }),
+        });
+        if (!resp1.ok) throw new Error('Не удалось установить временный порядок');
+
+        const resp2 = await apiFetch(`/trips/${tripId}/locations/${conflictingLoc.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ visit_order: loc.visit_order }),
+        });
+        if (!resp2.ok) throw new Error('Не удалось обновить конфликтующую локацию');
+
+        const resp3 = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ visit_order: newOrder }),
+        });
+        if (!resp3.ok) throw new Error('Не удалось установить новый порядок');
+
+        showToast('Порядок успешно изменен');
+      } else {
+        const resp = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ visit_order: newOrder }),
+        });
+        if (!resp.ok) {
+          const text = await resp.text();
+          throw new Error(text || 'Ошибка обновления');
+        }
         showToast('Локация обновлена');
-        loadTripLocations();
       }
+
+      loadTripLocations();
     } catch (e) {
-      showToast('Ошибка обновления', 'error');
+      showToast('Ошибка: ' + e.message, 'error');
+      console.error('Update location error:', e);
     }
   };
 
@@ -366,7 +407,7 @@ const TripDetail = () => {
     const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8080';
     window.open(`${baseUrl}/${fileUrl}`, '_blank');
   };
-  
+
   if (loading) return <div className="loading-state">Загрузка данных поездки...</div>;
   if (!trip) return <div className="error-state">Поездка не найдена</div>;
 
@@ -635,6 +676,9 @@ const TripDetail = () => {
                       {statusLabels[o.status] || o.status}
                     </span>
                     {o.price_amount && ` — ${o.price_amount} ${o.price_currency}`}
+                  </div>
+                  <div className="sub" style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                    ID: {o.id}
                   </div>
                 </div>
                 <div className="actions">

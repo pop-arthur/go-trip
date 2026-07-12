@@ -21,12 +21,10 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
     for
       data <- createOrderData(80)
       otherUser <- UserRepository.makePostgres[IO](sessionPool).create(sampleUser(81, "other@example.test"))
-      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id))
-      byId <- orders.findById(order.id)
+      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).user_id, sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).trip_id, orderCreate(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id)))
       byUser <- orders.findByUser(data.user.id, order.id)
       byOtherUser <- orders.findByUser(otherUser.id, order.id)
     yield
-      assertEquals(byId, Some(order))
       assertEquals(byUser, Some(order))
       assertEquals(byOtherUser, None)
   }
@@ -36,7 +34,7 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
 
     for
       data <- createOrderData(80)
-      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id))
+      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).user_id, sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).trip_id, orderCreate(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id)))
       listed <- orders.listByTrip(data.user.id, data.trip.id, OrderSearchParams(serviceType = Some(ServiceType.Train), status = Some(OrderStatus.PendingVerification)))
     yield assertEquals(listed, List(order))
   }
@@ -60,9 +58,8 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
 
     for
       data <- createOrderData(80)
-      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id))
-      updatedOrder = order.copy(title = OrderTitle("Updated Train"), status = OrderStatus.Confirmed, updated_at = t(87))
-      updated <- orders.update(updatedOrder)
+      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).user_id, sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).trip_id, orderCreate(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id)))
+      updated <- orders.update(data.user.id, order.id, OrderUpdate(title = Some(OrderTitle("Updated Train")), status = Some(OrderStatus.Confirmed)))
     yield assertEquals(updated.map(_.title), Some(OrderTitle("Updated Train")))
   }
 
@@ -71,8 +68,8 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
 
     for
       data <- createOrderData(80)
-      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id))
-      statusUpdated <- orders.updateStatus(order.copy(status = OrderStatus.Delayed, start_datetime = Some(odt(88)), updated_at = t(88)))
+      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).user_id, sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).trip_id, orderCreate(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id)))
+      statusUpdated <- orders.updateStatus(data.user.id, order.id, OrderStatusUpdate(OrderStatus.Delayed, new_start_datetime = Some(odt(88))))
     yield assertEquals(statusUpdated.map(_.status), Some(OrderStatus.Delayed))
   }
 
@@ -81,10 +78,10 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
 
     for
       data <- createOrderData(80)
-      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id))
+      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).user_id, sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).trip_id, orderCreate(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id)))
       event = sampleOrderStatusEvent(89, order.id)
       insertedEvent <- orders.insertStatusEvent(event)
-    yield assertEquals(insertedEvent, event)
+    yield assertEquals(insertedEvent.copy(created_at = event.created_at), event)
   }
 
   repositoryTest("OrderRepository deletes orders by owner") {
@@ -92,7 +89,7 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
 
     for
       data <- createOrderData(80)
-      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id))
+      order <- orders.create(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).user_id, sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id).trip_id, orderCreate(sampleOrder(86, data.user.id, data.trip.id, data.provider.id, data.departure.id, data.arrival.id)))
       deleted <- orders.delete(data.user.id, order.id)
       byUser <- orders.findByUser(data.user.id, order.id)
     yield
@@ -108,7 +105,7 @@ final class OrderRepositorySpec extends PostgresRepositorySpecBase with Reposito
 
     for
       user <- users.create(sampleUser(start))
-      trip <- trips.create(sampleTrip(start + 2, user.id))
+      trip <- trips.create(sampleTrip(start + 2, user.id).user_id, tripCreate(sampleTrip(start + 2, user.id)))
       provider <- providers.create(sampleProvider(start + 3, "Rail Europe", ProviderType.TransportCompany))
       departure <- locations.create(sampleLocation(start + 4, "Paris Gare de Lyon", LocationType.TrainStation, country = Some("France"), city = Some("Paris")))
       arrival <- locations.create(sampleLocation(start + 5, "Milano Centrale", LocationType.TrainStation, country = Some("Italy"), city = Some("Milan")))

@@ -103,6 +103,7 @@ function logout() {
     state.notificationEnabled = null;
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('notificationEnabled');
     document.getElementById('app').classList.add('hidden');
     document.getElementById('auth-page').style.display = 'flex';
     document.getElementById('auth-error').textContent = '';
@@ -338,6 +339,12 @@ function renderNotifications(container) {
 
     updateToggleFromState();
 
+    const saved = localStorage.getItem('notificationEnabled');
+    if (saved !== null) {
+        state.notificationEnabled = saved === 'true';
+        updateToggleFromState();
+    }
+
     function loadPreferences() {
         apiFetch('/notification-preferences')
             .then(resp => {
@@ -358,6 +365,7 @@ function renderNotifications(container) {
             .then(pref => {
                 if (pref && pref.is_enabled !== undefined) {
                     state.notificationEnabled = pref.is_enabled;
+                    localStorage.setItem('notificationEnabled', pref.is_enabled);
                     updateToggleFromState();
                 }
             })
@@ -367,9 +375,7 @@ function renderNotifications(container) {
             });
     }
 
-    if (state.notificationEnabled === null) {
-        loadPreferences();
-    }
+    loadPreferences();
 
     const saveBtn = document.getElementById('notif-save-btn');
     if (saveBtn) {
@@ -382,6 +388,7 @@ function renderNotifications(container) {
                 });
                 if (resp.ok) {
                     state.notificationEnabled = enabled;
+                    localStorage.setItem('notificationEnabled', enabled);
                     showToast('Настройки сохранены');
                 } else {
                     const err = await resp.json();
@@ -444,11 +451,9 @@ function renderAchievements(container) {
     ]).then(([allAchievements, userAchievements]) => {
         const achievementsMap = Object.fromEntries(allAchievements.map(a => [a.id, a]));
 
-        // Дедупликация: оставляем только последнюю запись для каждого achievement_id
         const uniqueUserAchievements = [];
         const seen = new Set();
         if (userAchievements) {
-            // Сортируем по убыванию unlocked_at, чтобы оставить самую свежую
             const sorted = [...userAchievements].sort((a, b) => {
                 const dateA = new Date(a.unlocked_at ?? a.unlockedAt);
                 const dateB = new Date(b.unlocked_at ?? b.unlockedAt);
@@ -545,7 +550,6 @@ function getTargetName(targetType, targetId) {
         case 'LOCATION':
             return locationsMap[targetId] || `Локация #${targetId.slice(0, 8)}`;
         case 'ADDITIONAL_SERVICE':
-        case 'ADDITIONALSERVICE':
             return servicesMap[targetId] || `Услуга #${targetId.slice(0, 8)}`;
         case 'ORDER':
             return `Заказ #${targetId.slice(0, 8)}`;
@@ -561,9 +565,7 @@ function getUserLabel(userId, currentUserId) {
 }
 
 function renderReviews(container) {
-    if (Object.keys(providersMap).length === 0) {
-        loadReviewMaps();
-    }
+    loadReviewMaps();
 
     let viewMode = 'all';
 
@@ -602,8 +604,7 @@ function renderReviews(container) {
             </div>
             <div class="card">
                 <h3>Список отзывов</h3>
-                <!-- Вкладки -->
-                <div class="form-row" style="margin-bottom: 12px;">
+                <div class="form-row" style="margin-bottom:12px;">
                     <button class="btn btn-sm btn-outline review-tab" data-view="all" style="background: var(--color-primary);">Все</button>
                     <button class="btn btn-sm btn-outline review-tab" data-view="mine">Мои</button>
                 </div>
@@ -931,6 +932,7 @@ function renderReviews(container) {
                         <div class="info">
                             <div class="title">
                                 <span style="color: #f5b342;">⭐</span> ${r.rating}/5 — ${targetName}
+                                <button class="btn btn-sm btn-outline" style="margin-left:8px;" onclick="viewRating('${r.targetType}', '${r.targetId}')">ℹ️</button>
                             </div>
                             <div class="sub">${text}</div>
                             <div class="sub" style="font-size:12px;color:var(--color-text-secondary);">
@@ -950,6 +952,21 @@ function renderReviews(container) {
             showToast('Ошибка загрузки отзывов', 'error');
         }
     }
+
+    window.viewRating = async (targetType, targetId) => {
+        try {
+            const resp = await apiFetch(`/reviews/rating-summary?targetType=${targetType.toUpperCase()}&targetId=${targetId}`);
+            if (!resp.ok) {
+                showToast('Не удалось загрузить рейтинг', 'error');
+                return;
+            }
+            const data = await resp.json();
+            const name = getTargetName(targetType, targetId);
+            alert(`Цель: ${name}\nСредняя оценка: ${data.averageRating ? data.averageRating.toFixed(1) : 'нет оценок'}\nКоличество отзывов: ${data.reviewCount || 0}`);
+        } catch (e) {
+            showToast('Ошибка загрузки рейтинга', 'error');
+        }
+    };
 
     if (createBtn) {
         createBtn.addEventListener('click', async () => {
@@ -982,6 +999,11 @@ function renderReviews(container) {
                     document.getElementById('review-rating').value = '';
                     document.getElementById('review-text').value = '';
                     targetIdSelect.value = '';
+                    filterTypeSelect.value = '';
+                    filterTargetSelect.innerHTML = '<option value="">-- Все --</option>';
+                    filterTargetSelect.disabled = false;
+                    filterType = '';
+                    filterTargetId = '';
                     loadReviews();
                 } else {
                     const err = await resp.json();
@@ -1060,10 +1082,6 @@ function renderLocations(container) {
                     <label>Город <input id="loc-city" /></label>
                     <label>Адрес <input id="loc-address" /></label>
                 </div>
-                <div class="form-row">
-                    <label>Широта <input id="loc-lat" type="number" step="any" /></label>
-                    <label>Долгота <input id="loc-lon" type="number" step="any" /></label>
-                </div>
                 <button class="btn btn-primary" id="loc-create-btn">Создать</button>
             </div>
             <div class="card">
@@ -1093,13 +1111,11 @@ function renderLocations(container) {
             const country = document.getElementById('loc-country').value;
             const city = document.getElementById('loc-city').value;
             const address = document.getElementById('loc-address').value;
-            const lat = parseFloat(document.getElementById('loc-lat').value) || null;
-            const lon = parseFloat(document.getElementById('loc-lon').value) || null;
             if (!name) { showToast('Название обязательно', 'error'); return; }
             try {
                 const resp = await apiFetch('/locations', {
                     method: 'POST',
-                    body: JSON.stringify({ name, type, country, city, address, latitude: lat, longitude: lon })
+                    body: JSON.stringify({ name, type, country, city, address })
                 });
                 if (resp.ok) { showToast('Создано'); renderLocations(container); }
                 else { const err = await resp.json(); showToast('Ошибка: ' + err.message, 'error'); }
@@ -1140,14 +1156,40 @@ function renderLocations(container) {
                             <div class="sub">${l.country || ''} ${l.city || ''} ${l.address || ''}</div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-sm btn-outline" onclick="editLocation('${l.id}')">Редактировать</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteLocation('${l.id}')">Удалить</button>
+                            <button class="btn btn-sm btn-outline" onclick="editLocation('${l.id}')">✎</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteLocation('${l.id}')">✕</button>
+                            <button class="btn btn-sm btn-outline" onclick="viewLocation('${l.id}')">👁</button>
                         </div>
                     </div>
                 `).join('');
             }
         } catch (e) { showToast('Ошибка загрузки', 'error'); }
     }
+
+    window.viewLocation = async (id) => {
+        try {
+            const resp = await apiFetch(`/locations/${id}`);
+            if (!resp.ok) { showToast('Не удалось загрузить локацию', 'error'); return; }
+            const loc = await resp.json();
+            const ratingResp = await apiFetch(`/reviews/rating-summary?targetType=LOCATION&targetId=${id}`);
+            let rating = null;
+            if (ratingResp.ok) {
+                rating = await ratingResp.json();
+            }
+            alert(
+                `ID: ${loc.id}\n` +
+                `Название: ${loc.name}\n` +
+                `Тип: ${loc.type}\n` +
+                `Страна: ${loc.country || '—'}\n` +
+                `Город: ${loc.city || '—'}\n` +
+                `Адрес: ${loc.address || '—'}\n` +
+                `Средняя оценка: ${rating ? (rating.averageRating ? rating.averageRating.toFixed(1) : 'нет оценок') : 'нет оценок'}\n` +
+                `Количество отзывов: ${rating ? rating.reviewCount || 0 : 0}`
+            );
+        } catch (e) {
+            showToast('Ошибка загрузки', 'error');
+        }
+    };
 
     window.editLocation = (id) => {
         apiFetch(`/locations/${id}`).then(resp => resp.json()).then(loc => {
@@ -1270,13 +1312,38 @@ function renderProviders(container) {
                             <div class="sub">${p.website || ''} ${p.support_contact || ''}</div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-sm btn-danger" onclick="deleteProvider('${p.id}')">Удалить</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProvider('${p.id}')">✕</button>
+                            <button class="btn btn-sm btn-outline" onclick="viewProvider('${p.id}')">👁</button>
                         </div>
                     </div>
                 `).join('');
             }
         } catch (e) { showToast('Ошибка', 'error'); }
     }
+
+    window.viewProvider = async (id) => {
+        try {
+            const resp = await apiFetch(`/providers/${id}`);
+            if (!resp.ok) { showToast('Не удалось загрузить провайдера', 'error'); return; }
+            const prov = await resp.json();
+            const ratingResp = await apiFetch(`/reviews/rating-summary?targetType=PROVIDER&targetId=${id}`);
+            let rating = null;
+            if (ratingResp.ok) {
+                rating = await ratingResp.json();
+            }
+            alert(
+                `ID: ${prov.id}\n` +
+                `Название: ${prov.name}\n` +
+                `Тип: ${prov.type}\n` +
+                `Сайт: ${prov.website || '—'}\n` +
+                `Контакты: ${prov.support_contact || '—'}\n` +
+                `Средняя оценка: ${rating ? (rating.averageRating ? rating.averageRating.toFixed(1) : 'нет оценок') : 'нет оценок'}\n` +
+                `Количество отзывов: ${rating ? rating.reviewCount || 0 : 0}`
+            );
+        } catch (e) {
+            showToast('Ошибка загрузки', 'error');
+        }
+    };
 
     window.deleteProvider = async (id) => {
         if (!confirm('Удалить провайдера?')) return;
@@ -1351,11 +1418,39 @@ function renderServices(container) {
                             <div class="title">${s.title} (${s.service_type})</div>
                             <div class="sub">${s.description || ''} ${s.price_amount ? s.price_amount + ' ' + s.price_currency : ''}</div>
                         </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewService('${s.id}')">👁</button>
+                        </div>
                     </div>
                 `).join('');
             }
         } catch (e) { showToast('Ошибка', 'error'); }
     }
+
+    window.viewService = async (id) => {
+        try {
+            const resp = await apiFetch(`/additional-services/${id}`);
+            if (!resp.ok) { showToast('Не удалось загрузить услугу', 'error'); return; }
+            const serv = await resp.json();
+            const ratingResp = await apiFetch(`/reviews/rating-summary?targetType=ADDITIONAL_SERVICE&targetId=${id}`);
+            let rating = null;
+            if (ratingResp.ok) {
+                rating = await ratingResp.json();
+            }
+            alert(
+                `ID: ${serv.id}\n` +
+                `Название: ${serv.title}\n` +
+                `Тип: ${serv.service_type}\n` +
+                `Описание: ${serv.description || '—'}\n` +
+                `Цена: ${serv.price_amount ? serv.price_amount + ' ' + serv.price_currency : '—'}\n` +
+                `Активна: ${serv.is_active ? 'Да' : 'Нет'}\n` +
+                `Средняя оценка: ${rating ? (rating.averageRating ? rating.averageRating.toFixed(1) : 'нет оценок') : 'нет оценок'}\n` +
+                `Количество отзывов: ${rating ? rating.reviewCount || 0 : 0}`
+            );
+        } catch (e) {
+            showToast('Ошибка загрузки', 'error');
+        }
+    };
 }
 
 // ============================================================
@@ -1465,9 +1560,9 @@ function renderTrips(container) {
                             <div class="sub">${t.status} ${t.start_date ? 'с ' + t.start_date : ''} ${t.end_date ? 'по ' + t.end_date : ''}</div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewTrip('${t.id}')">Просмотр</button>
-                            <button class="btn btn-sm btn-outline" onclick="editTrip('${t.id}')">Редактировать</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteTrip('${t.id}')">Удалить</button>
+                            <button class="btn btn-sm btn-outline" onclick="viewTrip('${t.id}')">📋</button>
+                            <button class="btn btn-sm btn-outline" onclick="editTrip('${t.id}')">✎</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTrip('${t.id}')">✕</button>
                         </div>
                     </div>
                 `).join('');
@@ -1522,6 +1617,11 @@ function renderTripDetail(container) {
                 <div id="trip-info"></div>
             </div>
             <div class="card">
+                <h3>Маршрут</h3>
+                <button class="btn btn-primary" id="add-location-btn" style="margin-bottom:16px;">+ Добавить локацию</button>
+                <div id="trip-location-list"></div>
+            </div>
+            <div class="card">
                 <h3>Заказы</h3>
                 <button class="btn btn-primary" id="order-create-btn" style="margin-bottom:16px;">+ Создать заказ</button>
                 <div id="order-list"></div>
@@ -1537,16 +1637,171 @@ function renderTripDetail(container) {
         });
     }
 
-    apiFetch(`/trips/${tripId}`).then(resp => resp.json()).then(trip => {
-        document.getElementById('trip-detail-title').textContent = `Поездка: ${trip.title}`;
-        document.getElementById('trip-info').innerHTML = `
-            <p><strong>ID:</strong> ${trip.id}</p>
-            <p><strong>Название:</strong> ${trip.title}</p>
-            <p><strong>Дата начала:</strong> ${trip.start_date || '—'}</p>
-            <p><strong>Дата окончания:</strong> ${trip.end_date || '—'}</p>
-            <p><strong>Статус:</strong> ${trip.status}</p>
-        `;
-    }).catch(() => showToast('Ошибка загрузки поездки', 'error'));
+    async function loadAll() {
+        try {
+            const tripResp = await apiFetch(`/trips/${tripId}`);
+            if (tripResp.ok) {
+                const trip = await tripResp.json();
+                document.getElementById('trip-detail-title').textContent = `Поездка: ${trip.title}`;
+                document.getElementById('trip-info').innerHTML = `
+                    <p><strong>ID:</strong> ${trip.id}</p>
+                    <p><strong>Название:</strong> ${trip.title}</p>
+                    <p><strong>Дата начала:</strong> ${trip.start_date || '—'}</p>
+                    <p><strong>Дата окончания:</strong> ${trip.end_date || '—'}</p>
+                    <p><strong>Статус:</strong> ${trip.status}</p>
+                `;
+            }
+        } catch (e) { showToast('Ошибка загрузки поездки', 'error'); }
+
+        loadTripLocations();
+        loadOrders();
+    }
+
+    async function loadTripLocations() {
+        const el = document.getElementById('trip-location-list');
+        if (!el) return;
+        try {
+            const resp = await apiFetch(`/trips/${tripId}/locations`);
+            if (resp.ok) {
+                const locations = await resp.json();
+                if (!locations || locations.length === 0) {
+                    el.innerHTML = '<div class="empty-state">Нет локаций в маршруте</div>';
+                    return;
+                }
+                const locResp = await apiFetch('/locations');
+                const allLocations = locResp.ok ? await locResp.json() : [];
+                const locMap = {};
+                allLocations.forEach(l => locMap[l.id] = l.name);
+
+                el.innerHTML = locations.map(l => `
+                    <div class="list-item">
+                        <div class="info">
+                            <div class="title">${locMap[l.location_id] || l.location_id.slice(0,8)} (порядок: ${l.visit_order})</div>
+                            <div class="sub">Прибытие: ${l.arrival_date || '—'} / Отбытие: ${l.departure_date || '—'}</div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-outline" onclick="editTripLocation('${l.id}')">✎</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTripLocation('${l.id}')">✕</button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                el.innerHTML = '<div class="error-state">Ошибка загрузки маршрута</div>';
+            }
+        } catch (e) {
+            el.innerHTML = '<div class="error-state">Ошибка загрузки маршрута</div>';
+        }
+    }
+
+    window.editTripLocation = async (locationId) => {
+        try {
+            const resp = await apiFetch(`/trips/${tripId}/locations/${locationId}`);
+            if (!resp.ok) { showToast('Не удалось загрузить локацию', 'error'); return; }
+            const loc = await resp.json();
+
+            const visitOrderInput = prompt('Новый порядок (число > 0):', loc.visit_order);
+            if (visitOrderInput === null) return;
+            const visitOrder = parseInt(visitOrderInput, 10);
+            if (isNaN(visitOrder) || visitOrder < 1) {
+                showToast('Порядок должен быть положительным числом', 'error');
+                return;
+            }
+
+            // Проверяем, занят ли новый порядок
+            const locationsResp = await apiFetch(`/trips/${tripId}/locations`);
+            const allLocations = locationsResp.ok ? await locationsResp.json() : [];
+            const conflicting = allLocations.find(l => l.id !== locationId && l.visit_order === visitOrder);
+
+            let arrivalDate = prompt('Дата прибытия (ISO, опционально):', loc.arrival_date || '');
+            let departureDate = prompt('Дата отбытия (ISO, опционально):', loc.departure_date || '');
+
+            if (conflicting) {
+                // Меняем местами
+                const maxOrder = allLocations.reduce((max, l) => Math.max(max, l.visit_order), 0);
+                const tempOrder = maxOrder + 1;
+
+                // Шаг 1: текущая на временный
+                const r1 = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ visit_order: tempOrder })
+                });
+                if (!r1.ok) throw new Error('Не удалось установить временный порядок');
+
+                // Шаг 2: конфликтующая на старый
+                const r2 = await apiFetch(`/trips/${tripId}/locations/${conflicting.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ visit_order: loc.visit_order })
+                });
+                if (!r2.ok) throw new Error('Не удалось обновить конфликтующую локацию');
+
+                // Шаг 3: текущая на новый
+                const r3 = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ visit_order: visitOrder })
+                });
+                if (!r3.ok) throw new Error('Не удалось установить новый порядок');
+
+                showToast('Порядки успешно обменяны');
+            } else {
+                // Просто обновляем
+                const r = await apiFetch(`/trips/${tripId}/locations/${locationId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        visit_order: visitOrder,
+                        arrival_date: arrivalDate || null,
+                        departure_date: departureDate || null
+                    })
+                });
+                if (!r.ok) throw new Error('Ошибка обновления');
+                showToast('Локация обновлена');
+            }
+
+            loadTripLocations();
+        } catch (e) {
+            showToast('Ошибка: ' + e.message, 'error');
+            console.error(e);
+        }
+    };
+
+    window.deleteTripLocation = async (locationId) => {
+        if (!confirm('Удалить локацию из маршрута?')) return;
+        try {
+            const resp = await apiFetch(`/trips/${tripId}/locations/${locationId}`, { method: 'DELETE' });
+            if (resp.ok) {
+                showToast('Локация удалена');
+                loadTripLocations();
+            } else {
+                const err = await resp.json();
+                showToast('Ошибка: ' + (err.message || ''), 'error');
+            }
+        } catch (e) {
+            showToast('Ошибка', 'error');
+        }
+    };
+
+    document.getElementById('add-location-btn').addEventListener('click', async () => {
+        const locationId = prompt('Введите ID локации:');
+        if (!locationId) return;
+        const visitOrder = prompt('Порядок (число):') || 1;
+        try {
+            const resp = await apiFetch(`/trips/${tripId}/locations`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    location_id: locationId,
+                    visit_order: parseInt(visitOrder)
+                })
+            });
+            if (resp.ok) {
+                showToast('Локация добавлена');
+                loadTripLocations();
+            } else {
+                const err = await resp.json();
+                showToast('Ошибка: ' + (err.message || ''), 'error');
+            }
+        } catch (e) {
+            showToast('Ошибка', 'error');
+        }
+    });
 
     window.loadOrders = async function() {
         const el = document.getElementById('order-list');
@@ -1566,10 +1821,10 @@ function renderTripDetail(container) {
                             <div class="sub">${o.status} — ${o.price_amount ? o.price_amount + ' ' + o.price_currency : ''}</div>
                         </div>
                         <div class="actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewOrderFiles('${o.id}')">Файлы</button>
-                            <button class="btn btn-sm btn-outline" onclick="editOrder('${o.id}')">Редактировать</button>
-                            <button class="btn btn-sm btn-outline" onclick="changeOrderStatus('${o.id}')">Изменить статус</button>
-                            <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">Удалить</button>
+                            <button class="btn btn-sm btn-outline" onclick="viewOrderFiles('${o.id}')">📁</button>
+                            <button class="btn btn-sm btn-outline" onclick="editOrder('${o.id}')">✎</button>
+                            <button class="btn btn-sm btn-outline" onclick="changeOrderStatus('${o.id}')">🔄</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteOrder('${o.id}')">✕</button>
                         </div>
                     </div>
                 `).join('');
@@ -1579,56 +1834,119 @@ function renderTripDetail(container) {
         }
     };
 
-    window.loadOrders();
-
-    const orderCreateBtn = document.getElementById('order-create-btn');
-    if (orderCreateBtn) {
-        orderCreateBtn.addEventListener('click', () => {
-            showOrderCreateForm(tripId, container);
-        });
-    }
-
     window.viewOrderFiles = (orderId) => {
         state.orderDetailId = orderId;
         renderOrderFiles(container);
     };
 
-    window.editOrder = (orderId) => {
-        apiFetch(`/orders/${orderId}`).then(resp => resp.json()).then(order => {
-            const title = prompt('Название:', order.title);
-            if (title === null) return;
-            const status = prompt('Статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):', order.status);
-            if (!status) return;
-            const price = prompt('Цена:', order.price_amount || '');
-            const currency = prompt('Валюта:', order.price_currency || '');
-            apiFetch(`/orders/${orderId}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ title, status, price_amount: price ? parseFloat(price) : null, price_currency: currency || null })
-            }).then(resp => {
-                if (resp.ok) { showToast('Заказ обновлён'); window.loadOrders(); }
-                else showToast('Ошибка', 'error');
-            });
-        }).catch(() => showToast('Ошибка', 'error'));
-    };
+    window.loadOrders();
+    loadAll();
 
-    window.changeOrderStatus = (orderId) => {
-        const newStatus = prompt('Новый статус (PENDING_VERIFICATION/CONFIRMED/DELAYED/CANCELLED/COMPLETED/REFUND_PENDING/REFUNDED):');
-        if (!newStatus) return;
-        const reason = prompt('Причина (опционально):');
-        apiFetch(`/orders/${orderId}/status`, {
-            method: 'PATCH',
-            body: JSON.stringify({ status: newStatus, reason: reason || null })
-        }).then(resp => {
-            if (resp.ok) { showToast('Статус обновлён'); window.loadOrders(); }
-            else showToast('Ошибка', 'error');
-        }).catch(() => showToast('Ошибка', 'error'));
-    };
+    document.getElementById('order-create-btn').addEventListener('click', () => {
+        showOrderCreateForm(tripId, container);
+    });
+}
 
-    window.deleteOrder = async (orderId) => {
-        if (!confirm('Удалить заказ?')) return;
+// ============================================================
+//  ORDER FILES
+// ============================================================
+function renderOrderFiles(container) {
+    const orderId = state.orderDetailId;
+    container.innerHTML = `
+        <div class="section active">
+            <div class="back-link" id="order-files-back-btn">← Назад к заказам</div>
+            <h2>Файлы заказа #${orderId}</h2>
+            <div class="card">
+                <h3>Добавить файл</h3>
+                <div class="form-row">
+                    <label>URL файла <input id="file-url" /></label>
+                    <label>Тип файла <select id="file-type">
+                        <option value="PDF">PDF</option>
+                        <option value="IMAGE">Изображение</option>
+                        <option value="EMAIL">Email</option>
+                        <option value="JSON">JSON</option>
+                        <option value="OTHER">Другое</option>
+                    </select></label>
+                </div>
+                <button class="btn btn-primary" id="file-create-btn">Добавить</button>
+            </div>
+            <div class="card">
+                <h3>Список файлов</h3>
+                <div id="file-list"></div>
+            </div>
+        </div>
+    `;
+
+    const backBtn = document.getElementById('order-files-back-btn');
+    if (backBtn) {
+        backBtn.addEventListener('click', () => {
+            state.orderDetailId = null;
+            renderTripDetail(container);
+        });
+    }
+
+    const createBtn = document.getElementById('file-create-btn');
+    if (createBtn) {
+        createBtn.addEventListener('click', async () => {
+            const fileUrl = document.getElementById('file-url').value;
+            const fileType = document.getElementById('file-type').value;
+            if (!fileUrl) { showToast('URL обязателен', 'error'); return; }
+            try {
+                const resp = await apiFetch(`/orders/${orderId}/files`, {
+                    method: 'POST',
+                    body: JSON.stringify({ file_url: fileUrl, file_type: fileType })
+                });
+                if (resp.ok) {
+                    showToast('Файл добавлен');
+                    loadFiles();
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + (err.message || ''), 'error');
+                }
+            } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
+        });
+    }
+
+    loadFiles();
+
+    async function loadFiles() {
+        const el = document.getElementById('file-list');
+        if (!el) return;
         try {
-            const resp = await apiFetch(`/orders/${orderId}`, { method: 'DELETE' });
-            if (resp.ok) { showToast('Удалено'); window.loadOrders(); }
+            const resp = await apiFetch(`/orders/${orderId}/files`);
+            if (resp.ok) {
+                const files = await resp.json();
+                if (!files || files.length === 0) {
+                    el.innerHTML = '<div class="empty-state">Нет файлов</div>';
+                    return;
+                }
+                el.innerHTML = files.map(f => `
+                    <div class="list-item">
+                        <div class="info">
+                            <div class="title">${f.file_url}</div>
+                            <div class="sub">${f.file_type} — ${new Date(f.uploaded_at).toLocaleString()}</div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewFile('${f.file_url}')">👁</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.id}')">✕</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            el.innerHTML = '<div class="error-state">Ошибка загрузки файлов</div>';
+        }
+    }
+
+    window.viewFile = (fileUrl) => {
+        window.open(API_BASE + '/' + fileUrl, '_blank');
+    };
+
+    window.deleteFile = async (fileId) => {
+        if (!confirm('Удалить файл?')) return;
+        try {
+            const resp = await apiFetch(`/orders/${orderId}/files/${fileId}`, { method: 'DELETE' });
+            if (resp.ok) { showToast('Удалено'); loadFiles(); }
             else showToast('Ошибка', 'error');
         } catch (e) { showToast('Ошибка', 'error'); }
     };
@@ -1756,8 +2074,6 @@ function showOrderCreateForm(tripId, container) {
                     card.remove();
                     if (typeof window.loadOrders === 'function') {
                         window.loadOrders();
-                    } else {
-                        renderTripDetail(container);
                     }
                 } else {
                     const err = await resp.json();
@@ -1766,106 +2082,6 @@ function showOrderCreateForm(tripId, container) {
             } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
         });
     }
-}
-
-// ============================================================
-//  ORDER FILES
-// ============================================================
-function renderOrderFiles(container) {
-    const orderId = state.orderDetailId;
-    container.innerHTML = `
-        <div class="section active">
-            <div class="back-link" id="order-files-back-btn">← Назад к заказам</div>
-            <h2>Файлы заказа #${orderId}</h2>
-            <div class="card">
-                <h3>Добавить файл</h3>
-                <div class="form-row">
-                    <label>URL файла <input id="file-url" /></label>
-                    <label>Тип файла <select id="file-type">
-                        <option value="PDF">PDF</option>
-                        <option value="IMAGE">Изображение</option>
-                        <option value="EMAIL">Email</option>
-                        <option value="JSON">JSON</option>
-                        <option value="OTHER">Другое</option>
-                    </select></label>
-                </div>
-                <button class="btn btn-primary" id="file-create-btn">Добавить</button>
-            </div>
-            <div class="card">
-                <h3>Список файлов</h3>
-                <div id="file-list"></div>
-            </div>
-        </div>
-    `;
-
-    const backBtn = document.getElementById('order-files-back-btn');
-    if (backBtn) {
-        backBtn.addEventListener('click', () => {
-            state.orderDetailId = null;
-            renderTripDetail(container);
-        });
-    }
-
-    const createBtn = document.getElementById('file-create-btn');
-    if (createBtn) {
-        createBtn.addEventListener('click', async () => {
-            const fileUrl = document.getElementById('file-url').value;
-            const fileType = document.getElementById('file-type').value;
-            if (!fileUrl) { showToast('URL обязателен', 'error'); return; }
-            try {
-                const resp = await apiFetch(`/orders/${orderId}/files`, {
-                    method: 'POST',
-                    body: JSON.stringify({ file_url: fileUrl, file_type: fileType })
-                });
-                if (resp.ok) {
-                    showToast('Файл добавлен');
-                    loadFiles();
-                } else {
-                    const err = await resp.json();
-                    showToast('Ошибка: ' + (err.message || ''), 'error');
-                }
-            } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
-        });
-    }
-
-    loadFiles();
-
-    async function loadFiles() {
-        const el = document.getElementById('file-list');
-        if (!el) return;
-        try {
-            const resp = await apiFetch(`/orders/${orderId}/files`);
-            if (resp.ok) {
-                const files = await resp.json();
-                if (!files || files.length === 0) {
-                    el.innerHTML = '<div class="empty-state">Нет файлов</div>';
-                    return;
-                }
-                el.innerHTML = files.map(f => `
-                    <div class="list-item">
-                        <div class="info">
-                            <div class="title">${f.file_url}</div>
-                            <div class="sub">${f.file_type} — ${new Date(f.uploaded_at).toLocaleString()}</div>
-                        </div>
-                        <div class="actions">
-                            <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.id}')">Удалить</button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        } catch (e) {
-            el.innerHTML = '<div class="error-state">Ошибка загрузки файлов</div>';
-        }
-    }
-
-    window.deleteFile = async (fileId) => {
-        if (!confirm('Удалить файл?')) return;
-        try {
-            const resp = await apiFetch(`/orders/${orderId}/files/${fileId}`, { method: 'DELETE' });
-            if (resp.ok) { showToast('Удалено'); loadFiles(); }
-            else showToast('Ошибка', 'error');
-        } catch (e) { showToast('Ошибка', 'error');
-    };}
 }
 
 // ============================================================
@@ -2201,16 +2417,63 @@ function renderAdmin(container) {
         container.innerHTML = `<div class="section active"><h2>Доступ запрещён</h2><p>У вас нет прав администратора.</p></div>`;
         return;
     }
+
+    let activeTab = 'achievements';
+
     container.innerHTML = `
         <div class="section active">
             <h2>Административная панель</h2>
+            <div class="form-row" style="margin-bottom:16px;">
+                <button class="btn btn-sm btn-outline admin-tab" data-tab="achievements" style="background:var(--color-primary);">Достижения</button>
+                <button class="btn btn-sm btn-outline admin-tab" data-tab="providers">Провайдеры</button>
+                <button class="btn btn-sm btn-outline admin-tab" data-tab="services">Доп. услуги</button>
+                <button class="btn btn-sm btn-outline admin-tab" data-tab="orders">Симуляция заказов</button>
+            </div>
+            <div id="admin-content"></div>
+        </div>
+    `;
+
+    const tabs = container.querySelectorAll('.admin-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.style.background = '');
+            this.style.background = 'var(--color-primary)';
+            activeTab = this.dataset.tab;
+            renderAdminTab(activeTab);
+        });
+    });
+
+    function renderAdminTab(tab) {
+        const content = document.getElementById('admin-content');
+        switch (tab) {
+            case 'achievements':
+                renderAchievementsAdmin(content);
+                break;
+            case 'providers':
+                renderProvidersAdmin(content);
+                break;
+            case 'services':
+                renderServicesAdmin(content);
+                break;
+            case 'orders':
+                renderOrdersAdmin(content);
+                break;
+            default:
+                content.innerHTML = '<p>Неизвестная вкладка</p>';
+        }
+    }
+
+    function renderAchievementsAdmin(el) {
+        let achievements = [];
+        let loading = true;
+        let createData = { code: '', title: '', description: '', conditionType: 'TRIPS_COUNT', conditionValue: '', iconUrl: '' };
+
+        el.innerHTML = `
             <div class="card">
                 <h3>Управление достижениями</h3>
                 <div class="form-row">
                     <label>Код <input id="adm-ach-code" /></label>
                     <label>Название <input id="adm-ach-title" /></label>
-                </div>
-                <div class="form-row">
                     <label>Описание <input id="adm-ach-desc" /></label>
                     <label>Тип условия <select id="adm-ach-cond">
                         <option value="TRIPS_COUNT">Количество поездок</option>
@@ -2219,22 +2482,49 @@ function renderAdmin(container) {
                         <option value="REVIEWS_COUNT">Количество отзывов</option>
                         <option value="SPENDING_AMOUNT">Сумма трат</option>
                     </select></label>
-                </div>
-                <div class="form-row">
                     <label>Значение <input id="adm-ach-value" type="number" /></label>
                     <label>URL иконки <input id="adm-ach-icon" /></label>
                 </div>
-                <button class="btn btn-primary" id="adm-ach-create">Создать достижение</button>
+                <button class="btn btn-primary" id="adm-ach-create">Создать</button>
                 <hr style="margin:20px 0;border-color:#2a2440;" />
-                <div id="adm-ach-list"></div>
+                <div id="adm-ach-list"><p>Загрузка...</p></div>
             </div>
-        </div>
-    `;
-    loadAdminAchievements();
+        `;
 
-    const createBtn = document.getElementById('adm-ach-create');
-    if (createBtn) {
-        createBtn.addEventListener('click', async () => {
+        async function loadAchievements() {
+            try {
+                const resp = await apiFetch('/achievements');
+                if (resp.ok) {
+                    achievements = await resp.json();
+                    renderList();
+                }
+            } catch (e) {
+                document.getElementById('adm-ach-list').innerHTML = '<div class="error-state">Ошибка загрузки</div>';
+            }
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('adm-ach-list');
+            if (!listEl) return;
+            if (!achievements || achievements.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">Нет достижений</div>';
+                return;
+            }
+            listEl.innerHTML = achievements.map(a => `
+                <div class="list-item">
+                    <div class="info">
+                        <div class="title">${a.title} (${a.code})</div>
+                        <div class="sub">${a.description || ''}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-outline" onclick="adminEditAchievement('${a.id}')">✎</button>
+                        <button class="btn btn-sm btn-danger" onclick="adminDeleteAchievement('${a.id}')">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('adm-ach-create').addEventListener('click', async () => {
             const code = document.getElementById('adm-ach-code').value;
             const title = document.getElementById('adm-ach-title').value;
             const description = document.getElementById('adm-ach-desc').value;
@@ -2250,69 +2540,365 @@ function renderAdmin(container) {
                     method: 'POST',
                     body: JSON.stringify({ code, title, description: description || null, conditionType, conditionValue, iconUrl: iconUrl || null })
                 });
-                if (resp.ok) { showToast('Достижение создано'); loadAdminAchievements(); }
-                else { const err = await resp.json(); showToast('Ошибка: ' + err.message, 'error'); }
-            } catch (e) { showToast('Ошибка: ' + e.message, 'error'); }
+                if (resp.ok) {
+                    showToast('Достижение создано');
+                    loadAchievements();
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + err.message, 'error');
+                }
+            } catch (e) {
+                showToast('Ошибка: ' + e.message, 'error');
+            }
+        });
+
+        window.adminEditAchievement = (id) => {
+            const ach = achievements.find(a => a.id === id);
+            if (!ach) return;
+            const code = prompt('Код:', ach.code);
+            if (code === null) return;
+            const title = prompt('Название:', ach.title);
+            if (title === null) return;
+            const desc = prompt('Описание:', ach.description || '');
+            const condType = prompt('Тип условия (TRIPS_COUNT/COUNTRIES_COUNT/ORDERS_COUNT/REVIEWS_COUNT/SPENDING_AMOUNT):', ach.conditionType);
+            if (condType === null) return;
+            const condValue = prompt('Значение:', ach.conditionValue);
+            if (condValue === null) return;
+            const normalizedCondType = condType.toUpperCase().replace(/\s+/g, '_');
+            apiFetch(`/admin/achievements/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    code, title, description: desc || null,
+                    conditionType: normalizedCondType,
+                    conditionValue: parseInt(condValue),
+                    iconUrl: ach.iconUrl
+                })
+            }).then(resp => {
+                if (resp.ok) { showToast('Обновлено'); loadAchievements(); }
+                else { resp.json().then(err => showToast('Ошибка: ' + err.message, 'error')); }
+            }).catch(() => showToast('Ошибка', 'error'));
+        };
+
+        window.adminDeleteAchievement = async (id) => {
+            if (!confirm('Удалить достижение?')) return;
+            try {
+                const resp = await apiFetch(`/admin/achievements/${id}`, { method: 'DELETE' });
+                if (resp.ok) { showToast('Удалено'); loadAchievements(); }
+                else { showToast('Ошибка', 'error'); }
+            } catch (e) {
+                showToast('Ошибка', 'error');
+            }
+        };
+
+        loadAchievements();
+    }
+
+    function renderProvidersAdmin(el) {
+        let providers = [];
+        let createData = { name: '', type: 'OTHER', website: '', support_contact: '' };
+
+        el.innerHTML = `
+            <div class="card">
+                <h3>Управление провайдерами</h3>
+                <div class="form-row">
+                    <label>Название <input id="adm-prov-name" /></label>
+                    <label>Тип <select id="adm-prov-type">
+                        <option value="AIRLINE">Авиакомпания</option>
+                        <option value="HOTEL">Отель</option>
+                        <option value="TOUR_COMPANY">Туроператор</option>
+                        <option value="TRANSPORT_COMPANY">Транспортная компания</option>
+                        <option value="BOOKING_PLATFORM">Платформа бронирования</option>
+                        <option value="INSURANCE_COMPANY">Страховая компания</option>
+                        <option value="OTHER">Другое</option>
+                    </select></label>
+                    <label>Сайт <input id="adm-prov-website" /></label>
+                    <label>Контакты <input id="adm-prov-contact" /></label>
+                </div>
+                <button class="btn btn-primary" id="adm-prov-create">Создать</button>
+                <hr style="margin:20px 0;border-color:#2a2440;" />
+                <div id="adm-prov-list"><p>Загрузка...</p></div>
+            </div>
+        `;
+
+        async function loadProviders() {
+            try {
+                const resp = await apiFetch('/providers');
+                if (resp.ok) {
+                    providers = await resp.json();
+                    renderList();
+                }
+            } catch (e) {
+                document.getElementById('adm-prov-list').innerHTML = '<div class="error-state">Ошибка загрузки</div>';
+            }
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('adm-prov-list');
+            if (!listEl) return;
+            if (!providers || providers.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">Нет провайдеров</div>';
+                return;
+            }
+            listEl.innerHTML = providers.map(p => `
+                <div class="list-item">
+                    <div class="info">
+                        <div class="title">${p.name} (${p.type})</div>
+                        <div class="sub">${p.website || ''} ${p.support_contact || ''}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-outline" onclick="adminEditProvider('${p.id}')">✎</button>
+                        <button class="btn btn-sm btn-danger" onclick="adminDeleteProvider('${p.id}')">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('adm-prov-create').addEventListener('click', async () => {
+            const name = document.getElementById('adm-prov-name').value;
+            const type = document.getElementById('adm-prov-type').value;
+            const website = document.getElementById('adm-prov-website').value;
+            const contact = document.getElementById('adm-prov-contact').value;
+            if (!name) { showToast('Название обязательно', 'error'); return; }
+            try {
+                const resp = await apiFetch('/admin/providers', {
+                    method: 'POST',
+                    body: JSON.stringify({ name, type, website: website || null, support_contact: contact || null })
+                });
+                if (resp.ok) {
+                    showToast('Провайдер создан');
+                    loadProviders();
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + err.message, 'error');
+                }
+            } catch (e) {
+                showToast('Ошибка: ' + e.message, 'error');
+            }
+        });
+
+        window.adminEditProvider = (id) => {
+            const p = providers.find(x => x.id === id);
+            if (!p) return;
+            const name = prompt('Название:', p.name);
+            if (name === null) return;
+            const type = prompt('Тип:', p.type);
+            if (type === null) return;
+            const website = prompt('Сайт:', p.website || '');
+            const contact = prompt('Контакты:', p.support_contact || '');
+            apiFetch(`/admin/providers/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({ name, type, website: website || null, support_contact: contact || null })
+            }).then(resp => {
+                if (resp.ok) { showToast('Обновлено'); loadProviders(); }
+                else { resp.json().then(err => showToast('Ошибка: ' + err.message, 'error')); }
+            }).catch(() => showToast('Ошибка', 'error'));
+        };
+
+        window.adminDeleteProvider = async (id) => {
+            if (!confirm('Удалить провайдера?')) return;
+            try {
+                const resp = await apiFetch(`/admin/providers/${id}`, { method: 'DELETE' });
+                if (resp.ok) { showToast('Удалено'); loadProviders(); }
+                else { showToast('Ошибка', 'error'); }
+            } catch (e) {
+                showToast('Ошибка', 'error');
+            }
+        };
+
+        loadProviders();
+    }
+
+    function renderServicesAdmin(el) {
+        let services = [];
+        let createData = { title: '', description: '', service_type: 'OTHER', provider_id: '', location_id: '', price_amount: '', price_currency: '', is_active: true };
+
+        el.innerHTML = `
+            <div class="card">
+                <h3>Управление доп. услугами</h3>
+                <div class="form-row">
+                    <label>Название <input id="adm-serv-title" /></label>
+                    <label>Описание <input id="adm-serv-desc" /></label>
+                    <label>Тип <select id="adm-serv-type">
+                        <option value="FLIGHT">Авиа</option>
+                        <option value="TRAIN">Поезд</option>
+                        <option value="BUS">Автобус</option>
+                        <option value="HOTEL">Отель</option>
+                        <option value="TOUR">Тур</option>
+                        <option value="CAR_RENTAL">Аренда авто</option>
+                        <option value="INSURANCE">Страховка</option>
+                        <option value="TAXI">Такси</option>
+                        <option value="ESIM">eSIM</option>
+                        <option value="LOUNGE">Лаунж</option>
+                        <option value="EXTRA_BAGGAGE">Доп. багаж</option>
+                        <option value="OTHER">Другое</option>
+                    </select></label>
+                    <label>Цена <input id="adm-serv-price" type="number" step="any" /></label>
+                    <label>Валюта <input id="adm-serv-currency" /></label>
+                    <label>ID провайдера <input id="adm-serv-provider" /></label>
+                    <label>ID локации <input id="adm-serv-location" /></label>
+                    <label><input type="checkbox" id="adm-serv-active" checked /> Активна</label>
+                </div>
+                <button class="btn btn-primary" id="adm-serv-create">Создать</button>
+                <hr style="margin:20px 0;border-color:#2a2440;" />
+                <div id="adm-serv-list"><p>Загрузка...</p></div>
+            </div>
+        `;
+
+        async function loadServices() {
+            try {
+                const resp = await apiFetch('/additional-services');
+                if (resp.ok) {
+                    services = await resp.json();
+                    renderList();
+                }
+            } catch (e) {
+                document.getElementById('adm-serv-list').innerHTML = '<div class="error-state">Ошибка загрузки</div>';
+            }
+        }
+
+        function renderList() {
+            const listEl = document.getElementById('adm-serv-list');
+            if (!listEl) return;
+            if (!services || services.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">Нет услуг</div>';
+                return;
+            }
+            listEl.innerHTML = services.map(s => `
+                <div class="list-item">
+                    <div class="info">
+                        <div class="title">${s.title} (${s.service_type})</div>
+                        <div class="sub">${s.description || ''} ${s.price_amount ? s.price_amount + ' ' + s.price_currency : ''}</div>
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-sm btn-outline" onclick="adminEditService('${s.id}')">✎</button>
+                        <button class="btn btn-sm btn-danger" onclick="adminDeleteService('${s.id}')">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('adm-serv-create').addEventListener('click', async () => {
+            const title = document.getElementById('adm-serv-title').value;
+            const description = document.getElementById('adm-serv-desc').value;
+            const service_type = document.getElementById('adm-serv-type').value;
+            const price_amount = parseFloat(document.getElementById('adm-serv-price').value);
+            const price_currency = document.getElementById('adm-serv-currency').value;
+            const provider_id = document.getElementById('adm-serv-provider').value;
+            const location_id = document.getElementById('adm-serv-location').value;
+            const is_active = document.getElementById('adm-serv-active').checked;
+            if (!title) { showToast('Название обязательно', 'error'); return; }
+            try {
+                const resp = await apiFetch('/admin/additional-services', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        title, description: description || null, service_type,
+                        price_amount: isNaN(price_amount) ? null : price_amount,
+                        price_currency: price_currency || null,
+                        provider_id: provider_id || null,
+                        location_id: location_id || null,
+                        is_active
+                    })
+                });
+                if (resp.ok) {
+                    showToast('Услуга создана');
+                    loadServices();
+                } else {
+                    const err = await resp.json();
+                    showToast('Ошибка: ' + err.message, 'error');
+                }
+            } catch (e) {
+                showToast('Ошибка: ' + e.message, 'error');
+            }
+        });
+
+        window.adminEditService = (id) => {
+            const s = services.find(x => x.id === id);
+            if (!s) return;
+            const title = prompt('Название:', s.title);
+            if (title === null) return;
+            const description = prompt('Описание:', s.description || '');
+            const service_type = prompt('Тип:', s.service_type);
+            if (service_type === null) return;
+            const price = prompt('Цена:', s.price_amount || '');
+            const currency = prompt('Валюта:', s.price_currency || '');
+            const is_active = confirm('Активна?');
+            apiFetch(`/admin/additional-services/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    title, description: description || null, service_type,
+                    price_amount: price ? parseFloat(price) : null,
+                    price_currency: currency || null,
+                    is_active
+                })
+            }).then(resp => {
+                if (resp.ok) { showToast('Обновлено'); loadServices(); }
+                else { resp.json().then(err => showToast('Ошибка: ' + err.message, 'error')); }
+            }).catch(() => showToast('Ошибка', 'error'));
+        };
+
+        window.adminDeleteService = async (id) => {
+            if (!confirm('Удалить услугу?')) return;
+            try {
+                const resp = await apiFetch(`/admin/additional-services/${id}`, { method: 'DELETE' });
+                if (resp.ok) { showToast('Удалено'); loadServices(); }
+                else { showToast('Ошибка', 'error'); }
+            } catch (e) {
+                showToast('Ошибка', 'error');
+            }
+        };
+
+        loadServices();
+    }
+
+    function renderOrdersAdmin(el) {
+        el.innerHTML = `
+            <div class="card">
+                <h3>Симуляция статуса заказа</h3>
+                <div class="form-row">
+                    <label>ID заказа <input id="adm-order-id" placeholder="UUID заказа" /></label>
+                    <label>Статус <select id="adm-order-status">
+                        <option value="PENDING_VERIFICATION">Ожидает проверки</option>
+                        <option value="CONFIRMED">Подтверждён</option>
+                        <option value="DELAYED">Задержан</option>
+                        <option value="CANCELLED">Отменён</option>
+                        <option value="COMPLETED">Завершён</option>
+                        <option value="REFUND_PENDING">Возврат средств</option>
+                        <option value="REFUNDED">Возвращён</option>
+                    </select></label>
+                    <label>Причина <input id="adm-order-reason" placeholder="Опционально" /></label>
+                </div>
+                <button class="btn btn-primary" id="adm-order-simulate">Симулировать</button>
+                <p style="font-size:14px;color:var(--color-text-secondary);">Этот эндпоинт создаёт событие статуса с источником admin_simulation.</p>
+                <div id="adm-order-result"></div>
+            </div>
+        `;
+
+        document.getElementById('adm-order-simulate').addEventListener('click', async () => {
+            const orderId = document.getElementById('adm-order-id').value.trim();
+            const status = document.getElementById('adm-order-status').value;
+            const reason = document.getElementById('adm-order-reason').value;
+            if (!orderId) { showToast('Введите ID заказа', 'error'); return; }
+            try {
+                const resp = await apiFetch(`/admin/orders/${orderId}/simulate-status-change`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status, reason: reason || null })
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    document.getElementById('adm-order-result').innerHTML = `<div class="success">Статус обновлён: ${data.status}</div>`;
+                    showToast('Симуляция выполнена');
+                } else {
+                    const err = await resp.json();
+                    document.getElementById('adm-order-result').innerHTML = `<div class="error-state">${err.message || 'Ошибка'}</div>`;
+                    showToast('Ошибка: ' + err.message, 'error');
+                }
+            } catch (e) {
+                showToast('Ошибка: ' + e.message, 'error');
+            }
         });
     }
 
-    async function loadAdminAchievements() {
-        try {
-            const resp = await apiFetch('/achievements');
-            if (resp.ok) {
-                const list = await resp.json();
-                const el = document.getElementById('adm-ach-list');
-                if (!el) return;
-                if (!list || list.length === 0) {
-                    el.innerHTML = '<div class="empty-state">Нет достижений</div>';
-                    return;
-                }
-                el.innerHTML = list.map(a => `
-                    <div class="list-item">
-                        <div class="info">
-                            <div class="title">${a.title} (${a.code})</div>
-                            <div class="sub">${a.description || ''}</div>
-                        </div>
-                        <div class="actions">
-                            <button class="btn btn-sm btn-outline" onclick="adminEditAchievement('${a.id}')">Редактировать</button>
-                            <button class="btn btn-sm btn-danger" onclick="adminDeleteAchievement('${a.id}')">Удалить</button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        } catch (e) { showToast('Ошибка загрузки', 'error'); }
-    }
-
-    window.adminEditAchievement = (id) => {
-        apiFetch(`/achievements`).then(resp => resp.json()).then(list => {
-            const a = list.find(x => x.id === id);
-            if (!a) return;
-            const code = prompt('Код:', a.code);
-            if (code === null) return;
-            const title = prompt('Название:', a.title);
-            if (title === null) return;
-            const desc = prompt('Описание:', a.description || '');
-            const condType = prompt('Тип условия:', a.condition_type);
-            const condValue = prompt('Значение:', a.condition_value);
-            if (condValue === null) return;
-            apiFetch(`/admin/achievements/${id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({ code, title, description: desc || null, conditionType: condType, conditionValue: parseInt(condValue) })
-            }).then(resp => {
-                if (resp.ok) { showToast('Достижение обновлено'); loadAdminAchievements(); }
-                else showToast('Ошибка', 'error');
-            });
-        }).catch(() => showToast('Ошибка', 'error'));
-    };
-    window.adminDeleteAchievement = async (id) => {
-        if (!confirm('Удалить достижение?')) return;
-        try {
-            const resp = await apiFetch(`/admin/achievements/${id}`, { method: 'DELETE' });
-            if (resp.ok) { showToast('Удалено'); loadAdminAchievements(); }
-            else showToast('Ошибка', 'error');
-        } catch (e) { showToast('Ошибка', 'error');
-        }
-    };
+    renderAdminTab('achievements');
 }
 
 // ============================================================

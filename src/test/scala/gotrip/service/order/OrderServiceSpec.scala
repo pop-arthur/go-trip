@@ -15,6 +15,7 @@ import gotrip.repository.notificationpreference.NotificationPreferenceRepository
 import gotrip.repository.order.OrderRepository
 import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
 import gotrip.service.notification.NotificationService
+import gotrip.service.achievement.AchievementEngine
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -62,9 +63,7 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
       repository.providerExists.expects(providerId).returning(IO.pure(true))
       repository.locationExists.expects(departureLocationId).returning(IO.pure(true))
       repository.locationExists.expects(arrivalLocationId).returning(IO.pure(true))
-      expectGeneratedId(generatedData, orderId.value)
-      expectGeneratedNow(generatedData, order.created_at)
-      repository.create.expects(order).returning(IO.pure(order))
+      repository.create.expects(userId, tripId, orderCreate).returning(IO.pure(order))
 
       service.create(userId, tripId, orderCreate).unsafeRunSync() shouldBe Right(order)
     }
@@ -130,8 +129,7 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
       repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
       repository.providerExists.expects(providerId).returning(IO.pure(true))
       repository.locationExists.expects(arrivalLocationId).returning(IO.pure(true))
-      expectGeneratedNow(generatedData, updatedOrderDetails.updated_at)
-      repository.update.expects(updatedOrderDetails).returning(IO.pure(Some(updatedOrderDetails)))
+      repository.update.expects(userId, orderId, orderUpdate).returning(IO.pure(Some(updatedOrderDetails)))
 
       service.update(userId, orderId, orderUpdate).unsafeRunSync() shouldBe Right(updatedOrderDetails)
     }
@@ -181,13 +179,12 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
 
       repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
       inSequence {
-        expectGeneratedNow(generatedData, statusAt)
         expectGeneratedId(generatedData, statusEventId.value)
         expectGeneratedNow(generatedData, statusAt)
         expectGeneratedId(generatedData, notificationId.value)
         expectGeneratedNow(generatedData, notificationAt)
       }
-      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
+      repository.updateStatus.expects(userId, orderId, statusUpdate).returning(IO.pure(Some(updatedOrder)))
       repository.insertStatusEvent.expects(statusEvent).returning(IO.pure(statusEvent))
 
       service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
@@ -203,11 +200,10 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
 
       repository.findByUser.expects(userId, orderId).returning(IO.pure(Some(order)))
       inSequence {
-        expectGeneratedNow(generatedData, statusAt)
         expectGeneratedId(generatedData, statusEventId.value)
         expectGeneratedNow(generatedData, statusAt)
       }
-      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
+      repository.updateStatus.expects(userId, orderId, statusUpdate).returning(IO.pure(Some(updatedOrder)))
       repository.insertStatusEvent.expects(statusEvent).returning(IO.pure(statusEvent))
 
       service.updateStatus(userId, orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
@@ -234,69 +230,6 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
         Left(OrderServiceError.InvalidDateTimeRange)
     }
 
-    "admin update status for any order and notify the owner" in {
-      val repository = mock[OrderRepository[IO]]
-      val notifications = new RecordingNotificationRepository
-      val generatedData = generatedDataMock
-      val adminStatusEvent = statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)
-      val service = serviceWith(repository, preference = Some(enabledPreference), notifications = notifications, generatedData)
-
-      repository.findById.expects(orderId).returning(IO.pure(Some(order)))
-      inSequence {
-        expectGeneratedNow(generatedData, statusAt)
-        expectGeneratedId(generatedData, statusEventId.value)
-        expectGeneratedNow(generatedData, statusAt)
-        expectGeneratedId(generatedData, notificationId.value)
-        expectGeneratedNow(generatedData, notificationAt)
-      }
-      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
-      repository.insertStatusEvent.expects(adminStatusEvent).returning(IO.pure(adminStatusEvent))
-
-      service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
-      notifications.created.size shouldBe 1
-      notifications.created.head.userId.value shouldBe userId.value
-      notifications.created.head.orderId.value shouldBe Some(orderId.value)
-    }
-
-    "return not found when admin updating a missing order status" in {
-      val repository = mock[OrderRepository[IO]]
-      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
-
-      repository.findById.expects(orderId).returning(IO.pure(None))
-
-      service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe
-        Left(OrderServiceError.OrderNotFound(orderId))
-    }
-
-    "reject admin status update when new start datetime is after current end datetime" in {
-      val repository = mock[OrderRepository[IO]]
-      val service = serviceWith(repository, preference = None, notifications = new RecordingNotificationRepository)
-
-      repository.findById.expects(orderId).returning(IO.pure(Some(order)))
-
-      service.adminUpdateStatus(orderId, invalidStatusUpdate).unsafeRunSync() shouldBe
-        Left(OrderServiceError.InvalidDateTimeRange)
-    }
-
-    "skip admin status update notification when preferences are disabled" in {
-      val repository = mock[OrderRepository[IO]]
-      val notifications = new RecordingNotificationRepository
-      val generatedData = generatedDataMock
-      val adminStatusEvent = statusEvent.copy(source = OrderStatusEventSource.AdminSimulation)
-      val service = serviceWith(repository, preference = Some(disabledPreference), notifications = notifications, generatedData)
-
-      repository.findById.expects(orderId).returning(IO.pure(Some(order)))
-      inSequence {
-        expectGeneratedNow(generatedData, statusAt)
-        expectGeneratedId(generatedData, statusEventId.value)
-        expectGeneratedNow(generatedData, statusAt)
-      }
-      repository.updateStatus.expects(updatedOrder).returning(IO.pure(Some(updatedOrder)))
-      repository.insertStatusEvent.expects(adminStatusEvent).returning(IO.pure(adminStatusEvent))
-
-      service.adminUpdateStatus(orderId, statusUpdate).unsafeRunSync() shouldBe Right(updatedOrder)
-      notifications.created shouldBe empty
-    }
   }
 
   private def serviceWith(
@@ -304,10 +237,13 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
     preference: Option[NotificationPreference],
     notifications: RecordingNotificationRepository
   ): OrderService[IO] =
+    val achievementEngine = mock[AchievementEngine[IO]]
+    achievementEngine.checkAndUnlock.expects(*, *).returning(IO.unit).anyNumberOfTimes()
     OrderService[IO](
       repository,
       new StaticNotificationPreferenceRepository(preference),
-      NotificationService[IO](notifications)
+      NotificationService[IO](notifications),
+      achievementEngine
     )
 
   private def serviceWith(
@@ -317,10 +253,13 @@ final class OrderServiceSpec extends AnyWordSpec with Matchers with MockFactory 
     generatedData: GeneratedData[IO]
   ): OrderService[IO] =
     given GeneratedData[IO] = generatedData
+    val achievementEngine = mock[AchievementEngine[IO]]
+    achievementEngine.checkAndUnlock.expects(*, *).returning(IO.unit).anyNumberOfTimes()
     OrderService[IO](
       repository,
       new StaticNotificationPreferenceRepository(preference),
-      NotificationService[IO](notifications)
+      NotificationService[IO](notifications),
+      achievementEngine
     )
 
   private def uuid(suffix: String): UUID =

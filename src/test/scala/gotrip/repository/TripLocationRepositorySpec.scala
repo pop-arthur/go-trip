@@ -18,11 +18,11 @@ final class TripLocationRepositorySpec extends PostgresRepositorySpecBase with R
 
     for
       user <- users.create(sampleUser(70))
-      trip <- trips.create(sampleTrip(71, user.id))
+      trip <- trips.create(sampleTrip(71, user.id).user_id, tripCreate(sampleTrip(71, user.id)))
       departure <- locations.create(sampleLocation(72, "Paris Gare de Lyon", LocationType.TrainStation, country = Some("France"), city = Some("Paris")))
       arrival <- locations.create(sampleLocation(73, "Milano Centrale", LocationType.TrainStation, country = Some("Italy"), city = Some("Milan")))
-      firstStop <- tripLocations.create(sampleTripLocation(74, trip.id, departure.id, 1))
-      secondStop <- tripLocations.create(sampleTripLocation(75, trip.id, arrival.id, 2))
+      firstStop <- tripLocations.create(sampleTripLocation(74, trip.id, departure.id, 1).trip_id, tripLocationCreate(sampleTripLocation(74, trip.id, departure.id, 1)), sampleTripLocation(74, trip.id, departure.id, 1).visit_order)
+      secondStop <- tripLocations.create(sampleTripLocation(75, trip.id, arrival.id, 2).trip_id, tripLocationCreate(sampleTripLocation(75, trip.id, arrival.id, 2)), sampleTripLocation(75, trip.id, arrival.id, 2).visit_order)
       listed <- tripLocations.listByTrip(trip.id)
       found <- tripLocations.findInTrip(trip.id, firstStop.id)
     yield
@@ -38,9 +38,9 @@ final class TripLocationRepositorySpec extends PostgresRepositorySpecBase with R
 
     for
       user <- users.create(sampleUser(70))
-      trip <- trips.create(sampleTrip(71, user.id))
+      trip <- trips.create(sampleTrip(71, user.id).user_id, tripCreate(sampleTrip(71, user.id)))
       departure <- locations.create(sampleLocation(72, "Paris Gare de Lyon", LocationType.TrainStation, country = Some("France"), city = Some("Paris")))
-      firstStop <- tripLocations.create(sampleTripLocation(74, trip.id, departure.id, 1))
+      firstStop <- tripLocations.create(sampleTripLocation(74, trip.id, departure.id, 1).trip_id, tripLocationCreate(sampleTripLocation(74, trip.id, departure.id, 1)), sampleTripLocation(74, trip.id, departure.id, 1).visit_order)
       tripExists <- tripLocations.tripExists(trip.id)
       tripExistsForUser <- tripLocations.tripExistsForUser(user.id, trip.id)
       locationExists <- tripLocations.locationExists(departure.id)
@@ -64,9 +64,9 @@ final class TripLocationRepositorySpec extends PostgresRepositorySpecBase with R
 
     for
       user <- users.create(sampleUser(70))
-      trip <- trips.create(sampleTrip(71, user.id))
+      trip <- trips.create(sampleTrip(71, user.id).user_id, tripCreate(sampleTrip(71, user.id)))
       arrival <- locations.create(sampleLocation(73, "Milano Centrale", LocationType.TrainStation, country = Some("Italy"), city = Some("Milan")))
-      stop <- tripLocations.create(sampleTripLocation(75, trip.id, arrival.id, 2))
+      stop <- tripLocations.create(sampleTripLocation(75, trip.id, arrival.id, 2).trip_id, tripLocationCreate(sampleTripLocation(75, trip.id, arrival.id, 2)), sampleTripLocation(75, trip.id, arrival.id, 2).visit_order)
       updated <- tripLocations.update(trip.id, stop.id, TripLocationUpdate(visit_order = Some(VisitOrder(3))))
     yield assertEquals(updated.map(_.visit_order), Some(VisitOrder(3)))
 
@@ -80,9 +80,9 @@ final class TripLocationRepositorySpec extends PostgresRepositorySpecBase with R
 
     for
       user <- users.create(sampleUser(70))
-      trip <- trips.create(sampleTrip(71, user.id))
+      trip <- trips.create(sampleTrip(71, user.id).user_id, tripCreate(sampleTrip(71, user.id)))
       departure <- locations.create(sampleLocation(72, "Paris Gare de Lyon", LocationType.TrainStation, country = Some("France"), city = Some("Paris")))
-      stop <- tripLocations.create(sampleTripLocation(74, trip.id, departure.id, 1))
+      stop <- tripLocations.create(sampleTripLocation(74, trip.id, departure.id, 1).trip_id, tripLocationCreate(sampleTripLocation(74, trip.id, departure.id, 1)), sampleTripLocation(74, trip.id, departure.id, 1).visit_order)
       deleted <- tripLocations.delete(trip.id, stop.id)
       found <- tripLocations.findInTrip(trip.id, stop.id)
     yield

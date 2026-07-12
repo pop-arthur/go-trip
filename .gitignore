@@ -87,6 +87,7 @@ Thumbs.db
 # ============================================
 *.pid
 *.lock
+!frontend-react/package-lock.json
 *.cache
 *.prof
 *.hprof
