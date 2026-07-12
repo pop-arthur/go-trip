@@ -2,85 +2,92 @@ package gotrip.http.review
 
 import cats.effect.IO
 import gotrip.domain.review._
-import gotrip.http.HttpError
 import gotrip.http.auth.AuthSupport
+import gotrip.http.{HttpError}
 import gotrip.service.review.ReviewService
 import sttp.tapir.server.ServerEndpoint
-import ReviewCodecs.{ReviewCreateRequest, ReviewRatingSummary, ReviewUpdateRequest}
-import java.time.Instant
+
 import java.util.UUID
 
-final class ReviewController(service: ReviewService[IO], authSupport: AuthSupport):
-  private val placeholderId = ReviewId(UUID.fromString("00000000-0000-0000-0000-000000000000"))
-  private val placeholderTime = Instant.EPOCH
+final class ReviewController(
+  service: ReviewService[IO],
+  authSupport: AuthSupport
+) {
 
   val listReviews: ServerEndpoint[Any, IO] =
     ReviewEndpoints.listReviews
       .serverSecurityLogic(authSupport.authenticate)
       .serverLogic { _ => { case (targetType, targetId) =>
-      (targetType, targetId) match
-        case (Some(tt), Some(tid)) =>
-          service.findByTarget(tt, tid).attempt.map {
-            case Right(list) => Right(list)
-            case Left(error) => Left(HttpError.Internal(error.getMessage))
-          }
-        case _ =>
-          IO.pure(Right(Nil))
-    }}
-
-  val ratingSummary: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.ratingSummary
-      .serverSecurityLogic(authSupport.authenticate)
-      .serverLogic { _ => { case (targetType, targetId) =>
-        service.findByTarget(targetType, targetId).attempt.map {
-          case Right(reviews) =>
-            val reviewCount = reviews.size
-            val averageRating =
-              if reviewCount == 0 then None
-              else Some(reviews.map(_.rating.value).sum.toDouble / reviewCount)
-
-            Right(
-              ReviewRatingSummary(
-                targetType = targetType,
-                targetId = targetId,
-                averageRating = averageRating,
-                reviewCount = reviewCount
-              )
-            )
-          case Left(error) =>
-            Left(HttpError.Internal(error.getMessage))
+        (targetType, targetId) match {
+          case (Some(tt), Some(tid)) =>
+            try {
+              val tidUuid = UUID.fromString(tid)
+              service.findByTarget(tt, ReviewTargetId(tidUuid)).attempt.map {
+                case Right(list) => Right(list)
+                case Left(error) => Left(HttpError.Internal(error.getMessage))
+              }
+            } catch {
+              case _: IllegalArgumentException =>
+                IO.pure(Left(HttpError.Validation("Invalid targetId format")))
+            }
+          case (Some(tt), None) =>
+            service.findByTargetType(tt).attempt.map {
+              case Right(list) => Right(list)
+              case Left(error) => Left(HttpError.Internal(error.getMessage))
+            }
+          case _ =>
+            service.findAll().attempt.map {
+              case Right(list) => Right(list)
+              case Left(error) => Left(HttpError.Internal(error.getMessage))
+            }
         }
-      }}
+      } }
 
   val createReview: ServerEndpoint[Any, IO] =
     ReviewEndpoints.createReview
       .serverSecurityLogic(authSupport.authenticate)
       .serverLogic { authUser => request =>
-      val userId = authUser.userId
-      if (request.rating < 1 || request.rating > 5)
-        IO.pure(Left(HttpError.Validation("Rating must be between 1 and 5")))
-      else {
-        val review = Review(
-          id = placeholderId,
-          userId = userId,
-          targetType = request.targetType,
-          targetId = request.targetId,
-          rating = ReviewRating(request.rating),
-          text = ReviewText(request.text),
-          createdAt = placeholderTime,
-          updatedAt = placeholderTime
-        )
-        service.create(review).attempt.map {
-          case Right(created) => Right(created)
-          case Left(error)    => Left(HttpError.Internal(error.getMessage))
+        val userId = authUser.userId
+        try {
+          val targetId = ReviewTargetId(UUID.fromString(request.targetId))
+          if (request.rating < 1 || request.rating > 5)
+            IO.pure(Left(HttpError.Validation("Rating must be between 1 and 5")))
+          else {
+            val now = java.time.Instant.now()
+            val review = Review(
+              id = ReviewId(UUID.randomUUID()),
+              userId = userId,
+              targetType = request.targetType,
+              targetId = targetId,
+              rating = ReviewRating(request.rating),
+              text = ReviewText(request.text.map(_.trim).filter(_.nonEmpty)),
+              createdAt = now,
+              updatedAt = now
+            )
+            service.create(review).attempt.map {
+              case Right(created) => Right(created)
+              case Left(error)    => Left(HttpError.Internal(error.getMessage))
+            }
+          }
+        } catch {
+          case _: IllegalArgumentException =>
+            IO.pure(Left(HttpError.Validation("Invalid targetId format, expected UUID")))
         }
       }
-    }
+
+  val getRatingSummary: ServerEndpoint[Any, IO] =
+    ReviewEndpoints.getRatingSummary
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { _ => { case (targetType: ReviewTargetType, targetId: ReviewTargetId) =>
+        service.getRatingSummary(targetType, targetId).attempt.map {
+          case Right(Some(summary)) => Right(summary)
+          case Right(None)          => Left(HttpError.NotFound(s"No reviews found for target"))
+          case Left(error)          => Left(HttpError.Internal(error.getMessage))
+        }
+      }}
 
   val getReview: ServerEndpoint[Any, IO] =
-    ReviewEndpoints.getReview
-      .serverSecurityLogic(authSupport.authenticate)
-      .serverLogic { _ => id =>
+    ReviewEndpoints.getReview.serverLogic { id =>
       service.findById(id).attempt.map {
         case Right(Some(r)) => Right(r)
         case Right(None)    => Left(HttpError.NotFound(s"Review ${id.value} not found"))
@@ -92,34 +99,36 @@ final class ReviewController(service: ReviewService[IO], authSupport: AuthSuppor
     ReviewEndpoints.updateReview
       .serverSecurityLogic(authSupport.authenticate)
       .serverLogic { _ => { case (id, update) =>
-      service.findById(id).flatMap {
-        case Some(existing) =>
-          val updated = existing.copy(
-            rating = update.rating.map(ReviewRating.apply).getOrElse(existing.rating),
-            text = update.text.map(s => ReviewText(Some(s))).getOrElse(existing.text)
-          )
-          service.update(updated).attempt.map {
-            case Right(n) if n == 1 => Right(updated)
-            case Right(n) if n == 0 => Left(HttpError.NotFound(s"Review ${id.value} not found"))
-            case Right(n)           => Left(HttpError.Internal(s"Unexpected update count: $n"))
-            case Left(error)        => Left(HttpError.Internal(error.getMessage))
-          }
-        case None =>
-          IO.pure(Left(HttpError.NotFound(s"Review ${id.value} not found")))
-      }
-    }}
+        service.findById(id).flatMap {
+          case Some(existing) =>
+            val updated = existing.copy(
+              rating = update.rating.map(ReviewRating.apply).getOrElse(existing.rating),
+              text = update.text.map(t => ReviewText(Some(t))).getOrElse(existing.text),
+              updatedAt = java.time.Instant.now()
+            )
+            service.update(updated).attempt.map {
+              case Right(1)          => Right(updated)
+              case Right(0)          => Left(HttpError.NotFound(s"Review ${id.value} not found"))
+              case Right(otherCount) => Left(HttpError.Internal(s"Unexpected update count: $otherCount"))
+              case Left(error)       => Left(HttpError.Internal(error.getMessage))
+            }
+          case None =>
+            IO.pure(Left(HttpError.NotFound(s"Review ${id.value} not found")))
+        }
+      } }
 
   val deleteReview: ServerEndpoint[Any, IO] =
     ReviewEndpoints.deleteReview
       .serverSecurityLogic(authSupport.authenticate)
       .serverLogic { _ => id =>
-      service.delete(id).attempt.map {
-        case Right(n) if n == 1 => Right(())
-        case Right(n) if n == 0 => Left(HttpError.NotFound(s"Review ${id.value} not found"))
-        case Right(n)           => Left(HttpError.Internal(s"Unexpected delete count: $n"))
-        case Left(error)        => Left(HttpError.Internal(error.getMessage))
+        service.delete(id).attempt.map {
+          case Right(1)          => Right(())
+          case Right(0)          => Left(HttpError.NotFound(s"Review ${id.value} not found"))
+          case Right(otherCount) => Left(HttpError.Internal(s"Unexpected delete count: $otherCount"))
+          case Left(error)       => Left(HttpError.Internal(error.getMessage))
+        }
       }
-    }
 
   val all: List[ServerEndpoint[Any, IO]] =
-    List(listReviews, createReview, ratingSummary, getReview, updateReview, deleteReview)
+    List(listReviews, createReview, getRatingSummary, getReview, updateReview, deleteReview)
+}

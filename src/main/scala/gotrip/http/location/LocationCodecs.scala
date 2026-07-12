@@ -9,7 +9,6 @@ import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
 import sttp.tapir.Schema.derived
 
 object LocationCodecs:
-  // API errors
   given Encoder[ApiError] =
     deriveEncoder
 
@@ -19,7 +18,6 @@ object LocationCodecs:
   given Schema[ApiError] =
     derived
 
-  // Location models
   given Encoder[Location] =
     deriveEncoder
 
@@ -47,7 +45,6 @@ object LocationCodecs:
   given Schema[LocationUpdate] =
     derived
   
-  // LocationId
   given Encoder[LocationId] =
     uuidEncoder(_.value)
 
@@ -60,7 +57,6 @@ object LocationCodecs:
   given Codec[String, LocationId, CodecFormat.TextPlain] =
     uuidTextCodec(LocationId.apply, _.value)
 
-  // LocationName
   given Encoder[LocationName] =
     Encoder.encodeString.contramap(_.value)
 
@@ -70,7 +66,6 @@ object LocationCodecs:
   given Schema[LocationName] =
     Schema.schemaForString.map(value => Some(LocationName(value)))(_.value)
 
-  // Optional text fields
   given Encoder[LocationCountry] =
     Encoder.encodeOption[String].contramap(_.value)
 
@@ -98,7 +93,6 @@ object LocationCodecs:
   given Schema[LocationAddress] =
     Schema.schemaForOption[String].map(value => Some(LocationAddress(value)))(_.value)
 
-  // Coordinates
   given Encoder[LocationLatitude] =
     Encoder.encodeOption[Double].contramap(_.value)
 
@@ -121,7 +115,6 @@ object LocationCodecs:
       .map(value => Some(LocationLongitude(value)))(_.value)
       .validate(optionalDoubleInRange[LocationLongitude](_.value, -180.0, 180.0))
 
-  // LocationType
   given Encoder[LocationType] =
     Encoder.encodeString.contramap(encodeLocationType)
 

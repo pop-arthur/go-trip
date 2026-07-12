@@ -1,17 +1,9 @@
-# macOS
-.DS_Store
-
-# IDEs and editors
-.idea/
-.vscode/
-.metals/
-
-# Build tools
-.bloop/
-.bsp/
-.scala-build/
+# ============================================
+# SBT / Scala
+# ============================================
 target/
 project/target/
+<<<<<<< HEAD
 node_modules/
 
 # Local services
@@ -20,4 +12,104 @@ pgdata/
 
 # Metals generated sbt files
 project/metals.sbt
+=======
+>>>>>>> origin/main
 project/project/
+.bsp/
+.bloop/
+.metals/
+.vscode/
+.idea/
+*.iml
+*.classpath
+*.project
+.settings/
+*.class
+*.log
+*.jar
+!*.jar
+project/metals.sbt
+
+# ============================================
+# React / Node.js
+# ============================================
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+node_modules/
+build/
+.npm/
+.yarn/
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# ============================================
+# Docker
+# ============================================
+.dockerignore
+docker-compose.override.yml
+
+# ============================================
+# Среда и конфигурация
+# ============================================
+.env
+.env.*
+!.env.example
+*.secret
+*.key
+*.pem
+*.crt
+*.p12
+
+# ============================================
+# Логи
+# ============================================
+logs/
+*.log
+*.out
+
+# ============================================
+# OS / Системные
+# ============================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.tmp
+*.temp
+
+# ============================================
+# Прочие временные файлы
+# ============================================
+*.pid
+*.lock
+*.cache
+*.prof
+*.hprof
+*.gc
+
+# ============================================
+# История редакторов
+# ============================================
+.history/
+.settings/
+.classpath
+.project
+.factorypath
+
+# ============================================
+# Тесты
+# ============================================
+test-output/
+*.test
+
+# ============================================
+# Приватные скрипты и данные
+# ============================================
+scripts/local/
+data/
+tmp/

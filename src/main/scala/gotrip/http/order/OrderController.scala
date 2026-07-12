@@ -1,11 +1,10 @@
 package gotrip.http.order
 
 import cats.effect.IO
-import gotrip.domain.location.*
-import gotrip.domain.order.*
-import gotrip.domain.provider.*
-import gotrip.domain.trip.*
-import gotrip.domain.userrole.Role
+import gotrip.domain.location._
+import gotrip.domain.order._
+import gotrip.domain.provider._
+import gotrip.domain.trip._
 import gotrip.http.{HttpError, ValidationError}
 import gotrip.http.auth.AuthSupport
 import gotrip.service.order.{OrderService, OrderServiceError}
@@ -84,24 +83,22 @@ final class OrderController(service: OrderService[IO], authSupport: AuthSupport)
           case Left(errors) =>
             IO.pure(Left(ValidationError.toHttpError(errors)))
           case Right(validUpdate) =>
-            service.updateStatus(user.userId, orderId, validUpdate).attempt.map {
+            service.updateStatus(user.userId, orderId, validUpdate, OrderStatusEventSource.UserEdit).attempt.map {
               case Right(Right(updated)) => Right(updated)
               case Right(Left(error))    => Left(serviceError(error))
               case Left(error)           => Left(internalError(error))
             }
       }}
 
-  val adminSimulateStatusChange: ServerEndpoint[Any, IO] =
-    OrderEndpoints.adminSimulateStatusChange
-      .serverSecurityLogic(token =>
-        authSupport.authenticate(token).map(_.flatMap(user => authSupport.requireRole(user, Role.ADMIN)))
-      )
-      .serverLogic { _ => { case (orderId, update) =>
+  val adminUpdateOrderStatus: ServerEndpoint[Any, IO] =
+    OrderEndpoints.adminUpdateOrderStatus
+      .serverSecurityLogic(authSupport.authenticate)
+      .serverLogic { user => { case (orderId, update) =>
         OrderValidator.validate(update).toEither match
           case Left(errors) =>
             IO.pure(Left(ValidationError.toHttpError(errors)))
           case Right(validUpdate) =>
-            service.adminUpdateStatus(orderId, validUpdate).attempt.map {
+            service.updateStatus(user.userId, orderId, validUpdate, OrderStatusEventSource.AdminSimulation).attempt.map {
               case Right(Right(updated)) => Right(updated)
               case Right(Left(error))    => Left(serviceError(error))
               case Left(error)           => Left(internalError(error))
@@ -116,7 +113,7 @@ final class OrderController(service: OrderService[IO], authSupport: AuthSupport)
       updateOrder,
       deleteOrder,
       updateOrderStatus,
-      adminSimulateStatusChange
+      adminUpdateOrderStatus
     )
 
   private def serviceError(error: OrderServiceError): OrderEndpoints.ErrorResponse =

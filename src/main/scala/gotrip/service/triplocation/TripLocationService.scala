@@ -3,17 +3,19 @@ package gotrip.service.triplocation
 import cats.Monad
 import cats.data.EitherT
 import cats.effect.Sync
-import cats.syntax.applicative.*
-import cats.syntax.functor.*
-import gotrip.domain.location.*
-import gotrip.domain.trip.*
+import cats.syntax.applicative._
+import cats.syntax.functor._
+import gotrip.domain.location._
+import gotrip.domain.trip._
 import gotrip.domain.user.UserId
 import gotrip.repository.triplocation.TripLocationRepository
 import gotrip.service.GeneratedData
 
-final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocationRepository[F]):
+import java.time.OffsetDateTime
 
-  import TripLocationServiceError.*
+final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocationRepository[F]) {
+
+  import TripLocationServiceError._
 
   def listByTrip(userId: UserId, tripId: TripId): F[Either[TripLocationServiceError, List[TripLocation]]] =
     (for {
@@ -32,8 +34,7 @@ final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocat
       _ <- ensureLocationExists(location.location_id)
       visitOrder <- EitherT.liftF(location.visit_order.fold(repository.nextVisitOrder(tripId))(_.pure[F]))
       _ <- ensureVisitOrderAvailable(tripId, visitOrder, None)
-      materialized <- EitherT.liftF(materializeTripLocation(tripId, location, visitOrder))
-      created <- EitherT.liftF(repository.create(materialized))
+      created <- EitherT.liftF(repository.create(tripId, location, visitOrder))
     } yield created).value
 
   def update(
@@ -95,53 +96,42 @@ final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocat
       }
     }
 
-  private def materializeTripLocation(
-    tripId: TripId,
-    create: TripLocationCreate,
-    visitOrder: VisitOrder
-  ): F[TripLocation] =
-    GeneratedData[F].newId().map { id =>
-      TripLocation(
-        id = TripLocationId(id),
-        trip_id = tripId,
-        location_id = create.location_id,
-        visit_order = visitOrder,
-        arrival_date = create.arrival_date,
-        departure_date = create.departure_date
-      )
-    }
-
   private def validateDateRange(
-    arrivalDate: Option[java.time.OffsetDateTime],
-    departureDate: Option[java.time.OffsetDateTime]
+    arrivalDate: Option[OffsetDateTime],
+    departureDate: Option[OffsetDateTime]
   ): EitherT[F, TripLocationServiceError, Unit] =
     EitherT.fromEither {
-      (arrivalDate, departureDate) match
+      (arrivalDate, departureDate) match {
         case (Some(arrival), Some(departure)) if arrival.isAfter(departure) =>
           Left(InvalidDateRange)
         case _ =>
           Right(())
+      }
     }
 
   private def nextArrivalDate(
     current: TripLocation,
     update: TripLocationUpdate
-  ): Option[java.time.OffsetDateTime] =
-    update.arrival_date match
+  ): Option[OffsetDateTime] =
+    update.arrival_date match {
       case Some(arrivalDate) => arrivalDate.value
       case None              => current.arrival_date.value
+    }
 
   private def nextDepartureDate(
     current: TripLocation,
     update: TripLocationUpdate
-  ): Option[java.time.OffsetDateTime] =
-    update.departure_date match
+  ): Option[OffsetDateTime] =
+    update.departure_date match {
       case Some(departureDate) => departureDate.value
       case None                => current.departure_date.value
+    }
+}
 
-enum TripLocationServiceError:
+enum TripLocationServiceError {
   case TripNotFound(id: TripId)
   case LocationNotFound(id: LocationId)
   case TripLocationNotFound(id: TripLocationId)
   case DuplicateVisitOrder(visitOrder: VisitOrder)
   case InvalidDateRange
+}

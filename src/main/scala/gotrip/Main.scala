@@ -22,6 +22,7 @@ import gotrip.http.achievement.{AchievementController, AdminAchievementControlle
 import gotrip.http.userachievement.UserAchievementController
 import gotrip.http.review.ReviewController
 import gotrip.http.recommendation.RecommendationController
+import gotrip.http.statistics.StatisticsController
 
 import gotrip.repository.additionalservice.AdditionalServiceRepository
 import gotrip.repository.location.LocationRepository
@@ -37,6 +38,7 @@ import gotrip.repository.achievement.AchievementRepository
 import gotrip.repository.userachievement.UserAchievementRepository
 import gotrip.repository.review.ReviewRepository
 import gotrip.repository.auth.AuthSessionRepository
+import gotrip.repository.statistics.StatisticsRepository
 
 import gotrip.service.auth.{AuthService, JwtService, PasswordHasher}
 import gotrip.service.additionalservice.AdditionalServiceService
@@ -49,18 +51,21 @@ import gotrip.service.orderfile.OrderFileService
 import gotrip.service.user.UserService
 import gotrip.service.notification.NotificationService
 import gotrip.service.notificationpreference.NotificationPreferenceService
-import gotrip.service.achievement.AchievementService
+import gotrip.service.achievement.{AchievementService, AchievementEngine}
 import gotrip.service.userachievement.UserAchievementService
 import gotrip.service.review.ReviewService
 import gotrip.service.recommendation.RecommendationService
+import gotrip.service.statistics.StatisticsService
 
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.server.Router
 import org.http4s.server.middleware.CORS
+import org.http4s.server.staticcontent.{fileService, FileService}
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
 
 import scala.concurrent.ExecutionContext
+import java.nio.file.{Files, Paths}
 
 object Main extends IOApp.Simple {
 
@@ -83,12 +88,13 @@ object Main extends IOApp.Simple {
           .leftMap(e => ConfigReaderException[DuffelConfig](e))
       )
 
+      _ <- IO.blocking(Files.createDirectories(Paths.get("uploads"))).handleError(_ => ())
+
       _ <- IO.println("Running Flyway migrations...")
       _ <- Migration.migrate[IO](databaseConfig)
 
       _ <- IO.println("Initializing Skunk session pool...")
       _ <- SkunkSessionPool[IO](databaseConfig).use { sessionPool =>
-        // ---- Repository Layer ----
         val locationRepository = LocationRepository.makePostgres[IO](sessionPool)
         val tripRepository = TripRepository.makePostgres[IO](sessionPool)
         val tripLocationRepository = TripLocationRepository.makePostgres[IO](sessionPool)
@@ -103,12 +109,21 @@ object Main extends IOApp.Simple {
         val userAchievementRepository = UserAchievementRepository.makePostgres[IO](sessionPool)
         val reviewRepository = ReviewRepository.makePostgres[IO](sessionPool)
         val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
+        val statisticsRepository = StatisticsRepository.make[IO](sessionPool)
 
-        // ---- Service Layer ----
+        val achievementEngine = new AchievementEngine[IO](
+          achievementRepository,
+          userAchievementRepository,
+          tripRepository,
+          orderRepository,
+          reviewRepository,
+          tripLocationRepository
+        )
+
         val jwtService = new JwtService[IO](authConfig)
         val passwordHasher = PasswordHasher.bcrypt[IO](authConfig.passwordCost)
         val locationService = LocationService[IO](locationRepository)
-        val tripService = TripService[IO](tripRepository)
+        val tripService = new TripService[IO](tripRepository, achievementEngine)
         val tripLocationService = TripLocationService[IO](tripLocationRepository)
         val providerService = ProviderService[IO](providerRepository)
         val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
@@ -125,12 +140,13 @@ object Main extends IOApp.Simple {
         val orderFileService = new OrderFileService[IO](orderFileRepository)
         val achievementService = new AchievementService[IO](achievementRepository)
         val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
-        val reviewService = new ReviewService[IO](reviewRepository)
+        val reviewService = new ReviewService[IO](reviewRepository, achievementEngine)
         val recommendationService = new RecommendationService[IO](
           orderRepository,
           tripLocationRepository,
           additionalServiceRepository
         )
+        val statisticsService = new StatisticsService[IO](statisticsRepository)
         val authService = new AuthService[IO](
           userRepository,
           authSessionRepository,
@@ -139,7 +155,6 @@ object Main extends IOApp.Simple {
           authConfig.refreshTokenTtl
         )
 
-        // ---- Controller Layer ----
         val authSupport = new AuthSupport(jwtService)
         val authController = new AuthController(authService, authSupport)
         val locationController = new LocationController(locationService, authSupport)
@@ -161,8 +176,8 @@ object Main extends IOApp.Simple {
         val userAchievementController = new UserAchievementController(userAchievementService, authSupport)
         val reviewController = new ReviewController(reviewService, authSupport)
         val recommendationController = new RecommendationController(recommendationService, authSupport)
+        val statisticsController = new StatisticsController(statisticsService, authSupport)
 
-        // ---- Сборка всех эндпоинтов ----
         val serverEndpoints =
           authController.all ++
           locationController.all ++
@@ -179,15 +194,23 @@ object Main extends IOApp.Simple {
           adminAchievementController.all ++
           userAchievementController.all ++
           reviewController.all ++
-          recommendationController.all
+          recommendationController.all ++
+          statisticsController.all
 
-        // ---- Swagger ----
         val swaggerEndpoints = SwaggerInterpreter()
           .fromServerEndpoints[IO](serverEndpoints, "GoTrip API", "0.1.0")
         val routes = Http4sServerInterpreter[IO]().toRoutes(serverEndpoints ++ swaggerEndpoints)
-        val httpApp = Router("/" -> routes).orNotFound
 
-        // ---- CORS middleware (разрешить все источники для разработки) ----
+        val staticRoutes = fileService[IO](FileService.Config(
+          systemPath = "uploads",
+          pathPrefix = ""
+        ))
+
+        val httpApp = Router(
+          "/" -> routes,
+          "/uploads" -> staticRoutes
+        ).orNotFound
+
         val corsApp = CORS.policy
           .withAllowOriginAll
           .apply(httpApp)

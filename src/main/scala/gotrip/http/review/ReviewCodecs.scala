@@ -1,16 +1,16 @@
 package gotrip.http.review
 
 import gotrip.domain.review._
-import gotrip.domain.user.UserId
-import gotrip.http.UuidCodecs.*
 import gotrip.http.HttpError
+import gotrip.http.user.UserCodecs.given
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import sttp.tapir.Schema.derived
 import sttp.tapir.{Codec, CodecFormat, Schema, Validator}
-import gotrip.http.user.UserCodecs.given
 
-object ReviewCodecs:
+import java.util.UUID
+
+object ReviewCodecs {
 
   given Encoder[HttpError.Validation] = deriveEncoder
   given Decoder[HttpError.Validation] = deriveDecoder
@@ -24,34 +24,21 @@ object ReviewCodecs:
   given Decoder[HttpError.Internal] = deriveDecoder
   given Schema[HttpError.Internal] = derived
 
-  given Encoder[ReviewId] = uuidEncoder(_.value)
-  given Decoder[ReviewId] = uuidDecoder(ReviewId.apply)
+  given Encoder[ReviewId] = Encoder.encodeString.contramap(_.value.toString)
+  given Decoder[ReviewId] = Decoder.decodeString.map(s => ReviewId(UUID.fromString(s)))
   given Schema[ReviewId] =
-    uuidSchema(ReviewId.apply, _.value)
+    Schema.schemaForString.map(s => Some(ReviewId(UUID.fromString(s))))(_.value.toString)
 
   given Codec[String, ReviewId, CodecFormat.TextPlain] =
-    uuidTextCodec(ReviewId.apply, _.value)
+    Codec.string.map(s => ReviewId(UUID.fromString(s)))(_.value.toString)
 
-  given Encoder[ReviewTargetId] = uuidEncoder(_.value)
-  given Decoder[ReviewTargetId] = uuidDecoder(ReviewTargetId.apply)
+  given Encoder[ReviewTargetId] = Encoder.encodeString.contramap(_.value.toString)
+  given Decoder[ReviewTargetId] = Decoder.decodeString.map(s => ReviewTargetId(UUID.fromString(s)))
   given Schema[ReviewTargetId] =
-    uuidSchema(ReviewTargetId.apply, _.value)
+    Schema.schemaForString.map(s => Some(ReviewTargetId(UUID.fromString(s))))(_.value.toString)
 
   given Codec[String, ReviewTargetId, CodecFormat.TextPlain] =
-    uuidTextCodec(ReviewTargetId.apply, _.value)
-
-  given Encoder[ReviewTargetType] = Encoder.encodeString.contramap(_.toString)
-  given Decoder[ReviewTargetType] = Decoder.decodeString.emap { s =>
-    ReviewTargetType.fromString(s).toRight(s"Invalid review target type: $s")
-  }
-  given Schema[ReviewTargetType] = derived
-
-  given Codec[String, ReviewTargetType, CodecFormat.TextPlain] =
-    Codec.string.mapDecode { s =>
-      ReviewTargetType.fromString(s) match
-        case Some(v) => sttp.tapir.DecodeResult.Value(v)
-        case None    => sttp.tapir.DecodeResult.Error(s, new Exception(s"Invalid review target type: $s"))
-    }(_.toString)
+    Codec.string.map(s => ReviewTargetId(UUID.fromString(s)))(_.value.toString)
 
   given Encoder[ReviewRating] = Encoder.encodeInt.contramap(_.value)
   given Decoder[ReviewRating] = Decoder.decodeInt.map(ReviewRating.apply)
@@ -65,23 +52,31 @@ object ReviewCodecs:
   given Schema[ReviewText] =
     Schema.schemaForOption[String].map(value => Some(ReviewText(value)))(_.value)
 
+  given Encoder[ReviewTargetType] = Encoder.encodeString.contramap(_.toString)
+  given Decoder[ReviewTargetType] = Decoder.decodeString.emap { s =>
+    ReviewTargetType.fromString(s).toRight(s"Invalid review target type: $s")
+  }
+  given Schema[ReviewTargetType] = derived
+
+  given Codec[String, ReviewTargetType, CodecFormat.TextPlain] =
+    Codec.string.mapDecode { s =>
+      ReviewTargetType.fromString(s) match {
+        case Some(v) => sttp.tapir.DecodeResult.Value(v)
+        case None    => sttp.tapir.DecodeResult.Error(s, new Exception(s"Invalid review target type: $s"))
+      }
+    }(_.toString)
+
   given Encoder[Review] = deriveEncoder
   given Decoder[Review] = deriveDecoder
   given Schema[Review] = derived
 
-  case class ReviewRatingSummary(
-    targetType: ReviewTargetType,
-    targetId: ReviewTargetId,
-    averageRating: Option[Double],
-    reviewCount: Int
-  )
   given Encoder[ReviewRatingSummary] = deriveEncoder
   given Decoder[ReviewRatingSummary] = deriveDecoder
   given Schema[ReviewRatingSummary] = derived
 
   case class ReviewCreateRequest(
     targetType: ReviewTargetType,
-    targetId: ReviewTargetId,
+    targetId: String,
     rating: Int,
     text: Option[String]
   )
@@ -96,3 +91,4 @@ object ReviewCodecs:
   given Encoder[ReviewUpdateRequest] = deriveEncoder
   given Decoder[ReviewUpdateRequest] = deriveDecoder
   given Schema[ReviewUpdateRequest] = derived
+}

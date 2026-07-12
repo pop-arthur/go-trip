@@ -1,7 +1,5 @@
 package gotrip.repository.review
 
-import java.util.UUID
-
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
 import gotrip.domain.user._
@@ -11,6 +9,7 @@ import skunk.codec.all._
 import skunk.implicits._
 import skunk.data._
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.util.UUID
 
 final class PostgresReviewRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -48,10 +47,24 @@ final class PostgresReviewRepository[F[_]: Concurrent](
       }
     }
 
+  override def findByTargetType(targetType: ReviewTargetType): F[List[Review]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.selectByTargetType).flatMap { query =>
+        query.stream(ReviewTargetType.toString(targetType), 64).compile.toList
+      }
+    }
+
   override def findByUserId(userId: UserId): F[List[Review]] =
     sessionPool.use { session =>
       session.prepare(PostgresReviewRepository.selectByUserId).flatMap { query =>
         query.stream(userId.value, 64).compile.toList
+      }
+    }
+
+  override def findAll(): F[List[Review]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.selectAll).flatMap { query =>
+        query.stream(Void, 64).compile.toList
       }
     }
 
@@ -62,7 +75,6 @@ final class PostgresReviewRepository[F[_]: Concurrent](
           (
             review.rating.value,
             review.text.value,
-            PostgresReviewRepository.toOffset(review.updatedAt),
             review.id.value
           )
         ).map(PostgresReviewRepository.rowsAffected)
@@ -83,9 +95,24 @@ final class PostgresReviewRepository[F[_]: Concurrent](
       }
     }
 
-object PostgresReviewRepository {
-  private def toOffset(instant: Instant): OffsetDateTime =
-    instant.atOffset(ZoneOffset.UTC)
+  override def countByUser(userId: UserId): F[Int] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.countByUserQuery).flatMap { q =>
+        q.unique(userId.value)
+      }
+    }
+
+  override def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]] =
+    sessionPool.use { session =>
+      session.prepare(PostgresReviewRepository.ratingSummaryQuery).flatMap { query =>
+        query.option((ReviewTargetType.toString(targetType), targetId.value)).map {
+          case Some((avg, count)) => Some(ReviewRatingSummary(targetType, targetId, Some(avg), count))
+          case None => Some(ReviewRatingSummary(targetType, targetId, None, 0))
+        }
+      }
+    }
+
+object PostgresReviewRepository:
 
   private def rowsAffected(c: Completion): Int = c match {
     case Completion.Insert(count) => count
@@ -93,6 +120,9 @@ object PostgresReviewRepository {
     case Completion.Delete(count) => count
     case _                        => 0
   }
+
+  private def toOffset(instant: Instant): OffsetDateTime =
+    instant.atOffset(ZoneOffset.UTC)
 
   private val decoder: Decoder[Review] =
     (uuid ~ uuid ~ text ~ uuid ~ int4 ~ text.opt ~ timestamptz ~ timestamptz).map {
@@ -130,6 +160,14 @@ object PostgresReviewRepository {
       ORDER BY created_at DESC
     """.query(decoder)
 
+  val selectByTargetType: Query[String, Review] =
+    sql"""
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
+      FROM reviews
+      WHERE target_type = $text
+      ORDER BY created_at DESC
+    """.query(decoder)
+
   val selectByUserId: Query[UUID, Review] =
     sql"""
       SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
@@ -137,10 +175,17 @@ object PostgresReviewRepository {
       ORDER BY created_at DESC
     """.query(decoder)
 
-  val updateCommand: Command[(Int, Option[String], OffsetDateTime, UUID)] =
+  val selectAll: Query[Void, Review] =
+    sql"""
+      SELECT id, user_id, target_type::text, target_id, rating, text::text, created_at, updated_at
+      FROM reviews
+      ORDER BY created_at DESC
+    """.query(decoder)
+
+  val updateCommand: Command[(Int, Option[String], UUID)] =
     sql"""
       UPDATE reviews
-      SET rating = $int4, text = ${text.opt}, updated_at = $timestamptz
+      SET rating = $int4, text = ${text.opt}, updated_at = NOW()
       WHERE id = $uuid
     """.command
 
@@ -154,7 +199,17 @@ object PostgresReviewRepository {
       WHERE target_type = $text AND target_id = $uuid
     """.query(float8)
 
+  val countByUserQuery: Query[UUID, Int] =
+    sql"SELECT COUNT(*)::int FROM reviews WHERE user_id = $uuid".query(int4)
+
+  val ratingSummaryQuery: Query[(String, UUID), (Double, Int)] =
+    sql"""
+      SELECT
+        COALESCE(AVG(rating), 0.0)::double precision,
+        COUNT(*)::int
+      FROM reviews
+      WHERE target_type = $text AND target_id = $uuid
+    """.query(float8 ~ int4)
+
   def make[F[_]: Concurrent](sessionPool: Resource[F, Session[F]]): ReviewRepository[F] =
     new PostgresReviewRepository(sessionPool)
-
-}

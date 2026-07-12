@@ -1,0 +1,22 @@
+.select {
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  font-family: var(--font-family);
+  font-size: 14px;
+  width: 100%;
+  background: white;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary-dark);
+  box-shadow: 0 0 0 2px rgba(184, 212, 227, 0.3);
+}
+
+.select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

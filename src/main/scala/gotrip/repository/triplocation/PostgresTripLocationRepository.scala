@@ -1,18 +1,18 @@
 package gotrip.repository.triplocation
 
-import java.util.UUID
-
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
 import gotrip.domain.location.*
 import gotrip.domain.trip.*
 import gotrip.domain.user.*
+import gotrip.repository.SkunkCodecs
 import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
 import java.time.OffsetDateTime
+import java.util.UUID
 
 final class PostgresTripLocationRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -32,12 +32,25 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(location: TripLocation): F[TripLocation] =
+  override def create(
+    tripId: TripId,
+    location: TripLocationCreate,
+    visitOrder: VisitOrder
+  ): F[TripLocation] =
     sessionPool.use { session =>
-      PostgresTripLocationRepository.uniqueTripLocation(
-        session,
-        PostgresTripLocationRepository.createFragment(location)
-      )
+      val newId = UUID.randomUUID()
+      session.prepare(PostgresTripLocationRepository.insertQuery).flatMap { cmd =>
+        cmd.unique(
+          (
+            newId,
+            tripId.value,
+            location.location_id.value,
+            visitOrder.value,
+            location.arrival_date.value,
+            location.departure_date.value
+          )
+        )
+      }
     }
 
   override def update(
@@ -102,6 +115,13 @@ final class PostgresTripLocationRepository[F[_]: Concurrent](
       }
     }
 
+  override def countDistinctCountries(userId: UserId): F[Int] =
+    sessionPool.use { session =>
+      session.prepare(PostgresTripLocationRepository.countDistinctCountriesQuery).flatMap { q =>
+        q.unique(userId.value)
+      }
+    }
+
 object PostgresTripLocationRepository:
   private type VisitOrderExistsInput = (UUID, Int, Boolean, UUID)
 
@@ -139,6 +159,13 @@ object PostgresTripLocationRepository:
             departure_date = TripLocationDepartureDate(departureDate)
           )
       }
+
+  val insertQuery: Query[(UUID, UUID, UUID, Int, Option[OffsetDateTime], Option[OffsetDateTime]), TripLocation] =
+    sql"""
+      INSERT INTO trip_locations (id, trip_id, location_id, visit_order, arrival_date, departure_date)
+      VALUES ($uuid, $uuid, $uuid, $int4, ${timestamptz.opt}, ${timestamptz.opt})
+      RETURNING id, trip_id, location_id, visit_order, arrival_date, departure_date
+    """.query(tripLocationDecoder)
 
   val listByTripQuery: Query[UUID, TripLocation] =
     sql"""
@@ -203,13 +230,27 @@ object PostgresTripLocationRepository:
       where trip_id = $uuid
     """.query(int4)
 
-  private def createFragment(location: TripLocation): AppliedFragment =
+  val countDistinctCountriesQuery: Query[UUID, Int] =
+    sql"""
+      SELECT COUNT(DISTINCT l.country)::int
+      FROM trips t
+      JOIN trip_locations tl ON tl.trip_id = t.id
+      JOIN locations l ON l.id = tl.location_id
+      WHERE t.user_id = $uuid
+        AND l.type = 'COUNTRY'
+        AND l.country IS NOT NULL
+    """.query(int4)
+
+  private def createFragment(
+    tripId: TripId,
+    location: TripLocationCreate,
+    visitOrder: VisitOrder
+  ): AppliedFragment =
     val fields =
       List(
-        "id" -> sql"$uuid"(location.id.value),
-        "trip_id" -> sql"$uuid"(location.trip_id.value),
+        "trip_id" -> sql"$uuid"(tripId.value),
         "location_id" -> sql"$uuid"(location.location_id.value),
-        "visit_order" -> sql"$int4"(location.visit_order.value)
+        "visit_order" -> sql"$int4"(visitOrder.value)
       ) ++ List(
         location.arrival_date.value.map(value => "arrival_date" -> sql"$timestamptz"(value)),
         location.departure_date.value.map(value => "departure_date" -> sql"$timestamptz"(value))

@@ -4,8 +4,8 @@ import java.util.UUID
 
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.all._
-import gotrip.domain.user._
 import gotrip.domain.achievement._
+import gotrip.domain.user._
 import gotrip.domain.userachievement._
 import skunk._
 import skunk.codec.all._
@@ -17,10 +17,10 @@ final class PostgresUserAchievementRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
 ) extends UserAchievementRepository[F]:
 
-  override def create(userAchievement: UserAchievement): F[UserAchievement] =
+  override def create(userAchievement: UserAchievement): F[Option[UserAchievement]] =
     sessionPool.use { session =>
       session.prepare(PostgresUserAchievementRepository.insertQuery).flatMap { cmd =>
-        cmd.unique(
+        cmd.option(
           (
             userAchievement.id.value,
             userAchievement.userId.value,

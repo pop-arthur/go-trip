@@ -3,8 +3,7 @@ package gotrip.repository.location
 import java.util.UUID
 
 import cats.effect.{Concurrent, Resource}
-import cats.syntax.flatMap.*
-import cats.syntax.functor.*
+import cats.syntax.all.*
 import gotrip.domain.location.*
 import gotrip.repository.SkunkCodecs.locationType
 import skunk.*
@@ -54,8 +53,18 @@ final class PostgresLocationRepository[F[_]: Concurrent](
 
   override def delete(id: LocationId): F[Boolean] =
     sessionPool.use { session =>
-      session.prepare(PostgresLocationRepository.deleteQuery).flatMap { query =>
-        query.option(id.value).map(_.isDefined)
+      session.transaction.use { _ =>
+        session.prepare(PostgresLocationRepository.findByIdQuery).flatMap { query =>
+          query.option(id.value).flatMap {
+            case None =>
+              false.pure[F]
+            case Some(_) =>
+              PostgresLocationRepository.deleteDependents(session, id) *>
+                session.prepare(PostgresLocationRepository.deleteQuery).flatMap { delete =>
+                  delete.option(id.value).map(_.isDefined)
+                }
+          }
+        }
       }
     }
 
@@ -138,6 +147,49 @@ object PostgresLocationRepository:
       where id = $uuid
       returning id
     """.query(uuid)
+
+  val deleteTripLocationsCommand: Command[UUID] =
+    sql"""
+      delete from trip_locations
+      where location_id = $uuid
+    """.command
+
+  val clearOrderLocationReferencesCommand: Command[(UUID, UUID, UUID, UUID)] =
+    sql"""
+      update orders
+      set
+        departure_location_id = case when departure_location_id = $uuid then null else departure_location_id end,
+        arrival_location_id = case when arrival_location_id = $uuid then null else arrival_location_id end
+      where departure_location_id = $uuid or arrival_location_id = $uuid
+    """.command
+
+  val clearAdditionalServiceLocationReferencesCommand: Command[UUID] =
+    sql"""
+      update additional_services
+      set location_id = null
+      where location_id = $uuid
+    """.command
+
+  val deleteLocationReviewsCommand: Command[UUID] =
+    sql"""
+      delete from reviews
+      where target_type = 'LOCATION' and target_id = $uuid
+    """.command
+
+  private def deleteDependents[F[_]: Concurrent](
+    session: Session[F],
+    id: LocationId
+  ): F[Unit] =
+    for
+      deleteReviews <- session.prepare(deleteLocationReviewsCommand)
+      clearServices <- session.prepare(clearAdditionalServiceLocationReferencesCommand)
+      clearOrders <- session.prepare(clearOrderLocationReferencesCommand)
+      deleteTripLocations <- session.prepare(deleteTripLocationsCommand)
+      _ <- deleteReviews.execute(id.value)
+      _ <- clearServices.execute(id.value)
+      _ <- clearOrders.execute((id.value, id.value, id.value, id.value))
+      _ <- deleteTripLocations.execute(id.value)
+    yield ()
 
   private def createFragment(location: Location): AppliedFragment =
     val fields =

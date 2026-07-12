@@ -1,24 +1,26 @@
 package gotrip.repository.review
 
-import cats.Applicative
-import cats.effect.Concurrent
-import skunk.Session
-import cats.effect.Resource
+import cats.effect.{Concurrent, Resource}
 import gotrip.domain.review.{Review, ReviewId, ReviewTargetType, ReviewTargetId}
 import gotrip.domain.user.UserId
+import skunk.Session
+import gotrip.domain.review.ReviewRatingSummary
 
-trait ReviewRepository[F[_]]:
+trait ReviewRepository[F[_]] {
   def create(review: Review): F[Review]
   def findById(id: ReviewId): F[Option[Review]]
   def findByTarget(targetType: ReviewTargetType, targetId: ReviewTargetId): F[List[Review]]
+  def findByTargetType(targetType: ReviewTargetType): F[List[Review]]
   def findByUserId(userId: UserId): F[List[Review]]
+  def findAll(): F[List[Review]]
   def update(review: Review): F[Int]
   def delete(id: ReviewId): F[Int]
   def averageRating(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[Double]]
+  def countByUser(userId: UserId): F[Int]
+  def getRatingSummary(targetType: ReviewTargetType, targetId: ReviewTargetId): F[Option[ReviewRatingSummary]]
+}
 
 object ReviewRepository:
-  def makeInMemory[F[_]: Applicative]: F[ReviewRepository[F]] =
-    InMemoryReviewRepository.make
 
   def makePostgres[F[_]: Concurrent](
     sessionPool: Resource[F, Session[F]]

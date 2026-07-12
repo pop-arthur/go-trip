@@ -1,7 +1,5 @@
 package gotrip.repository.trip
 
-import java.util.UUID
-
 import cats.effect.{Concurrent, Resource}
 import cats.syntax.flatMap.*
 import cats.syntax.functor.*
@@ -12,7 +10,8 @@ import skunk.*
 import skunk.codec.all.*
 import skunk.implicits.*
 
-import java.time.{Instant, LocalDate, OffsetDateTime, ZoneOffset}
+import java.time.{Instant, LocalDate}
+import java.util.UUID
 
 final class PostgresTripRepository[F[_]: Concurrent](
   sessionPool: Resource[F, Session[F]]
@@ -32,39 +31,34 @@ final class PostgresTripRepository[F[_]: Concurrent](
       }
     }
 
-  override def create(trip: Trip): F[Trip] =
+  override def create(userId: UserId, trip: TripCreate): F[Trip] =
     sessionPool.use { session =>
       session.prepare(PostgresTripRepository.createQuery).flatMap { query =>
+        val newId = UUID.randomUUID()
         query.unique(
           (
-            trip.id.value,
-            trip.user_id.value,
+            newId,
+            userId.value,
             trip.title.value,
             trip.start_date.value,
             trip.end_date.value,
-            trip.status,
-            PostgresTripRepository.toOffset(trip.created_at),
-            PostgresTripRepository.toOffset(trip.updated_at)
+            trip.status.getOrElse(TripStatus.Planned)
           )
         )
       }
     }
 
-  override def update(trip: Trip): F[Option[Trip]] =
+  override def update(userId: UserId, tripId: TripId, trip: TripUpdate): F[Option[Trip]] =
     sessionPool.use { session =>
-      session.prepare(PostgresTripRepository.updateQuery).flatMap { query =>
-        query.option(
-          (
-            trip.title.value,
-            trip.start_date.value,
-            trip.end_date.value,
-            trip.status,
-            PostgresTripRepository.toOffset(trip.updated_at),
-            trip.user_id.value,
-            trip.id.value
-          )
-        )
-      }
+      PostgresTripRepository.updateFragment(userId, tripId, trip) match
+        case Some(fragment) =>
+          session.prepare(fragment.fragment.query(PostgresTripRepository.tripDecoder)).flatMap { query =>
+            query.option(fragment.argument)
+          }
+        case None =>
+          session.prepare(PostgresTripRepository.findByUserQuery).flatMap { query =>
+            query.option((userId.value, tripId.value))
+          }
     }
 
   override def delete(userId: UserId, tripId: TripId): F[Boolean] =
@@ -78,6 +72,13 @@ final class PostgresTripRepository[F[_]: Concurrent](
     sessionPool.use { session =>
       session.prepare(PostgresTripRepository.existsForUserQuery).flatMap { query =>
         query.option((userId.value, tripId.value)).map(_.isDefined)
+      }
+    }
+
+  override def countByUser(userId: UserId): F[Int] =
+    sessionPool.use { session =>
+      session.prepare(PostgresTripRepository.countByUserQuery).flatMap { q =>
+        q.unique(userId.value)
       }
     }
 
@@ -132,26 +133,10 @@ object PostgresTripRepository:
         and id = $uuid
     """.query(tripDecoder)
 
-  private def toOffset(instant: Instant): OffsetDateTime =
-    instant.atOffset(ZoneOffset.UTC)
-
-  val createQuery: Query[(UUID, UUID, String, Option[LocalDate], Option[LocalDate], TripStatus, OffsetDateTime, OffsetDateTime), Trip] =
+  val createQuery: Query[(UUID, UUID, String, Option[LocalDate], Option[LocalDate], TripStatus), Trip] =
     sql"""
-      insert into trips (id, user_id, title, start_date, end_date, status, created_at, updated_at)
-      values ($uuid, $uuid, $text, ${date.opt}, ${date.opt}, ${SkunkCodecs.tripStatus}, $timestamptz, $timestamptz)
-      returning id, user_id, title::text, start_date, end_date, status, created_at, updated_at
-    """.query(tripDecoder)
-
-  val updateQuery: Query[(String, Option[LocalDate], Option[LocalDate], TripStatus, OffsetDateTime, UUID, UUID), Trip] =
-    sql"""
-      update trips
-      set title = $text,
-          start_date = ${date.opt},
-          end_date = ${date.opt},
-          status = ${SkunkCodecs.tripStatus},
-          updated_at = $timestamptz
-      where user_id = $uuid
-        and id = $uuid
+      insert into trips (id, user_id, title, start_date, end_date, status)
+      values ($uuid, $uuid, $text, ${date.opt}, ${date.opt}, ${SkunkCodecs.tripStatus})
       returning id, user_id, title::text, start_date, end_date, status, created_at, updated_at
     """.query(tripDecoder)
 
@@ -171,6 +156,32 @@ object PostgresTripRepository:
         and id = $uuid
     """.query(uuid)
 
+  val countByUserQuery: Query[UUID, Int] =
+    sql"SELECT COUNT(*)::int FROM trips WHERE user_id = $uuid".query(int4)
+
+  private def updateFragment(
+    userId: UserId,
+    tripId: TripId,
+    trip: TripUpdate
+  ): Option[AppliedFragment] =
+    val fields =
+      List(
+        trip.title.map(value => sql"title = $text"(value.value)),
+        trip.start_date.map(value => sql"start_date = ${date.opt}"(value.value)),
+        trip.end_date.map(value => sql"end_date = ${date.opt}"(value.value)),
+        trip.status.map(value => sql"status = ${SkunkCodecs.tripStatus}"(value))
+      ).flatten
+
+    fields.headOption.map { head =>
+      val sets = combineApplied(head :: fields.tail)
+      AppliedFragment(sql"update trips set ${sets.fragment}, updated_at = now()", sets.argument) |+|
+        sql"""
+          where user_id = $uuid
+            and id = $uuid
+          returning id, user_id, title::text, start_date, end_date, status, created_at, updated_at
+        """((userId.value, tripId.value))
+    }
+
   private def toListInput(userId: UserId, params: TripSearchParams): ListInput =
     (
       userId.value,
@@ -181,3 +192,8 @@ object PostgresTripRepository:
       params.toDate.isEmpty,
       params.toDate.getOrElse(LocalDate.of(9999, 12, 31))
     )
+
+  private def combineApplied(fragments: List[AppliedFragment]): AppliedFragment =
+    fragments.reduceLeft { (left, right) =>
+      left |+| sql", "(Void) |+| right
+    }
