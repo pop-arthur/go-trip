@@ -6,6 +6,7 @@ import gotrip.domain.review._
 import gotrip.domain.user.UserId
 import gotrip.repository.review.ReviewRepository
 import gotrip.service.{GeneratedData, GeneratedDataTestSupport}
+import gotrip.service.achievement.AchievementEngine
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -30,7 +31,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
 
     "find review by id" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val service = serviceWithDefault(repo)
 
       repo.findById.expects(reviewId).returning(IO.pure(Some(review)))
 
@@ -39,7 +40,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
 
     "find reviews by target" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val service = serviceWithDefault(repo)
 
       repo.findByTarget.expects(targetType, targetId).returning(IO.pure(List(review)))
 
@@ -48,7 +49,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
 
     "find reviews by user" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val service = serviceWithDefault(repo)
 
       repo.findByUserId.expects(userId).returning(IO.pure(List(review)))
 
@@ -69,7 +70,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
 
     "delete a review" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val service = serviceWithDefault(repo)
 
       repo.delete.expects(reviewId).returning(IO.pure(1))
 
@@ -78,7 +79,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
 
     "calculate average rating" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val service = serviceWithDefault(repo)
 
       repo.averageRating.expects(targetType, targetId).returning(IO.pure(Some(4.5)))
 
@@ -87,7 +88,7 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
 
     "return None average rating when no reviews exist" in {
       val repo = mock[ReviewRepository[IO]]
-      val service = new ReviewService[IO](repo)
+      val service = serviceWithDefault(repo)
 
       repo.averageRating.expects(targetType, targetId).returning(IO.pure(None))
 
@@ -103,7 +104,14 @@ final class ReviewServiceSpec extends AnyWordSpec with Matchers with MockFactory
     generatedData: GeneratedData[IO]
   ): ReviewService[IO] =
     given GeneratedData[IO] = generatedData
-    new ReviewService[IO](repository)
+    val achievementEngine = mock[AchievementEngine[IO]]
+    achievementEngine.checkAndUnlock.expects(*, *).returning(IO.unit).anyNumberOfTimes()
+    new ReviewService[IO](repository, achievementEngine)
+
+  private def serviceWithDefault(repository: ReviewRepository[IO]): ReviewService[IO] =
+    val achievementEngine = mock[AchievementEngine[IO]]
+    achievementEngine.checkAndUnlock.expects(*, *).returning(IO.unit).anyNumberOfTimes()
+    new ReviewService[IO](repository, achievementEngine)
 
   private val userId = UserId(uuid("000000000001"))
   private val reviewId = ReviewId(uuid("000000000100"))

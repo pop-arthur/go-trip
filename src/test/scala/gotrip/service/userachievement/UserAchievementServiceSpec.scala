@@ -24,9 +24,9 @@ final class UserAchievementServiceSpec extends AnyWordSpec with Matchers with Mo
 
       expectGeneratedId(generatedData, userAchievementUuid)
       expectGeneratedNow(generatedData, generatedAt)
-      repo.create.expects(userAchievement).returning(IO.pure(userAchievement))
+      repo.create.expects(userAchievement).returning(IO.pure(Some(userAchievement)))
 
-      service.unlock(userId, achievementId).unsafeRunSync() shouldBe userAchievement
+      service.unlock(userId, achievementId).unsafeRunSync() shouldBe Some(userAchievement)
     }
 
     "list achievements by user" in {

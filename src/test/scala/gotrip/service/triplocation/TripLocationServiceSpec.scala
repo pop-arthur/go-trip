@@ -45,8 +45,7 @@ final class TripLocationServiceSpec extends AnyWordSpec with Matchers with MockF
       repository.tripExistsForUser.expects(userId, tripId).returning(IO.pure(true))
       repository.locationExists.expects(locationId).returning(IO.pure(true))
       repository.visitOrderExists.expects(tripId, explicitVisitOrder, None).returning(IO.pure(false))
-      expectGeneratedId(generatedData, tripLocationId.value)
-      repository.create.expects(tripLocation).returning(IO.pure(tripLocation))
+      repository.create.expects(tripId, tripLocationCreate, explicitVisitOrder).returning(IO.pure(tripLocation))
 
       service.create(userId, tripId, tripLocationCreate).unsafeRunSync() shouldBe Right(tripLocation)
     }
@@ -60,8 +59,7 @@ final class TripLocationServiceSpec extends AnyWordSpec with Matchers with MockF
       repository.locationExists.expects(locationId).returning(IO.pure(true))
       repository.nextVisitOrder.expects(tripId).returning(IO.pure(generatedVisitOrder))
       repository.visitOrderExists.expects(tripId, generatedVisitOrder, None).returning(IO.pure(false))
-      expectGeneratedId(generatedData, tripLocationId.value)
-      repository.create.expects(generatedTripLocation).returning(IO.pure(generatedTripLocation))
+      repository.create.expects(tripId, tripLocationCreate.copy(visit_order = None), generatedVisitOrder).returning(IO.pure(generatedTripLocation))
 
       service.create(userId, tripId, tripLocationCreate.copy(visit_order = None)).unsafeRunSync() shouldBe
         Right(generatedTripLocation)

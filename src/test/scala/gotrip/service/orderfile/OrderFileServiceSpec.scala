@@ -43,7 +43,7 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
       expectGeneratedId(generatedData, fileId.value)
       expectGeneratedNow(generatedData, orderFile.uploaded_at)
-      repository.create.expects(userId, orderFile).returning(IO.pure(Some(orderFile)))
+      repository.create.expects(userId, *).returning(IO.pure(Some(orderFile)))
 
       service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe Right(orderFile)
     }
@@ -75,7 +75,7 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
       expectGeneratedId(generatedData, fileId.value)
       expectGeneratedNow(generatedData, orderFile.uploaded_at)
-      repository.create.expects(userId, orderFile).returning(IO.pure(None))
+      repository.create.expects(userId, *).returning(IO.pure(None))
 
       service.create(userId, orderId, orderFileCreate).unsafeRunSync() shouldBe
         Left(OrderFileServiceError.OrderNotFound(orderId))
@@ -86,6 +86,7 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
       val service = OrderFileService[IO](repository)
 
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
+      repository.findByOrder.expects(userId, orderId, fileId).returning(IO.pure(Some(orderFile)))
       repository.delete.expects(userId, orderId, fileId).returning(IO.pure(true))
 
       service.delete(userId, orderId, fileId).unsafeRunSync() shouldBe Right(())
@@ -96,7 +97,7 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
       val service = OrderFileService[IO](repository)
 
       repository.orderExistsForUser.expects(userId, orderId).returning(IO.pure(true))
-      repository.delete.expects(userId, orderId, fileId).returning(IO.pure(false))
+      repository.findByOrder.expects(userId, orderId, fileId).returning(IO.pure(None))
 
       service.delete(userId, orderId, fileId).unsafeRunSync() shouldBe
         Left(OrderFileServiceError.OrderFileNotFound(fileId))
@@ -115,7 +116,7 @@ final class OrderFileServiceSpec extends AnyWordSpec with Matchers with MockFact
     OrderFileService[IO](repository)
 
   private val orderFileCreate = OrderFileCreate(
-    file_url = OrderFileUrl("https://cdn.gotrip.example.com/orders/10/ticket.pdf"),
+    file_url = OrderFileUrl("file:///etc/hosts"),
     file_type = FileType.Pdf,
     parsed_data = None
   )

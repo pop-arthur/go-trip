@@ -19,8 +19,8 @@ final class UserAchievementRepositorySpec extends PostgresRepositorySpecBase wit
       byUser <- userAchievements.findByUserId(user.id)
       byAchievement <- userAchievements.findByAchievementId(achievement.id)
     yield
-      assertEquals(byUser, List(unlocked))
-      assertEquals(byAchievement, List(unlocked))
+      assertEquals(byUser, unlocked.toList)
+      assertEquals(byAchievement, unlocked.toList)
   }
 
   repositoryTest("UserAchievementRepository rejects duplicate user achievements") {

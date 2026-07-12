@@ -16,7 +16,7 @@ final class TripRepositorySpec extends PostgresRepositorySpecBase with Repositor
     for
       user <- users.create(sampleUser(60))
       otherUser <- users.create(sampleUser(61, "other@example.test"))
-      trip <- trips.create(sampleTrip(62, user.id))
+      trip <- trips.create(sampleTrip(62, user.id).user_id, tripCreate(sampleTrip(62, user.id)))
       byUser <- trips.findByUser(user.id, trip.id)
       byOtherUser <- trips.findByUser(otherUser.id, trip.id)
       exists <- trips.existsForUser(user.id, trip.id)
@@ -32,7 +32,7 @@ final class TripRepositorySpec extends PostgresRepositorySpecBase with Repositor
 
     for
       user <- users.create(sampleUser(60))
-      trip <- trips.create(sampleTrip(62, user.id))
+      trip <- trips.create(sampleTrip(62, user.id).user_id, tripCreate(sampleTrip(62, user.id)))
       listed <- trips.listByUser(user.id, TripSearchParams(status = Some(TripStatus.Planned), fromDate = Some(LocalDate.of(2026, 7, 1)), toDate = Some(LocalDate.of(2026, 7, 31))))
     yield assertEquals(listed, List(trip))
   }
@@ -43,8 +43,8 @@ final class TripRepositorySpec extends PostgresRepositorySpecBase with Repositor
 
     for
       user <- users.create(sampleUser(60))
-      trip <- trips.create(sampleTrip(62, user.id))
-      updated <- trips.update(trip.copy(title = TripTitle("Summer Train Trip"), updated_at = t(63)))
+      trip <- trips.create(sampleTrip(62, user.id).user_id, tripCreate(sampleTrip(62, user.id)))
+      updated <- trips.update(user.id, trip.id, TripUpdate(title = Some(TripTitle("Summer Train Trip"))))
     yield assertEquals(updated.map(_.title), Some(TripTitle("Summer Train Trip")))
   }
 
@@ -54,7 +54,7 @@ final class TripRepositorySpec extends PostgresRepositorySpecBase with Repositor
 
     for
       user <- users.create(sampleUser(60))
-      trip <- trips.create(sampleTrip(62, user.id))
+      trip <- trips.create(sampleTrip(62, user.id).user_id, tripCreate(sampleTrip(62, user.id)))
       deleted <- trips.delete(user.id, trip.id)
       byUser <- trips.findByUser(user.id, trip.id)
     yield
