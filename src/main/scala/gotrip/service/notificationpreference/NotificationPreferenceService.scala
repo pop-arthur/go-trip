@@ -8,36 +8,45 @@ import gotrip.domain.notificationpreference.{NotificationPreference, Notificatio
 import gotrip.repository.notificationpreference.NotificationPreferenceRepository
 import gotrip.service.GeneratedData
 
-final class NotificationPreferenceService[F[_]: Sync: Clock: GeneratedData](
-  repo: NotificationPreferenceRepository[F]
-):
+trait NotificationPreferenceService[F[_]] {
+  def getByUserId(userId: UserId): F[Option[NotificationPreference]]
+  def enable(userId: UserId): F[NotificationPreference]
+  def disable(userId: UserId): F[NotificationPreference]
+  def setStatus(userId: UserId, enabled: Boolean): F[NotificationPreference]
+}
 
-  def getByUserId(userId: UserId): F[Option[NotificationPreference]] =
-    repo.getByUserId(userId)
+object NotificationPreferenceService {
+  def make[F[_]: Sync: Clock: GeneratedData](repo: NotificationPreferenceRepository[F]): NotificationPreferenceService[F] =
+    new NotificationPreferenceService[F] {
+      override def getByUserId(userId: UserId): F[Option[NotificationPreference]] =
+        repo.getByUserId(userId)
 
-  def enable(userId: UserId): F[NotificationPreference] =
-    setStatus(userId, enabled = true)
+      override def enable(userId: UserId): F[NotificationPreference] =
+        setStatus(userId, enabled = true)
 
-  def disable(userId: UserId): F[NotificationPreference] =
-    setStatus(userId, enabled = false)
+      override def disable(userId: UserId): F[NotificationPreference] =
+        setStatus(userId, enabled = false)
 
-  def setStatus(userId: UserId, enabled: Boolean): F[NotificationPreference] =
-    for
-      existing <- repo.getByUserId(userId)
-      now <- GeneratedData[F].now()
-      preference <- existing match
-        case Some(current) =>
-          repo.upsert(current.copy(isEnabled = enabled, updatedAt = now))
-        case None =>
-          GeneratedData[F].newId().flatMap { id =>
-            repo.upsert(
-              NotificationPreference(
-                id = NotificationPreferenceId(id),
-                userId = userId,
-                isEnabled = enabled,
-                createdAt = now,
-                updatedAt = now
-              )
-            )
+      override def setStatus(userId: UserId, enabled: Boolean): F[NotificationPreference] =
+        for {
+          existing <- repo.getByUserId(userId)
+          now <- GeneratedData[F].now()
+          preference <- existing match {
+            case Some(current) =>
+              repo.upsert(current.copy(isEnabled = enabled, updatedAt = now))
+            case None =>
+              GeneratedData[F].newId().flatMap { id =>
+                repo.upsert(
+                  NotificationPreference(
+                    id = NotificationPreferenceId(id),
+                    userId = userId,
+                    isEnabled = enabled,
+                    createdAt = now,
+                    updatedAt = now
+                  )
+                )
+              }
           }
-    yield preference
+        } yield preference
+    }
+}

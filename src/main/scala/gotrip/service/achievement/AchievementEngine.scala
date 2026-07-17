@@ -18,50 +18,56 @@ import gotrip.repository.triplocation.TripLocationRepository
 import java.time.Instant
 import java.util.UUID
 
-class AchievementEngine[F[_]: Monad](
-  achievementRepo: AchievementRepository[F],
-  userAchievementRepo: UserAchievementRepository[F],
-  tripRepo: TripRepository[F],
-  orderRepo: OrderRepository[F],
-  reviewRepo: ReviewRepository[F],
-  tripLocationRepo: TripLocationRepository[F]
-) {
+trait AchievementEngine[F[_]] {
+  def checkAndUnlock(userId: UserId, event: AchievementEvent): F[Unit]
+}
 
-  def checkAndUnlock(userId: UserId, event: AchievementEvent): F[Unit] =
-    for {
-      all <- achievementRepo.findAll()
-      userAchievements <- userAchievementRepo.findByUserId(userId)
-      unlockedIds = userAchievements.map(_.achievementId).toSet
-      pending = all.filterNot(a => unlockedIds(a.id))
-      _ <- pending.traverse_ { ach =>
-        checkCondition(userId, ach).flatMap {
-          case true =>
-            val ua = UserAchievement(
-              id = UserAchievementId(UUID.randomUUID()),
-              userId = userId,
-              achievementId = ach.id,
-              unlockedAt = Instant.now(),
-              createdAt = Instant.now(),
-              updatedAt = Instant.now()
-            )
-            userAchievementRepo.create(ua).map(_ => ())
-          case false => Monad[F].unit
+object AchievementEngine {
+  def make[F[_]: Monad](
+    achievementRepo: AchievementRepository[F],
+    userAchievementRepo: UserAchievementRepository[F],
+    tripRepo: TripRepository[F],
+    orderRepo: OrderRepository[F],
+    reviewRepo: ReviewRepository[F],
+    tripLocationRepo: TripLocationRepository[F]
+  ): AchievementEngine[F] =
+    new AchievementEngine[F] {
+      override def checkAndUnlock(userId: UserId, event: AchievementEvent): F[Unit] =
+        for {
+          all <- achievementRepo.findAll()
+          userAchievements <- userAchievementRepo.findByUserId(userId)
+          unlockedIds = userAchievements.map(_.achievementId).toSet
+          pending = all.filterNot(a => unlockedIds(a.id))
+          _ <- pending.traverse_ { ach =>
+            checkCondition(userId, ach).flatMap {
+              case true =>
+                val ua = UserAchievement(
+                  id = UserAchievementId(UUID.randomUUID()),
+                  userId = userId,
+                  achievementId = ach.id,
+                  unlockedAt = Instant.now(),
+                  createdAt = Instant.now(),
+                  updatedAt = Instant.now()
+                )
+                userAchievementRepo.create(ua).map(_ => ())
+              case false => Monad[F].unit
+            }
+          }
+        } yield ()
+
+      private def checkCondition(userId: UserId, achievement: Achievement): F[Boolean] =
+        achievement.conditionType match {
+          case AchievementConditionType.TripsCount =>
+            tripRepo.countByUser(userId).map(_ >= achievement.conditionValue)
+          case AchievementConditionType.CountriesCount =>
+            tripLocationRepo.countDistinctCountries(userId).map(_ >= achievement.conditionValue)
+          case AchievementConditionType.OrdersCount =>
+            orderRepo.countByUser(userId).map(_ >= achievement.conditionValue)
+          case AchievementConditionType.ReviewsCount =>
+            reviewRepo.countByUser(userId).map(_ >= achievement.conditionValue)
+          case AchievementConditionType.SpendingAmount =>
+            orderRepo.getTotalSpending(userId).map(_ >= achievement.conditionValue.toDouble)
         }
-      }
-    } yield ()
-
-  private def checkCondition(userId: UserId, achievement: Achievement): F[Boolean] =
-    achievement.conditionType match {
-      case AchievementConditionType.TripsCount =>
-        tripRepo.countByUser(userId).map(_ >= achievement.conditionValue)
-      case AchievementConditionType.CountriesCount =>
-        tripLocationRepo.countDistinctCountries(userId).map(_ >= achievement.conditionValue)
-      case AchievementConditionType.OrdersCount =>
-        orderRepo.countByUser(userId).map(_ >= achievement.conditionValue)
-      case AchievementConditionType.ReviewsCount =>
-        reviewRepo.countByUser(userId).map(_ >= achievement.conditionValue)
-      case AchievementConditionType.SpendingAmount =>
-        orderRepo.getTotalSpending(userId).map(_ >= achievement.conditionValue.toDouble)
     }
 }
 

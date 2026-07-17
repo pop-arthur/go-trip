@@ -6,18 +6,26 @@ import gotrip.domain.statistics._
 import gotrip.domain.user.UserId
 import gotrip.repository.statistics.StatisticsRepository
 
-final class StatisticsService[F[_]: Monad](
-  repository: StatisticsRepository[F]
-) {
-  def getCountriesStatistics(userId: UserId, params: CountriesStatisticsParams): F[CountriesStatisticsResponse] =
-    repository.getCountriesStatistics(userId, params)
+trait StatisticsService[F[_]] {
+  def getCountriesStatistics(userId: UserId, params: CountriesStatisticsParams): F[CountriesStatisticsResponse]
+  def getSpendingStatistics(userId: UserId, params: SpendingStatisticsParams): F[SpendingStatisticsResponse]
+  def getUpcomingTripsStatistics(userId: UserId): F[UpcomingTripsResponse]
+  def getTripDurationsStatistics(userId: UserId, params: TripDurationsParams): F[TripDurationsResponse]
+}
 
-  def getSpendingStatistics(userId: UserId, params: SpendingStatisticsParams): F[SpendingStatisticsResponse] =
-    repository.getSpendingStatistics(userId, params)
+object StatisticsService {
+  def make[F[_]: Monad](repo: StatisticsRepository[F]): StatisticsService[F] =
+    new StatisticsService[F] {
+      override def getCountriesStatistics(userId: UserId, params: CountriesStatisticsParams): F[CountriesStatisticsResponse] =
+        repo.getCountriesStatistics(userId, params)
 
-  def getUpcomingTripsStatistics(userId: UserId): F[UpcomingTripsResponse] =
-    repository.getUpcomingTripsStatistics(userId)
+      override def getSpendingStatistics(userId: UserId, params: SpendingStatisticsParams): F[SpendingStatisticsResponse] =
+        repo.getSpendingStatistics(userId, params)
 
-  def getTripDurationsStatistics(userId: UserId, params: TripDurationsParams): F[TripDurationsResponse] =
-    repository.getTripDurationsStatistics(userId, params)
+      override def getUpcomingTripsStatistics(userId: UserId): F[UpcomingTripsResponse] =
+        repo.getUpcomingTripsStatistics(userId)
+
+      override def getTripDurationsStatistics(userId: UserId, params: TripDurationsParams): F[TripDurationsResponse] =
+        repo.getTripDurationsStatistics(userId, params)
+    }
 }
