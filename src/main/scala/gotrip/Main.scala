@@ -111,7 +111,7 @@ object Main extends IOApp.Simple {
         val authSessionRepository = AuthSessionRepository.makePostgres[IO](sessionPool)
         val statisticsRepository = StatisticsRepository.make[IO](sessionPool)
 
-        val achievementEngine = new AchievementEngine[IO](
+        val achievementEngine = AchievementEngine.make[IO](
           achievementRepository,
           userAchievementRepository,
           tripRepository,
@@ -122,36 +122,40 @@ object Main extends IOApp.Simple {
 
         val jwtService = new JwtService[IO](authConfig)
         val passwordHasher = PasswordHasher.bcrypt[IO](authConfig.passwordCost)
-        val locationService = LocationService[IO](locationRepository)
-        val tripService = new TripService[IO](tripRepository, achievementEngine)
-        val tripLocationService = TripLocationService[IO](tripLocationRepository)
-        val providerService = ProviderService[IO](providerRepository)
-        val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
-        val userService = new UserService[IO](userRepository)
-        val notificationService = new NotificationService[IO](notificationRepository)
+
+        val locationService = LocationService.make[IO](locationRepository)
+        val tripService = TripService.make[IO](tripRepository, achievementEngine)
+        val tripLocationService = TripLocationService.make[IO](tripLocationRepository)
+        val providerService = ProviderService.make[IO](providerRepository)
+        val additionalServiceService = AdditionalServiceService.make[IO](additionalServiceRepository)
+        val userService = UserService.make[IO](userRepository)
+        val notificationService = NotificationService.make[IO](notificationRepository)
+        val notifPrefService = NotificationPreferenceService.make[IO](notifPrefRepository)
+
         val orderStatusProvider = DuffelOrderStatusProvider.make[IO](duffelConfig)
-        val notifPrefService = new NotificationPreferenceService[IO](notifPrefRepository)
-        val orderService = new OrderService[IO](
+        val orderService = OrderService.make[IO](
           orderRepository,
           notifPrefRepository,
           notificationService,
           achievementEngine
         )
-        val orderStatusSyncService = new OrderStatusSyncService[IO](
+        val orderStatusSyncService = OrderStatusSyncService.make[IO](
           orderRepository,
           orderService,
           orderStatusProvider
         )
-        val orderFileService = new OrderFileService[IO](orderFileRepository)
-        val achievementService = new AchievementService[IO](achievementRepository)
-        val userAchievementService = new UserAchievementService[IO](userAchievementRepository)
-        val reviewService = new ReviewService[IO](reviewRepository, achievementEngine)
-        val recommendationService = new RecommendationService[IO](
+
+        val orderFileService = OrderFileService.make[IO](orderFileRepository)
+        val achievementService = AchievementService.make[IO](achievementRepository)
+        val userAchievementService = UserAchievementService.make[IO](userAchievementRepository)
+        val reviewService = ReviewService.make[IO](reviewRepository, achievementEngine)
+        val recommendationService = RecommendationService.make[IO](
           orderRepository,
           tripLocationRepository,
           additionalServiceRepository
         )
-        val statisticsService = new StatisticsService[IO](statisticsRepository)
+        val statisticsService = StatisticsService.make[IO](statisticsRepository)
+
         val authService = new AuthService[IO](
           userRepository,
           authSessionRepository,

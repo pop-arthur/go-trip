@@ -21,10 +21,11 @@ final class NotificationController(
       .serverSecurityLogic(authSupport.authenticate)
       .serverLogic { authUser => _ =>
         val userId = NotificationUserId(authUser.userId.value)
-        orderStatusSyncService.syncUserOrders(authUser.userId).attempt >> service.listByUser(userId).attempt.map {
-          case Right(notifications) => Right(notifications)
-          case Left(error)          => Left(HttpError.Internal(error.getMessage))
-        }
+        orderStatusSyncService.syncUserOrders(authUser.userId).attempt >>
+          service.listByUser(userId, limit = 50, offset = 0).attempt.map {
+            case Right(notifications) => Right(notifications)
+            case Left(error)          => Left(HttpError.Internal(error.getMessage))
+          }
       }
 
   val all: List[ServerEndpoint[Any, IO]] =
