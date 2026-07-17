@@ -9,31 +9,39 @@ import gotrip.domain.userachievement.{UserAchievement, UserAchievementId}
 import gotrip.repository.userachievement.UserAchievementRepository
 import gotrip.service.GeneratedData
 
-final class UserAchievementService[F[_]: Sync: Clock: GeneratedData](
-  repo: UserAchievementRepository[F]
-):
+trait UserAchievementService[F[_]] {
+  def unlock(userId: UserId, achievementId: AchievementId): F[Option[UserAchievement]]
+  def listByUser(userId: UserId): F[List[UserAchievement]]
+  def listByAchievement(achievementId: AchievementId): F[List[UserAchievement]]
+  def revoke(userId: UserId, achievementId: AchievementId): F[Int]
+}
 
-  def unlock(userId: UserId, achievementId: AchievementId): F[Option[UserAchievement]] =
-    for {
-      id <- GeneratedData[F].newId()
-      now <- GeneratedData[F].now()
-      achievement <- repo.create(
-        UserAchievement(
-          id = UserAchievementId(id),
-          userId = userId,
-          achievementId = achievementId,
-          unlockedAt = now,
-          createdAt = now,
-          updatedAt = now
-        )
-      )
-    } yield achievement
+object UserAchievementService {
+  def make[F[_]: Sync: Clock: GeneratedData](repo: UserAchievementRepository[F]): UserAchievementService[F] =
+    new UserAchievementService[F] {
+      override def unlock(userId: UserId, achievementId: AchievementId): F[Option[UserAchievement]] =
+        for {
+          id <- GeneratedData[F].newId()
+          now <- GeneratedData[F].now()
+          achievement <- repo.create(
+            UserAchievement(
+              id = UserAchievementId(id),
+              userId = userId,
+              achievementId = achievementId,
+              unlockedAt = now,
+              createdAt = now,
+              updatedAt = now
+            )
+          )
+        } yield achievement
 
-  def listByUser(userId: UserId): F[List[UserAchievement]] =
-    repo.findByUserId(userId)
+      override def listByUser(userId: UserId): F[List[UserAchievement]] =
+        repo.findByUserId(userId)
 
-  def listByAchievement(achievementId: AchievementId): F[List[UserAchievement]] =
-    repo.findByAchievementId(achievementId)
+      override def listByAchievement(achievementId: AchievementId): F[List[UserAchievement]] =
+        repo.findByAchievementId(achievementId)
 
-  def revoke(userId: UserId, achievementId: AchievementId): F[Int] =
-    repo.delete(userId, achievementId)
+      override def revoke(userId: UserId, achievementId: AchievementId): F[Int] =
+        repo.delete(userId, achievementId)
+    }
+}

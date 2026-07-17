@@ -13,118 +13,127 @@ import gotrip.service.GeneratedData
 
 import java.time.OffsetDateTime
 
-final class TripLocationService[F[_]: Sync: GeneratedData](repository: TripLocationRepository[F]) {
+trait TripLocationService[F[_]] {
+  def listByTrip(userId: UserId, tripId: TripId): F[Either[TripLocationServiceError, List[TripLocation]]]
+  def create(userId: UserId, tripId: TripId, location: TripLocationCreate): F[Either[TripLocationServiceError, TripLocation]]
+  def update(userId: UserId, tripId: TripId, tripLocationId: TripLocationId, location: TripLocationUpdate): F[Either[TripLocationServiceError, TripLocation]]
+  def delete(userId: UserId, tripId: TripId, tripLocationId: TripLocationId): F[Either[TripLocationServiceError, Unit]]
+}
 
-  import TripLocationServiceError._
+object TripLocationService {
+  def make[F[_]: Sync: GeneratedData](repo: TripLocationRepository[F]): TripLocationService[F] =
+    new TripLocationService[F] {
+      import TripLocationServiceError._
 
-  def listByTrip(userId: UserId, tripId: TripId): F[Either[TripLocationServiceError, List[TripLocation]]] =
-    (for {
-      _ <- ensureTripExists(userId, tripId)
-      locations <- EitherT.liftF(repository.listByTrip(tripId))
-    } yield locations).value
+      override def listByTrip(userId: UserId, tripId: TripId): F[Either[TripLocationServiceError, List[TripLocation]]] =
+        (for {
+          _ <- ensureTripExists(userId, tripId)
+          locations <- EitherT.liftF(repo.listByTrip(tripId))
+        } yield locations).value
 
-  def create(
-    userId: UserId,
-    tripId: TripId,
-    location: TripLocationCreate
-  ): F[Either[TripLocationServiceError, TripLocation]] =
-    (for {
-      _ <- validateDateRange(location.arrival_date.value, location.departure_date.value)
-      _ <- ensureTripExists(userId, tripId)
-      _ <- ensureLocationExists(location.location_id)
-      visitOrder <- EitherT.liftF(location.visit_order.fold(repository.nextVisitOrder(tripId))(_.pure[F]))
-      _ <- ensureVisitOrderAvailable(tripId, visitOrder, None)
-      created <- EitherT.liftF(repository.create(tripId, location, visitOrder))
-    } yield created).value
+      override def create(
+        userId: UserId,
+        tripId: TripId,
+        location: TripLocationCreate
+      ): F[Either[TripLocationServiceError, TripLocation]] =
+        (for {
+          _ <- validateDateRange(location.arrival_date.value, location.departure_date.value)
+          _ <- ensureTripExists(userId, tripId)
+          _ <- ensureLocationExists(location.location_id)
+          visitOrder <- EitherT.liftF(location.visit_order.fold(repo.nextVisitOrder(tripId))(_.pure[F]))
+          _ <- ensureVisitOrderAvailable(tripId, visitOrder, None)
+          created <- EitherT.liftF(repo.create(tripId, location, visitOrder))
+        } yield created).value
 
-  def update(
-    userId: UserId,
-    tripId: TripId,
-    tripLocationId: TripLocationId,
-    location: TripLocationUpdate
-  ): F[Either[TripLocationServiceError, TripLocation]] =
-    (for {
-      _ <- ensureTripExists(userId, tripId)
-      current <- EitherT.fromOptionF(
-        repository.findInTrip(tripId, tripLocationId),
-        TripLocationNotFound(tripLocationId)
-      )
-      _ <- validateDateRange(nextArrivalDate(current, location), nextDepartureDate(current, location))
-      _ <- location.visit_order.fold(EitherT.rightT[F, TripLocationServiceError](())) { visitOrder =>
-        ensureVisitOrderAvailable(tripId, visitOrder, Some(tripLocationId))
-      }
-      updated <- EitherT.fromOptionF(
-        repository.update(tripId, tripLocationId, location),
-        TripLocationNotFound(tripLocationId)
-      )
-    } yield updated).value
+      override def update(
+        userId: UserId,
+        tripId: TripId,
+        tripLocationId: TripLocationId,
+        location: TripLocationUpdate
+      ): F[Either[TripLocationServiceError, TripLocation]] =
+        (for {
+          _ <- ensureTripExists(userId, tripId)
+          current <- EitherT.fromOptionF(
+            repo.findInTrip(tripId, tripLocationId),
+            TripLocationNotFound(tripLocationId)
+          )
+          _ <- validateDateRange(nextArrivalDate(current, location), nextDepartureDate(current, location))
+          _ <- location.visit_order.fold(EitherT.rightT[F, TripLocationServiceError](())) { visitOrder =>
+            ensureVisitOrderAvailable(tripId, visitOrder, Some(tripLocationId))
+          }
+          updated <- EitherT.fromOptionF(
+            repo.update(tripId, tripLocationId, location),
+            TripLocationNotFound(tripLocationId)
+          )
+        } yield updated).value
 
-  def delete(
-    userId: UserId,
-    tripId: TripId,
-    tripLocationId: TripLocationId
-  ): F[Either[TripLocationServiceError, Unit]] =
-    (for {
-      _ <- ensureTripExists(userId, tripId)
-      deleted <- EitherT.liftF(repository.delete(tripId, tripLocationId))
-      _ <- if deleted then EitherT.rightT[F, TripLocationServiceError](())
-           else EitherT.leftT[F, Unit](TripLocationNotFound(tripLocationId))
-    } yield ()).value
+      override def delete(
+        userId: UserId,
+        tripId: TripId,
+        tripLocationId: TripLocationId
+      ): F[Either[TripLocationServiceError, Unit]] =
+        (for {
+          _ <- ensureTripExists(userId, tripId)
+          deleted <- EitherT.liftF(repo.delete(tripId, tripLocationId))
+          _ <- if deleted then EitherT.rightT[F, TripLocationServiceError](())
+               else EitherT.leftT[F, Unit](TripLocationNotFound(tripLocationId))
+        } yield ()).value
 
-  private def ensureTripExists(userId: UserId, tripId: TripId): EitherT[F, TripLocationServiceError, Unit] =
-    EitherT {
-      repository.tripExistsForUser(userId, tripId).map { exists =>
-        Either.cond(exists, (), TripNotFound(tripId))
-      }
-    }
+      private def ensureTripExists(userId: UserId, tripId: TripId): EitherT[F, TripLocationServiceError, Unit] =
+        EitherT {
+          repo.tripExistsForUser(userId, tripId).map { exists =>
+            Either.cond(exists, (), TripNotFound(tripId))
+          }
+        }
 
-  private def ensureLocationExists(locationId: LocationId): EitherT[F, TripLocationServiceError, Unit] =
-    EitherT {
-      repository.locationExists(locationId).map { exists =>
-        Either.cond(exists, (), LocationNotFound(locationId))
-      }
-    }
+      private def ensureLocationExists(locationId: LocationId): EitherT[F, TripLocationServiceError, Unit] =
+        EitherT {
+          repo.locationExists(locationId).map { exists =>
+            Either.cond(exists, (), LocationNotFound(locationId))
+          }
+        }
 
-  private def ensureVisitOrderAvailable(
-    tripId: TripId,
-    visitOrder: VisitOrder,
-    excludeTripLocationId: Option[TripLocationId]
-  ): EitherT[F, TripLocationServiceError, Unit] =
-    EitherT {
-      repository.visitOrderExists(tripId, visitOrder, excludeTripLocationId).map { exists =>
-        Either.cond(!exists, (), DuplicateVisitOrder(visitOrder))
-      }
-    }
+      private def ensureVisitOrderAvailable(
+        tripId: TripId,
+        visitOrder: VisitOrder,
+        excludeTripLocationId: Option[TripLocationId]
+      ): EitherT[F, TripLocationServiceError, Unit] =
+        EitherT {
+          repo.visitOrderExists(tripId, visitOrder, excludeTripLocationId).map { exists =>
+            Either.cond(!exists, (), DuplicateVisitOrder(visitOrder))
+          }
+        }
 
-  private def validateDateRange(
-    arrivalDate: Option[OffsetDateTime],
-    departureDate: Option[OffsetDateTime]
-  ): EitherT[F, TripLocationServiceError, Unit] =
-    EitherT.fromEither {
-      (arrivalDate, departureDate) match {
-        case (Some(arrival), Some(departure)) if arrival.isAfter(departure) =>
-          Left(InvalidDateRange)
-        case _ =>
-          Right(())
-      }
-    }
+      private def validateDateRange(
+        arrivalDate: Option[OffsetDateTime],
+        departureDate: Option[OffsetDateTime]
+      ): EitherT[F, TripLocationServiceError, Unit] =
+        EitherT.fromEither {
+          (arrivalDate, departureDate) match {
+            case (Some(arrival), Some(departure)) if arrival.isAfter(departure) =>
+              Left(InvalidDateRange)
+            case _ =>
+              Right(())
+          }
+        }
 
-  private def nextArrivalDate(
-    current: TripLocation,
-    update: TripLocationUpdate
-  ): Option[OffsetDateTime] =
-    update.arrival_date match {
-      case Some(arrivalDate) => arrivalDate.value
-      case None              => current.arrival_date.value
-    }
+      private def nextArrivalDate(
+        current: TripLocation,
+        update: TripLocationUpdate
+      ): Option[OffsetDateTime] =
+        update.arrival_date match {
+          case Some(arrivalDate) => arrivalDate.value
+          case None              => current.arrival_date.value
+        }
 
-  private def nextDepartureDate(
-    current: TripLocation,
-    update: TripLocationUpdate
-  ): Option[OffsetDateTime] =
-    update.departure_date match {
-      case Some(departureDate) => departureDate.value
-      case None                => current.departure_date.value
+      private def nextDepartureDate(
+        current: TripLocation,
+        update: TripLocationUpdate
+      ): Option[OffsetDateTime] =
+        update.departure_date match {
+          case Some(departureDate) => departureDate.value
+          case None                => current.departure_date.value
+        }
     }
 }
 
