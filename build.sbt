@@ -4,6 +4,7 @@ ThisBuild / scalaVersion := "3.8.4"
 ThisBuild / organization := "com.gotrip"
 
 val tapirVersion = "1.13.21"
+val sttpClientVersion = "4.0.26"
 val http4sVersion = "0.23.17"
 val circeVersion = "0.14.15"
 val scalaTestVersion = "3.2.20"
@@ -29,6 +30,7 @@ lazy val root = (project in file("."))
       "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % tapirVersion,
       "com.softwaremill.sttp.tapir" %% "tapir-json-circe" % tapirVersion,
       "com.softwaremill.sttp.tapir" %% "tapir-swagger-ui-bundle" % tapirVersion,
+      "com.softwaremill.sttp.client4" %% "cats" % sttpClientVersion,
       "org.http4s" %% "http4s-blaze-server" % http4sVersion,
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,

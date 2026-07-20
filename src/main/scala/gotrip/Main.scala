@@ -1,6 +1,7 @@
 package gotrip
 
 import cats.effect.{IO, IOApp}
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import pureconfig.ConfigSource
 import pureconfig.error.ConfigReaderException
@@ -63,6 +64,7 @@ import org.http4s.server.middleware.CORS
 import org.http4s.server.staticcontent.{fileService, FileService}
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 import sttp.tapir.swagger.bundle.SwaggerInterpreter
+import sttp.client4.httpclient.cats.HttpClientCatsBackend
 
 import scala.concurrent.ExecutionContext
 import java.nio.file.{Files, Paths}
@@ -94,7 +96,8 @@ object Main extends IOApp.Simple {
       _ <- Migration.migrate[IO](databaseConfig)
 
       _ <- IO.println("Initializing Skunk session pool...")
-      _ <- SkunkSessionPool[IO](databaseConfig).use { sessionPool =>
+      _ <- (SkunkSessionPool[IO](databaseConfig), HttpClientCatsBackend.resource[IO]()).tupled.use {
+        case (sessionPool, httpBackend) =>
         val locationRepository = LocationRepository.makePostgres[IO](sessionPool)
         val tripRepository = TripRepository.makePostgres[IO](sessionPool)
         val tripLocationRepository = TripLocationRepository.makePostgres[IO](sessionPool)
@@ -129,7 +132,7 @@ object Main extends IOApp.Simple {
         val additionalServiceService = AdditionalServiceService[IO](additionalServiceRepository)
         val userService = new UserService[IO](userRepository)
         val notificationService = new NotificationService[IO](notificationRepository)
-        val orderStatusProvider = DuffelOrderStatusProvider.make[IO](duffelConfig)
+        val orderStatusProvider = DuffelOrderStatusProvider.make[IO](duffelConfig, httpBackend)
         val notifPrefService = new NotificationPreferenceService[IO](notifPrefRepository)
         val orderService = new OrderService[IO](
           orderRepository,
